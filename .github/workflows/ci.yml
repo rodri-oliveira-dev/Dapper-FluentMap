@@ -206,3 +206,28 @@ jobs:
             ./artifacts/release-metadata/*.json
           if-no-files-found: error
           retention-days: 14
+
+  ci-gate:
+    name: CI Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: ${{ always() }}
+    needs:
+      - compatibility
+      - roslyn-components
+      - pack
+
+    steps:
+      - name: Verify required jobs
+        shell: bash
+        run: |
+          echo "compatibility=${{ needs.compatibility.result }}"
+          echo "roslyn-components=${{ needs.roslyn-components.result }}"
+          echo "pack=${{ needs.pack.result }}"
+
+          if [[ "${{ needs.compatibility.result }}" != "success" || \
+                "${{ needs.roslyn-components.result }}" != "success" || \
+                "${{ needs.pack.result }}" != "success" ]]; then
+            echo "One or more required CI jobs did not complete successfully."
+            exit 1
+          fi
