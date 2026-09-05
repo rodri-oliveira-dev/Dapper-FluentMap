@@ -1,14 +1,14 @@
 # Migration Guide
 
-This guide is for users moving from the historical archived `Dapper.FluentMap` line to the current fork.
+This guide is for users moving from FluentMap 2.x to the 3.0 line in the original `Dapper.FluentMap` repository.
 
 ```text
-Original FluentMap
+Dapper.FluentMap 2.x
         ↓
-Current fork
+Dapper.FluentMap 3.0
 ```
 
-Most existing root-level maps should not need source changes. The historical API remains supported while the fork adds opt-in capabilities for advanced materialization, generated registration, persistence metadata, property converters, profiles and isolated configuration.
+Most existing root-level maps should not need source changes. The historical API remains supported while 3.0 adds opt-in capabilities for advanced materialization, generated registration, persistence metadata, property converters, profiles and isolated configuration.
 
 ## What Stays Compatible
 
@@ -65,7 +65,7 @@ FluentMapper.Validate();
 
 Use this when your process has one effective mapping configuration and you want normal `Dapper.Query<T>()` calls to use FluentMap's global Dapper type map bridge.
 
-The current fork also publishes `FluentMapper.Configuration` and `FluentMapper.Runtime` after initialization. Existing code does not need to use those properties.
+Version 3.0 also publishes `FluentMapper.Configuration` and `FluentMapper.Runtime` after initialization. Existing code does not need to use those properties.
 
 ## Registration
 
@@ -92,7 +92,7 @@ Existing conventions remain supported:
 config.AddConvention<PrefixConvention>().ForEntity<Customer>();
 ```
 
-The fork adds naming policies for common transformations:
+Version 3.0 adds naming policies for common transformations:
 
 ```csharp
 config.UseNamingPolicy(NamingPolicy.SnakeCase, caseSensitive: false)
@@ -103,7 +103,7 @@ Precedence remains explicit mapping first, then convention/naming policy, then D
 
 ## Nested Objects
 
-Historical FluentMap mainly helps Dapper map root-level members. Nested object materialization in this fork is opt-in:
+Historical FluentMap mainly helps Dapper map root-level members. Nested object materialization in 3.0 is opt-in:
 
 ```csharp
 public sealed class CustomerMap : EntityMap<Customer>
@@ -268,13 +268,13 @@ FluentMapper.Initialize(config =>
 
 - Dommel persistence metadata has new behavior for read-only, computed, insert-excluded and update-excluded properties.
 - Some contradictory configurations that were previously accepted by accident now fail validation.
-- `DommelPropertyMap.GeneratedOption` has changed from non-nullable to nullable in the fork line; treat binary compatibility with historical Dommel `2.0.0` as not guaranteed.
-- Generated materialization and isolated runtime APIs are additive, but stable release still requires a fork-owned API baseline.
+- `DommelPropertyMap.GeneratedOption` has changed from non-nullable to nullable in the 3.0 line; treat binary compatibility with historical Dommel `2.0.0` as not guaranteed.
+- Generated materialization and isolated runtime APIs are additive, but the stable release still requires a defined 3.0 API baseline.
 
 ## Recommended Migration Path
 
 1. Keep existing `EntityMap<TEntity>` maps and `FluentMapper.Initialize(...)`.
-2. Run the full test suite of your application against the fork package.
+2. Run the full test suite of your application against the 3.0 package.
 3. Replace historical `Ignore()` write-workarounds with persistence metadata where needed.
 4. Move nested/value-object reads to `QueryMapped*` only where required.
 5. Add profiles only for alternate SQL shapes.
