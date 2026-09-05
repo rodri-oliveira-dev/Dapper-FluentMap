@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - master
-      - feature/etapa-3
   pull_request:
 
 env:
