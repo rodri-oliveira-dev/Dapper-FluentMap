@@ -1,37 +1,20 @@
 name: Release
 
-run-name: "Release ${{ inputs.version || 'dry-run' }} from ${{ github.ref_name }}"
+run-name: "Release ${{ inputs.version }} from ${{ github.ref_name }}"
 
 on:
-  pull_request:
-    branches:
-      - master
-    paths:
-      - .github/workflows/release.yml
-      - Directory.Build.props
-      - global.json
-      - Dapper.FluentMap.sln
-      - README.md
-      - eng/validate-release-artifacts.ps1
-      - eng/consumer-smoke/**
-      - src/**
   workflow_dispatch:
     inputs:
       version:
-        description: "Exact Semantic Version to publish, for example 3.0.0-rc.1 or 3.0.0."
+        description: "Semantic version without the v prefix, for example 3.0.0-rc.1 or 3.0.0."
         required: true
         type: string
-      publish:
-        description: "Publish the validated packages and GitHub Release."
-        required: true
-        default: false
-        type: boolean
 
 permissions:
   contents: read
 
 concurrency:
-  group: "release-${{ github.ref }}"
+  group: release
   cancel-in-progress: false
 
 env:
@@ -41,58 +24,82 @@ env:
   CI: "true"
 
 jobs:
-  build:
-    name: Build release artifacts
+  build-and-pack:
+    name: Validate, build, test and pack
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    permissions:
+      contents: read
     outputs:
-      version: "${{ steps.release-metadata.outputs.version }}"
-      tag: "${{ steps.release-metadata.outputs.tag }}"
-      is-prerelease: "${{ steps.release-metadata.outputs.is_prerelease }}"
+      package-version: ${{ steps.version.outputs.package_version }}
+      release-tag: ${{ steps.version.outputs.release_tag }}
+      is-prerelease: ${{ steps.version.outputs.is_prerelease }}
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          fetch-depth: 1
+          fetch-depth: 0
           persist-credentials: false
           show-progress: false
 
-      - name: Setup .NET SDK
+      - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           global-json-file: global.json
 
-      - name: Resolve release metadata
-        id: release-metadata
+      - name: Validate release version
+        id: version
         shell: bash
         env:
-          REQUESTED_VERSION: "${{ inputs.version || format('0.0.0-ci.{0}', github.run_number) }}"
+          VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
 
-          version="${REQUESTED_VERSION}"
-          if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
-            echo "Version '${version}' is not a supported Semantic Version. Build metadata (+...) is intentionally not accepted." >&2
-            exit 2
+          if [[ "$GITHUB_REF" != "refs/heads/master" ]]; then
+            echo "::error::Releases must be started from the master branch. Current ref: $GITHUB_REF"
+            exit 1
           fi
 
-          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            major="${version%%.*}"
-            if (( major < 3 )); then
-              echo "Official FluentMap releases from this workflow must use major version 3 or later." >&2
-              exit 2
-            fi
+          if [[ "$VERSION" == v* ]]; then
+            echo "::error::Enter the semantic version without the 'v' prefix (for example 3.0.0-rc.1)."
+            exit 1
           fi
 
+          semver='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
+          if [[ ! "$VERSION" =~ $semver ]]; then
+            echo "::error::Invalid semantic version '$VERSION'. Expected a value such as 3.0.0-rc.1 or 3.0.0."
+            exit 1
+          fi
+
+          major="${VERSION%%.*}"
+          if (( major < 3 )); then
+            echo "::error::FluentMap releases from this workflow must use major version 3 or later."
+            exit 1
+          fi
+
+          release_tag="v$VERSION"
           is_prerelease=false
-          if [[ "${version}" == *-* ]]; then
+          if [[ "$VERSION" == *-* ]]; then
             is_prerelease=true
           fi
 
-          echo "version=${version}" >> "${GITHUB_OUTPUT}"
-          echo "tag=v${version}" >> "${GITHUB_OUTPUT}"
-          echo "is_prerelease=${is_prerelease}" >> "${GITHUB_OUTPUT}"
+          git fetch --tags --force
+          if git rev-parse -q --verify "refs/tags/$release_tag" >/dev/null; then
+            tag_sha="$(git rev-list -n 1 "$release_tag")"
+            if [[ "$tag_sha" != "$GITHUB_SHA" ]]; then
+              echo "::error::Tag '$release_tag' already exists and points to $tag_sha instead of $GITHUB_SHA."
+              exit 1
+            fi
+
+            echo "Tag '$release_tag' already exists on the validated commit; this run can be safely retried."
+          fi
+
+          echo "package_version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
+          echo "is_prerelease=$is_prerelease" >> "$GITHUB_OUTPUT"
+          echo "Release version: $VERSION"
+          echo "Release tag: $release_tag"
 
       - name: Show .NET info
         run: dotnet --info
@@ -103,31 +110,31 @@ jobs:
       - name: Audit NuGet dependencies
         run: dotnet list ./Dapper.FluentMap.sln package --vulnerable --include-transitive
 
-      - name: Build Release
+      - name: Build release
         env:
-          RELEASE_VERSION: "${{ steps.release-metadata.outputs.version }}"
+          PACKAGE_VERSION: ${{ steps.version.outputs.package_version }}
         run: >-
           dotnet build ./Dapper.FluentMap.sln
           --configuration Release
           --no-restore
-          -p:Version=${RELEASE_VERSION}
+          -p:Version=${PACKAGE_VERSION}
           -p:RepositoryCommit=${GITHUB_SHA}
           -p:RepositoryBranch=${GITHUB_REF}
           -p:ContinuousIntegrationBuild=true
 
-      - name: Test Release
+      - name: Run tests
         run: dotnet test ./Dapper.FluentMap.sln --configuration Release --no-build --no-restore
 
-      - name: Pack exact release version
+      - name: Pack release
         env:
-          RELEASE_VERSION: "${{ steps.release-metadata.outputs.version }}"
+          PACKAGE_VERSION: ${{ steps.version.outputs.package_version }}
         run: >-
           dotnet pack ./Dapper.FluentMap.sln
           --configuration Release
           --no-build
           --no-restore
           --output ./artifacts/packages
-          -p:Version=${RELEASE_VERSION}
+          -p:Version=${PACKAGE_VERSION}
           -p:RepositoryCommit=${GITHUB_SHA}
           -p:RepositoryBranch=${GITHUB_REF}
           -p:ContinuousIntegrationBuild=true
@@ -135,12 +142,12 @@ jobs:
       - name: Validate release artifacts and write manifest
         shell: pwsh
         env:
-          RELEASE_VERSION: "${{ steps.release-metadata.outputs.version }}"
+          PACKAGE_VERSION: ${{ steps.version.outputs.package_version }}
         run: |
           $ErrorActionPreference = 'Stop'
           ./eng/validate-release-artifacts.ps1 `
             -PackageDirectory './artifacts/packages' `
-            -Version $env:RELEASE_VERSION `
+            -Version $env:PACKAGE_VERSION `
             -ManifestPath './artifacts/release-metadata/artifact-manifest.json' `
             -Repository '${{ github.repository }}' `
             -RepositoryUrl 'https://github.com/${{ github.repository }}' `
@@ -150,18 +157,15 @@ jobs:
       - name: Consumer smoke test release packages
         shell: pwsh
         env:
-          RELEASE_VERSION: "${{ steps.release-metadata.outputs.version }}"
+          PACKAGE_VERSION: ${{ steps.version.outputs.package_version }}
         run: |
           $ErrorActionPreference = 'Stop'
 
-          # The existing consumer fixtures were created for 3.0.0-rc.1. Rewrite only
-          # their package-version literals in the CI workspace so the same smoke suite
-          # validates the exact package version produced by this run.
           Get-ChildItem './eng/consumer-smoke' -Recurse -File |
             Where-Object { $_.Extension -in @('.csproj', '.ps1') } |
             ForEach-Object {
               $content = Get-Content -LiteralPath $_.FullName -Raw
-              $updated = $content.Replace('3.0.0-rc.1', $env:RELEASE_VERSION)
+              $updated = $content.Replace('3.0.0-rc.1', $env:PACKAGE_VERSION)
               if ($updated -ne $content) {
                 [System.IO.File]::WriteAllText($_.FullName, $updated, [System.Text.UTF8Encoding]::new($false))
               }
@@ -190,7 +194,7 @@ jobs:
           ) | Sort-Object FullName
 
           $lines = foreach ($file in $files) {
-            $relative = [System.IO.Path]::GetRelativePath($artifactRoot, $file.FullName).Replace('\', '/')
+            $relative = [System.IO.Path]::GetRelativePath($artifactRoot, $file.FullName).Replace('\\', '/')
             $hash = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
             "$hash  $relative"
           }
@@ -198,81 +202,198 @@ jobs:
           $checksumPath = Join-Path $artifactRoot 'release-metadata/SHA256SUMS'
           [System.IO.File]::WriteAllLines($checksumPath, $lines, [System.Text.UTF8Encoding]::new($false))
 
-      - name: Upload validated release candidate
+      - name: Upload release package
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: "release-candidate-${{ steps.release-metadata.outputs.version }}"
+          name: release-package
           path: ./artifacts
           if-no-files-found: error
           retention-days: 14
 
-  publish:
-    name: Publish official release
-    if: "${{ github.event_name == 'workflow_dispatch' && inputs.publish }}"
-    needs: build
+  ensure-release-tag:
+    name: Create release tag
+    needs: build-and-pack
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    environment: release
     permissions:
       contents: write
-      id-token: write
-      attestations: write
-      artifact-metadata: write
-      packages: write
 
     steps:
-      - name: Validate protected publication request
+      - name: Checkout validated commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Create or verify tag
         shell: bash
         env:
-          RELEASE_VERSION: "${{ needs.build.outputs.version }}"
-          RELEASE_TAG: "${{ needs.build.outputs.tag }}"
+          RELEASE_TAG: ${{ needs.build-and-pack.outputs.release-tag }}
+          VALIDATED_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
 
-          if [[ "${GITHUB_REF}" != "refs/heads/master" ]]; then
-            echo "Official publication is allowed only from refs/heads/master." >&2
-            exit 2
+          git fetch --tags --force
+          if git rev-parse -q --verify "refs/tags/$RELEASE_TAG" >/dev/null; then
+            tag_sha="$(git rev-list -n 1 "$RELEASE_TAG")"
+            if [[ "$tag_sha" != "$VALIDATED_SHA" ]]; then
+              echo "::error::Tag '$RELEASE_TAG' points to $tag_sha instead of $VALIDATED_SHA."
+              exit 1
+            fi
+
+            echo "Tag '$RELEASE_TAG' already exists on the validated commit."
+            exit 0
           fi
 
-          if [[ "${RELEASE_TAG}" != "v${RELEASE_VERSION}" ]]; then
-            echo "Resolved release tag must be exactly v${RELEASE_VERSION}." >&2
-            exit 2
-          fi
+          git tag "$RELEASE_TAG" "$VALIDATED_SHA"
+          git push origin "refs/tags/$RELEASE_TAG"
 
-      - name: Checkout exact release commit
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+  publish-nuget:
+    name: Publish to NuGet.org
+    needs:
+      - build-and-pack
+      - ensure-release-tag
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
-          ref: "${{ github.sha }}"
-          fetch-depth: 0
-          persist-credentials: false
+          global-json-file: global.json
 
-      - name: Download validated release candidate
+      - name: Download release package
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: "release-candidate-${{ needs.build.outputs.version }}"
+          name: release-package
           path: ./artifacts
 
-      - name: Verify downloaded release candidate checksums
+      - name: Verify release checksums
         shell: bash
         run: |
           set -euo pipefail
           cd ./artifacts
           sha256sum --check ./release-metadata/SHA256SUMS
 
-      - name: Revalidate downloaded package set
+      - name: Exchange GitHub OIDC token for temporary NuGet API key
+        id: nuget-login
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
+        with:
+          user: "${{ vars.NUGET_USER }}"
+
+      - name: Publish to NuGet.org
         shell: pwsh
         env:
-          RELEASE_VERSION: "${{ needs.build.outputs.version }}"
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+          PACKAGE_VERSION: ${{ needs.build-and-pack.outputs.package-version }}
         run: |
           $ErrorActionPreference = 'Stop'
-          ./eng/validate-release-artifacts.ps1 `
-            -PackageDirectory './artifacts/packages' `
-            -Version $env:RELEASE_VERSION `
-            -ManifestPath (Join-Path $env:RUNNER_TEMP 'reverified-artifact-manifest.json') `
-            -Repository '${{ github.repository }}' `
-            -RepositoryUrl 'https://github.com/${{ github.repository }}' `
-            -Commit '${{ github.sha }}' `
-            -Branch 'refs/heads/master'
+          $packageIds = @(
+            'Dapper.FluentMap',
+            'Dapper.FluentMap.Dommel',
+            'Dapper.FluentMap.DependencyInjection',
+            'Dapper.FluentMap.Analyzers',
+            'Dapper.FluentMap.Generators'
+          )
+
+          foreach ($packageId in $packageIds) {
+            $package = "./artifacts/packages/$packageId.$env:PACKAGE_VERSION.nupkg"
+            dotnet nuget push $package `
+              --source 'https://api.nuget.org/v3/index.json' `
+              --api-key $env:NUGET_API_KEY `
+              --skip-duplicate
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "NuGet.org publication failed for $packageId."
+            }
+          }
+
+  publish-github-packages:
+    name: Publish to GitHub Packages
+    needs:
+      - build-and-pack
+      - ensure-release-tag
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+
+      - name: Download release package
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-package
+          path: ./artifacts
+
+      - name: Verify release checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd ./artifacts
+          sha256sum --check ./release-metadata/SHA256SUMS
+
+      - name: Publish to GitHub Packages
+        shell: pwsh
+        env:
+          GITHUB_PACKAGE_SOURCE: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
+          GITHUB_PACKAGE_TOKEN: ${{ github.token }}
+          PACKAGE_VERSION: ${{ needs.build-and-pack.outputs.package-version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $packageIds = @(
+            'Dapper.FluentMap',
+            'Dapper.FluentMap.Dommel',
+            'Dapper.FluentMap.DependencyInjection',
+            'Dapper.FluentMap.Analyzers',
+            'Dapper.FluentMap.Generators'
+          )
+
+          foreach ($packageId in $packageIds) {
+            $package = "./artifacts/packages/$packageId.$env:PACKAGE_VERSION.nupkg"
+            dotnet nuget push $package `
+              --source $env:GITHUB_PACKAGE_SOURCE `
+              --api-key $env:GITHUB_PACKAGE_TOKEN `
+              --skip-duplicate
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "GitHub Packages publication failed for $packageId."
+            }
+          }
+
+  github-release:
+    name: Create GitHub Release
+    needs:
+      - build-and-pack
+      - ensure-release-tag
+      - publish-nuget
+      - publish-github-packages
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+
+    steps:
+      - name: Download release package
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-package
+          path: ./artifacts
+
+      - name: Verify release checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd ./artifacts
+          sha256sum --check ./release-metadata/SHA256SUMS
 
       - name: Attest release artifacts
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
@@ -284,134 +405,34 @@ jobs:
             ./artifacts/release-metadata/dependencies.json
             ./artifacts/release-metadata/SHA256SUMS
 
-      - name: Create or resume draft GitHub Release
+      - name: Create or update GitHub Release
         shell: bash
         env:
-          GH_TOKEN: "${{ github.token }}"
-          RELEASE_TAG: "${{ needs.build.outputs.tag }}"
-          IS_PRERELEASE: "${{ needs.build.outputs.is-prerelease }}"
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.build-and-pack.outputs.release-tag }}
+          IS_PRERELEASE: ${{ needs.build-and-pack.outputs.is-prerelease }}
         run: |
           set -euo pipefail
 
-          git fetch --force --tags origin
-          if git show-ref --tags --verify --quiet "refs/tags/${RELEASE_TAG}"; then
-            existing_commit="$(git rev-list -n 1 "${RELEASE_TAG}")"
-            if [[ "${existing_commit}" != "${GITHUB_SHA}" ]]; then
-              echo "Tag ${RELEASE_TAG} already points to ${existing_commit}, not ${GITHUB_SHA}." >&2
-              exit 3
-            fi
-          fi
-
-          release_state="$(gh release view "${RELEASE_TAG}" --json isDraft --jq '.isDraft' 2>/dev/null || true)"
-          if [[ "${release_state}" == "false" ]]; then
-            echo "Release ${RELEASE_TAG} is already published; refusing to mutate an immutable release." >&2
-            exit 3
-          fi
-
-          prerelease_args=()
-          if [[ "${IS_PRERELEASE}" == "true" ]]; then
-            prerelease_args+=(--prerelease)
-          fi
-
-          if [[ -z "${release_state}" ]]; then
-            if git show-ref --tags --verify --quiet "refs/tags/${RELEASE_TAG}"; then
-              gh release create "${RELEASE_TAG}" \
-                --verify-tag \
-                --draft \
-                --generate-notes \
-                --title "${RELEASE_TAG}" \
-                "${prerelease_args[@]}"
-            else
-              gh release create "${RELEASE_TAG}" \
-                --target "${GITHUB_SHA}" \
-                --draft \
-                --generate-notes \
-                --title "${RELEASE_TAG}" \
-                "${prerelease_args[@]}"
-            fi
-          fi
-
-          gh release upload "${RELEASE_TAG}" \
-            ./artifacts/packages/* \
-            ./artifacts/release-metadata/* \
-            --clobber
-
-      - name: Authenticate to NuGet.org with trusted publishing
-        id: nuget-login
-        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
-        with:
-          user: "${{ vars.NUGET_USER }}"
-
-      - name: Publish packages to NuGet.org
-        shell: pwsh
-        env:
-          NUGET_API_KEY: "${{ steps.nuget-login.outputs.NUGET_API_KEY }}"
-          RELEASE_VERSION: "${{ needs.build.outputs.version }}"
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $packageIds = @(
-            'Dapper.FluentMap',
-            'Dapper.FluentMap.Dommel',
-            'Dapper.FluentMap.DependencyInjection',
-            'Dapper.FluentMap.Analyzers',
-            'Dapper.FluentMap.Generators'
+          assets=(
+            ./artifacts/packages/*.nupkg
+            ./artifacts/packages/*.snupkg
+            ./artifacts/release-metadata/*
           )
 
-          foreach ($packageId in $packageIds) {
-            $package = "./artifacts/packages/$packageId.$env:RELEASE_VERSION.nupkg"
-            dotnet nuget push $package `
-              --source 'https://api.nuget.org/v3/index.json' `
-              --api-key $env:NUGET_API_KEY `
-              --skip-duplicate
+          if gh release view "$RELEASE_TAG" --repo "$GH_REPO" >/dev/null 2>&1; then
+            echo "GitHub Release '$RELEASE_TAG' already exists; refreshing release artifacts."
+            gh release upload "$RELEASE_TAG" "${assets[@]}" --repo "$GH_REPO" --clobber
+            exit 0
+          fi
 
-            if ($LASTEXITCODE -ne 0) {
-              throw "NuGet.org publication failed for $packageId."
-            }
-          }
+          release_args=(--verify-tag --generate-notes --title "$RELEASE_TAG")
+          if [[ "$IS_PRERELEASE" == "true" ]]; then
+            release_args+=(--prerelease)
+          fi
 
-      - name: Configure GitHub Packages source
-        env:
-          GITHUB_TOKEN: "${{ github.token }}"
-        run: >-
-          dotnet nuget add source
-          --username "${{ github.actor }}"
-          --password "${GITHUB_TOKEN}"
-          --store-password-in-clear-text
-          --name github
-          "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
-
-      - name: Publish packages to GitHub Packages
-        shell: pwsh
-        env:
-          GITHUB_TOKEN: "${{ github.token }}"
-          RELEASE_VERSION: "${{ needs.build.outputs.version }}"
-        run: |
-          $ErrorActionPreference = 'Stop'
-          $packageIds = @(
-            'Dapper.FluentMap',
-            'Dapper.FluentMap.Dommel',
-            'Dapper.FluentMap.DependencyInjection',
-            'Dapper.FluentMap.Analyzers',
-            'Dapper.FluentMap.Generators'
-          )
-
-          foreach ($packageId in $packageIds) {
-            $package = "./artifacts/packages/$packageId.$env:RELEASE_VERSION.nupkg"
-            dotnet nuget push $package `
-              --source github `
-              --api-key $env:GITHUB_TOKEN `
-              --skip-duplicate
-
-            if ($LASTEXITCODE -ne 0) {
-              throw "GitHub Packages publication failed for $packageId."
-            }
-          }
-
-      - name: Publish GitHub Release
-        shell: bash
-        env:
-          GH_TOKEN: "${{ github.token }}"
-          RELEASE_TAG: "${{ needs.build.outputs.tag }}"
-        run: |
-          set -euo pipefail
-          gh release edit "${RELEASE_TAG}" --draft=false
+          gh release create "$RELEASE_TAG" \
+            "${assets[@]}" \
+            --repo "$GH_REPO" \
+            "${release_args[@]}"
