@@ -24,7 +24,7 @@
     <PackageProjectUrl>$(RepositoryUrl)</PackageProjectUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
-    <PackageReleaseNotes>https://github.com/rodri-oliveira-dev/Dapper-FluentMap/releases/tag/v$(PackageVersion)</PackageReleaseNotes>
+    <PackageReleaseNotes>https://github.com/rodri-oliveira-dev/Dapper-FluentMap/releases</PackageReleaseNotes>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <Deterministic>true</Deterministic>
