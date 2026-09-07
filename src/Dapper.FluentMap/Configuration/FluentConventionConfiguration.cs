@@ -20,6 +20,7 @@ namespace Dapper.FluentMap.Configuration
         private readonly MappingRegistry _registry;
         private readonly Convention _convention;
         private readonly Action _ensureMutable;
+        private readonly Action _afterMutation;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="FluentConventionConfiguration"/> class,
@@ -27,11 +28,16 @@ namespace Dapper.FluentMap.Configuration
         /// </summary>
         /// <param name="convention">The convention.</param>
         public FluentConventionConfiguration(Convention convention)
-            : this(convention, FluentMapper.ConfigurationRegistry, ensureMutable: null)
+            : this(convention, FluentMapper.ConfigurationRegistry, ensureMutable: null, afterMutation: FluentMapper.PublishConfigurationMutation)
         {
         }
 
         internal FluentConventionConfiguration(Convention convention, MappingRegistry registry, Action ensureMutable)
+            : this(convention, registry, ensureMutable, afterMutation: null)
+        {
+        }
+
+        internal FluentConventionConfiguration(Convention convention, MappingRegistry registry, Action ensureMutable, Action afterMutation)
         {
             if (convention == null)
             {
@@ -41,6 +47,7 @@ namespace Dapper.FluentMap.Configuration
             _registry = registry ?? throw new ArgumentNullException(nameof(registry));
             _convention = convention;
             _ensureMutable = ensureMutable;
+            _afterMutation = afterMutation;
         }
 
         /// <summary>
@@ -57,6 +64,7 @@ namespace Dapper.FluentMap.Configuration
             MapProperties(type);
 
             _registry.AddConvention(type, _convention);
+            NotifyMutation();
             return this;
         }
 
@@ -87,6 +95,7 @@ namespace Dapper.FluentMap.Configuration
                 _registry.AddConvention(type, _convention);
             }
 
+            NotifyMutation();
             return this;
         }
 #endif
@@ -118,12 +127,18 @@ namespace Dapper.FluentMap.Configuration
                 _registry.AddConvention(type, _convention);
             }
 
+            NotifyMutation();
             return this;
         }
 
         private void EnsureCanMutate()
         {
             _ensureMutable?.Invoke();
+        }
+
+        private void NotifyMutation()
+        {
+            _afterMutation?.Invoke();
         }
 
         private void MapProperties(

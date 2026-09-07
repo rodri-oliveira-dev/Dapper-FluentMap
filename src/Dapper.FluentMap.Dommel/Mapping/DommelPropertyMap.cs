@@ -9,6 +9,8 @@ namespace Dapper.FluentMap.Dommel.Mapping
     /// </summary>
     public class DommelPropertyMap : PropertyMapBase<DommelPropertyMap>, IPropertyMap
     {
+        private DatabaseGeneratedOption? _generatedOption;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="DommelPropertyMap"/> class
         /// with the specified <see cref="PropertyInfo"/> object.
@@ -31,7 +33,19 @@ namespace Dapper.FluentMap.Dommel.Mapping
         /// <summary>
         /// Gets a value indicating how the column is generated.
         /// </summary>
-        public DatabaseGeneratedOption? GeneratedOption { get; set; }
+        public DatabaseGeneratedOption? GeneratedOption
+        {
+            get => _generatedOption;
+            set
+            {
+                _generatedOption = value;
+
+                if (value.HasValue)
+                {
+                    ApplyGeneratedOption(value.Value);
+                }
+            }
+        }
 
         internal DatabaseGeneratedOption EffectiveUpdateGeneratedOption
         {
@@ -93,7 +107,11 @@ namespace Dapper.FluentMap.Dommel.Mapping
         public DommelPropertyMap SetGeneratedOption(DatabaseGeneratedOption option)
         {
             GeneratedOption = option;
+            return this;
+        }
 
+        private void ApplyGeneratedOption(DatabaseGeneratedOption option)
+        {
             switch (option)
             {
                 case DatabaseGeneratedOption.None:
@@ -112,8 +130,6 @@ namespace Dapper.FluentMap.Dommel.Mapping
                     MarkAsNotGenerated();
                     break;
             }
-
-            return this;
         }
     }
 }

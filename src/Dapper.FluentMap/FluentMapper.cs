@@ -59,6 +59,14 @@ namespace Dapper.FluentMap
 
         internal static MappingRegistry ConfigurationRegistry => _builderRegistry;
 
+        internal static void PublishConfigurationMutation()
+        {
+            lock (_syncRoot)
+            {
+                PublishDefaultRuntime();
+            }
+        }
+
         /// <summary>
         /// Initializes Dapper.FluentMap with the specified configuration.
         /// This is method should be called when the application starts or when the first mapping is needed.

@@ -1,5 +1,6 @@
 using System;
 using Dapper;
+using Dapper.FluentMap.Configuration;
 using Dapper.FluentMap.Conventions;
 using Dapper.FluentMap.Mapping;
 using Microsoft.Data.Sqlite;
@@ -26,6 +27,35 @@ namespace Dapper.FluentMap.Tests
             finally
             {
                 ResetMapper(typeof(FirstLifecycleEntity), typeof(SecondLifecycleEntity));
+            }
+        }
+
+        [Fact]
+        [Trait("Category", "Integration")]
+        public void PublicConfigurationMutationShouldPublishDapperTypeMapAndRuntime()
+        {
+            ResetMapper(typeof(PublicConfigurationEntity));
+
+            try
+            {
+                var configuration = new FluentMapConfiguration();
+                configuration.AddMap(new PublicConfigurationMap());
+
+                var member = SqlMapper.GetTypeMap(typeof(PublicConfigurationEntity)).GetMember("public_id");
+
+                using (var connection = OpenConnection())
+                {
+                    var entity = connection.QueryMappedSingle<PublicConfigurationEntity>(
+                        "SELECT 42 AS public_id;");
+
+                    Assert.NotNull(member);
+                    Assert.Equal(nameof(PublicConfigurationEntity.Id), member.Property.Name);
+                    Assert.Equal(42, entity.Id);
+                }
+            }
+            finally
+            {
+                ResetMapper(typeof(PublicConfigurationEntity));
             }
         }
 
@@ -114,6 +144,19 @@ namespace Dapper.FluentMap.Tests
             public SecondLifecycleMap()
             {
                 Map(entity => entity.Name).ToColumn("second_name");
+            }
+        }
+
+        private sealed class PublicConfigurationEntity
+        {
+            public int Id { get; set; }
+        }
+
+        private sealed class PublicConfigurationMap : EntityMap<PublicConfigurationEntity>
+        {
+            public PublicConfigurationMap()
+            {
+                Map(entity => entity.Id).ToColumn("public_id");
             }
         }
 

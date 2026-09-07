@@ -177,6 +177,21 @@ namespace Dapper.FluentMap.Dommel.Tests
         }
 
         [Fact]
+        public void DirectGeneratedOptionAssignmentShouldUpdatePersistenceMetadata()
+        {
+            PreTest();
+
+            var map = new MapDirectGeneratedOptionProperty();
+            var property = map.PropertyMaps.Single();
+            var persistence = ((IPropertyMapWithPersistenceMetadata)property).Persistence;
+
+            Assert.True(persistence.IsGenerated);
+            Assert.True(persistence.IsComputed);
+            Assert.False(persistence.ParticipatesInInsert);
+            Assert.False(persistence.ParticipatesInUpdate);
+        }
+
+        [Fact]
         public void GeneratedOptionNoneShouldKeepNonIdentityKeyInsertable()
         {
             PreTest();
@@ -289,6 +304,14 @@ namespace Dapper.FluentMap.Dommel.Tests
             public MapComputedProperty()
             {
                 Map(p => p.Name).Computed();
+            }
+        }
+
+        private class MapDirectGeneratedOptionProperty : DommelEntityMap<DoubleIdEntity>
+        {
+            public MapDirectGeneratedOptionProperty()
+            {
+                Map(p => p.Name).GeneratedOption = DatabaseGeneratedOption.Computed;
             }
         }
 

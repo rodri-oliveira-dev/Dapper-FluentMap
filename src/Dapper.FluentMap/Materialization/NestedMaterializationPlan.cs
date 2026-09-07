@@ -81,6 +81,7 @@ namespace Dapper.FluentMap.Materialization
                 {
                     rootNode.AddRootField(
                         defaultMember.Field,
+                        TryGetAutoPropertyForBackingField(entityType, defaultMember.Field),
                         i,
                         columnName,
                         entityType,
@@ -154,6 +155,11 @@ namespace Dapper.FluentMap.Materialization
 
         private static Action<object, object> CreateFieldSetter(FieldInfo field)
         {
+            if (field.IsInitOnly || field.IsStatic)
+            {
+                return null;
+            }
+
             var target = Expression.Parameter(typeof(object), "target");
             var value = Expression.Parameter(typeof(object), "value");
             var body = Expression.Assign(
@@ -161,6 +167,37 @@ namespace Dapper.FluentMap.Materialization
                 Expression.Convert(value, field.FieldType));
 
             return Expression.Lambda<Action<object, object>>(body, target, value).Compile();
+        }
+
+        private static PropertyInfo TryGetAutoPropertyForBackingField(Type entityType, FieldInfo field)
+        {
+            if (field == null || !field.IsInitOnly || !IsAutoPropertyBackingFieldName(field.Name, out var propertyName))
+            {
+                return null;
+            }
+
+            return entityType
+                .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                .FirstOrDefault(property =>
+                    string.Equals(property.Name, propertyName, StringComparison.Ordinal) &&
+                    Equals(property.DeclaringType, field.DeclaringType) &&
+                    property.PropertyType == field.FieldType);
+        }
+
+        private static bool IsAutoPropertyBackingFieldName(string fieldName, out string propertyName)
+        {
+            propertyName = null;
+
+            if (fieldName == null ||
+                fieldName.Length <= 17 ||
+                fieldName[0] != '<' ||
+                !fieldName.EndsWith(">k__BackingField", StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            propertyName = fieldName.Substring(1, fieldName.Length - 17);
+            return propertyName.Length > 0;
         }
 
         private static Func<object, object> CreateConverter(
@@ -484,12 +521,13 @@ namespace Dapper.FluentMap.Materialization
 
             internal void AddRootField(
                 FieldInfo field,
+                PropertyInfo constructorProperty,
                 int columnIndex,
                 string columnName,
                 Type entityType,
                 Type profileType)
             {
-                _leaves.Add(NestedLeaf.ForField(field, columnIndex, columnName, field.Name, entityType, profileType));
+                _leaves.Add(NestedLeaf.ForField(field, constructorProperty, columnIndex, columnName, entityType, profileType));
             }
 
             internal void Seal(Type entityType)
@@ -677,8 +715,8 @@ namespace Dapper.FluentMap.Materialization
             private ParameterBinding TryBindParameter(ParameterInfo parameter)
             {
                 var leafMatches = _leaves
-                    .Where(leaf => leaf.Property != null &&
-                                   string.Equals(leaf.Property.Name, parameter.Name, StringComparison.OrdinalIgnoreCase) &&
+                    .Where(leaf => leaf.ConstructorProperty != null &&
+                                   string.Equals(leaf.ConstructorProperty.Name, parameter.Name, StringComparison.OrdinalIgnoreCase) &&
                                    IsParameterCompatible(parameter.ParameterType, leaf.TargetType))
                     .Select(leaf => ParameterBinding.ForLeaf(parameter, leaf, GetCompatibilityScore(parameter.ParameterType, leaf.TargetType)));
 
@@ -743,6 +781,7 @@ namespace Dapper.FluentMap.Materialization
 
             private NestedLeaf(
                 PropertyInfo property,
+                PropertyInfo constructorProperty,
                 FieldInfo field,
                 int columnIndex,
                 string columnName,
@@ -754,6 +793,7 @@ namespace Dapper.FluentMap.Materialization
                 PropertyConversionMetadata conversion)
             {
                 Property = property;
+                ConstructorProperty = constructorProperty;
                 Field = field;
                 ColumnIndex = columnIndex;
                 ColumnName = columnName;
@@ -764,6 +804,8 @@ namespace Dapper.FluentMap.Materialization
             }
 
             internal PropertyInfo Property { get; }
+
+            internal PropertyInfo ConstructorProperty { get; }
 
             internal FieldInfo Field { get; }
 
@@ -788,6 +830,7 @@ namespace Dapper.FluentMap.Materialization
             {
                 return new NestedLeaf(
                     property,
+                    property,
                     null,
                     columnIndex,
                     columnName,
@@ -801,19 +844,20 @@ namespace Dapper.FluentMap.Materialization
 
             internal static NestedLeaf ForField(
                 FieldInfo field,
+                PropertyInfo constructorProperty,
                 int columnIndex,
                 string columnName,
-                string memberPath,
                 Type entityType,
                 Type profileType)
             {
                 return new NestedLeaf(
                     null,
+                    constructorProperty,
                     field,
                     columnIndex,
                     columnName,
-                    memberPath,
-                    field.FieldType,
+                    constructorProperty == null ? field.Name : constructorProperty.Name,
+                    constructorProperty == null ? field.FieldType : constructorProperty.PropertyType,
                     CreateFieldSetter(field),
                     entityType,
                     profileType,

@@ -21,19 +21,26 @@ namespace Dapper.FluentMap.Configuration
 
         private readonly MappingRegistry _registry;
         private readonly Action _ensureMutable;
+        private readonly Action _afterMutation;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="FluentMapConfiguration"/> class.
         /// </summary>
         public FluentMapConfiguration()
-            : this(FluentMapper.ConfigurationRegistry, ensureMutable: null)
+            : this(FluentMapper.ConfigurationRegistry, ensureMutable: null, afterMutation: FluentMapper.PublishConfigurationMutation)
         {
         }
 
         internal FluentMapConfiguration(MappingRegistry registry, Action ensureMutable)
+            : this(registry, ensureMutable, afterMutation: null)
+        {
+        }
+
+        internal FluentMapConfiguration(MappingRegistry registry, Action ensureMutable, Action afterMutation)
         {
             _registry = registry ?? throw new ArgumentNullException(nameof(registry));
             _ensureMutable = ensureMutable;
+            _afterMutation = afterMutation;
         }
 
         /// <summary>
@@ -53,6 +60,7 @@ namespace Dapper.FluentMap.Configuration
 
             EnsureCanMutate();
             _registry.AddEntityMap(mapper);
+            NotifyMutation();
         }
 
         /// <summary>
@@ -71,6 +79,7 @@ namespace Dapper.FluentMap.Configuration
 
             EnsureCanMutate();
             _registry.AddEntityMap(entityType, mapper);
+            NotifyMutation();
             return this;
         }
 
@@ -91,6 +100,7 @@ namespace Dapper.FluentMap.Configuration
 
             EnsureCanMutate();
             _registry.AddProfileMap(entityType, profileType, mapper);
+            NotifyMutation();
             return this;
         }
 
@@ -143,6 +153,7 @@ namespace Dapper.FluentMap.Configuration
 
             EnsureCanMutate();
             _registry.AddGeneratedMaterializer(descriptor);
+            NotifyMutation();
             return this;
         }
 
@@ -176,6 +187,7 @@ namespace Dapper.FluentMap.Configuration
                 _registry.AddEntityMap(registration.EntityType, registration.Map);
             }
 
+            NotifyMutation();
             return this;
         }
 
@@ -203,7 +215,7 @@ namespace Dapper.FluentMap.Configuration
         public FluentConventionConfiguration AddConvention<TConvention>() where TConvention : Convention, new()
         {
             EnsureCanMutate();
-            return new FluentConventionConfiguration(new TConvention(), _registry, EnsureCanMutate);
+            return new FluentConventionConfiguration(new TConvention(), _registry, EnsureCanMutate, NotifyMutation);
         }
 
         /// <summary>
@@ -223,7 +235,7 @@ namespace Dapper.FluentMap.Configuration
             }
 
             EnsureCanMutate();
-            return new FluentConventionConfiguration(new NamingPolicyConvention(namingPolicy, caseSensitive), _registry, EnsureCanMutate);
+            return new FluentConventionConfiguration(new NamingPolicyConvention(namingPolicy, caseSensitive), _registry, EnsureCanMutate, NotifyMutation);
         }
 
         /// <summary>
@@ -370,6 +382,11 @@ namespace Dapper.FluentMap.Configuration
         private void EnsureCanMutate()
         {
             _ensureMutable?.Invoke();
+        }
+
+        private void NotifyMutation()
+        {
+            _afterMutation?.Invoke();
         }
 
         private static void EnsureNoDuplicateEntityMaps(IList<EntityMapDefinition> definitions)

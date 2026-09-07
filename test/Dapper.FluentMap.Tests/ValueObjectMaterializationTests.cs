@@ -302,6 +302,29 @@ namespace Dapper.FluentMap.Tests
 
         [Fact]
         [Trait("Category", "Integration")]
+        public void QueryMappedShouldMaterializeDefaultImmutableConstructorMapping()
+        {
+            PreTest(typeof(DefaultImmutableCustomer));
+
+            try
+            {
+                using (var connection = OpenConnection())
+                {
+                    var customer = connection.QueryMappedSingle<DefaultImmutableCustomer>(
+                        "SELECT 10 AS Id, 'Dorothy Vaughan' AS Name;");
+
+                    Assert.Equal(10, customer.Id);
+                    Assert.Equal("Dorothy Vaughan", customer.Name);
+                }
+            }
+            finally
+            {
+                PreTest(typeof(DefaultImmutableCustomer));
+            }
+        }
+
+        [Fact]
+        [Trait("Category", "Integration")]
         public void QueryMappedShouldMaterializeValueObjectsAcrossMultipleRows()
         {
             PreTest(typeof(CustomerWithCpf));
@@ -713,6 +736,19 @@ namespace Dapper.FluentMap.Tests
                 Map(customer => customer.Id).ToColumn("customer_id");
                 Map(customer => customer.FullName).ToColumn("full_name");
             }
+        }
+
+        private sealed class DefaultImmutableCustomer
+        {
+            public DefaultImmutableCustomer(int id, string name)
+            {
+                Id = id;
+                Name = name;
+            }
+
+            public int Id { get; }
+
+            public string Name { get; }
         }
 
         private sealed class HandlerCustomer
