@@ -187,8 +187,17 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $artifactRoot = (Resolve-Path './artifacts').Path
+          $packageFiles = @(
+            Get-ChildItem './artifacts/packages' -File |
+              Where-Object { $_.Extension -in @('.nupkg', '.snupkg') }
+          )
+
+          if ($packageFiles.Count -ne 8) {
+            throw "Expected 8 package artifacts for checksums, found $($packageFiles.Count)."
+          }
+
           $files = @(
-            Get-ChildItem './artifacts/packages' -File -Include '*.nupkg', '*.snupkg'
+            $packageFiles
             Get-Item './artifacts/release-metadata/artifact-manifest.json'
             Get-Item './artifacts/release-metadata/dependencies.json'
           ) | Sort-Object FullName
@@ -301,11 +310,10 @@ jobs:
             $package = "./artifacts/packages/$packageId.$env:PACKAGE_VERSION.nupkg"
             dotnet nuget push $package `
               --source 'https://api.nuget.org/v3/index.json' `
-              --api-key $env:NUGET_API_KEY `
-              --skip-duplicate
+              --api-key $env:NUGET_API_KEY
 
             if ($LASTEXITCODE -ne 0) {
-              throw "NuGet.org publication failed for $packageId."
+              throw "NuGet.org publication failed for $packageId. The version may already exist; refusing to suppress an unverified duplicate."
             }
           }
 
@@ -359,11 +367,10 @@ jobs:
             $package = "./artifacts/packages/$packageId.$env:PACKAGE_VERSION.nupkg"
             dotnet nuget push $package `
               --source $env:GITHUB_PACKAGE_SOURCE `
-              --api-key $env:GITHUB_PACKAGE_TOKEN `
-              --skip-duplicate
+              --api-key $env:GITHUB_PACKAGE_TOKEN
 
             if ($LASTEXITCODE -ne 0) {
-              throw "GitHub Packages publication failed for $packageId."
+              throw "GitHub Packages publication failed for $packageId. The version may already exist; refusing to suppress an unverified duplicate."
             }
           }
 
