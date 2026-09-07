@@ -149,8 +149,24 @@ jobs:
 
       - name: Consumer smoke test release packages
         shell: pwsh
+        env:
+          RELEASE_VERSION: "${{ steps.release-metadata.outputs.version }}"
         run: |
           $ErrorActionPreference = 'Stop'
+
+          # The existing consumer fixtures were created for 3.0.0-rc.1. Rewrite only
+          # their package-version literals in the CI workspace so the same smoke suite
+          # validates the exact package version produced by this run.
+          Get-ChildItem './eng/consumer-smoke' -Recurse -File |
+            Where-Object { $_.Extension -in @('.csproj', '.ps1') } |
+            ForEach-Object {
+              $content = Get-Content -LiteralPath $_.FullName -Raw
+              $updated = $content.Replace('3.0.0-rc.1', $env:RELEASE_VERSION)
+              if ($updated -ne $content) {
+                [System.IO.File]::WriteAllText($_.FullName, $updated, [System.Text.UTF8Encoding]::new($false))
+              }
+            }
+
           ./eng/consumer-smoke/run-consumer-smoke.ps1 `
             -PackageDirectory './artifacts/packages'
 
@@ -202,6 +218,7 @@ jobs:
       id-token: write
       attestations: write
       artifact-metadata: write
+      packages: write
 
     steps:
       - name: Validate protected publication request
@@ -325,7 +342,7 @@ jobs:
         with:
           user: "${{ vars.NUGET_USER }}"
 
-      - name: Publish NuGet packages
+      - name: Publish packages to NuGet.org
         shell: pwsh
         env:
           NUGET_API_KEY: "${{ steps.nuget-login.outputs.NUGET_API_KEY }}"
@@ -348,7 +365,45 @@ jobs:
               --skip-duplicate
 
             if ($LASTEXITCODE -ne 0) {
-              throw "NuGet publication failed for $packageId."
+              throw "NuGet.org publication failed for $packageId."
+            }
+          }
+
+      - name: Configure GitHub Packages source
+        env:
+          GITHUB_TOKEN: "${{ github.token }}"
+        run: >-
+          dotnet nuget add source
+          --username "${{ github.actor }}"
+          --password "${GITHUB_TOKEN}"
+          --store-password-in-clear-text
+          --name github
+          "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
+
+      - name: Publish packages to GitHub Packages
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: "${{ github.token }}"
+          RELEASE_VERSION: "${{ needs.build.outputs.version }}"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $packageIds = @(
+            'Dapper.FluentMap',
+            'Dapper.FluentMap.Dommel',
+            'Dapper.FluentMap.DependencyInjection',
+            'Dapper.FluentMap.Analyzers',
+            'Dapper.FluentMap.Generators'
+          )
+
+          foreach ($packageId in $packageIds) {
+            $package = "./artifacts/packages/$packageId.$env:RELEASE_VERSION.nupkg"
+            dotnet nuget push $package `
+              --source github `
+              --api-key $env:GITHUB_TOKEN `
+              --skip-duplicate
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "GitHub Packages publication failed for $packageId."
             }
           }
 
