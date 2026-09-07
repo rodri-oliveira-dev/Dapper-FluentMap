@@ -20,8 +20,6 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$candidateVersion = '3.0.0-rc.1'
-$candidateBranch = 'refs/heads/release/3.0.0-rc.1'
 $expectedRepositoryUrl = 'https://github.com/rodri-oliveira-dev/Dapper-FluentMap'
 $expectedNupkgIds = @(
   'Dapper.FluentMap',
@@ -38,7 +36,7 @@ $expectedSnupkgIds = @(
 $expectedDependencies = @{
   'Dapper.FluentMap' = @{
     'Dapper' = '[2.1.79, 3.0.0)'
-    'Microsoft.Bcl.AsyncInterfaces' = '10.0.8'
+    'Microsoft.Bcl.AsyncInterfaces' = '10.0.11'
   }
   'Dapper.FluentMap.Dommel' = @{
     'Dapper.FluentMap' = $Version
@@ -47,7 +45,7 @@ $expectedDependencies = @{
   }
   'Dapper.FluentMap.DependencyInjection' = @{
     'Dapper.FluentMap' = $Version
-    'Microsoft.Extensions.DependencyInjection.Abstractions' = '10.0.10'
+    'Microsoft.Extensions.DependencyInjection.Abstractions' = '10.0.11'
   }
   'Dapper.FluentMap.Analyzers' = @{}
   'Dapper.FluentMap.Generators' = @{}
@@ -90,7 +88,10 @@ function Get-ChildText {
     [string]$Name
   )
 
-  $child = $Node.ChildNodes | Where-Object { $_.LocalName -eq $Name } | Select-Object -First 1
+  $child = $Node.ChildNodes |
+    Where-Object { $_.LocalName -eq $Name } |
+    Select-Object -First 1
+
   if ($null -eq $child) {
     return $null
   }
@@ -235,17 +236,13 @@ function Assert-CommonPackageMetadata {
     Fail "$ExpectedId repository commit is '$($PackageInfo.RepositoryCommit)', expected '$Commit'."
   }
 
-  if ($Branch -ne '' -and $PackageInfo.RepositoryBranch -ne $Branch) {
+  if (-not [string]::IsNullOrWhiteSpace($Branch) -and $PackageInfo.RepositoryBranch -ne $Branch) {
     Fail "$ExpectedId repository branch is '$($PackageInfo.RepositoryBranch)', expected '$Branch'."
   }
 }
 
-if ($Version -ne $candidateVersion) {
-  Fail "This release gate only accepts version $candidateVersion; received '$Version'."
-}
-
-if ($Version -eq '2.0.0' -or $Version -eq '3.0.0' -or $Version -notmatch '-') {
-  Fail "Version '$Version' is not allowed for this release candidate."
+if ($Version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$') {
+  Fail "Version '$Version' is not a supported Semantic Version. Build metadata (+...) is intentionally not accepted."
 }
 
 if (-not (Test-Path -LiteralPath $PackageDirectory -PathType Container)) {
@@ -305,10 +302,6 @@ if ([string]::IsNullOrWhiteSpace($Commit)) {
   Fail 'Repository commit could not be determined.'
 }
 
-if ($Branch -ne $candidateBranch) {
-  Fail "This release gate only accepts branch $candidateBranch; received '$Branch'."
-}
-
 if ($RepositoryUrl -ne $expectedRepositoryUrl) {
   Fail "Repository URL '$RepositoryUrl' is not the expected release repository '$expectedRepositoryUrl'."
 }
@@ -345,7 +338,13 @@ if ($forbiddenArtifacts.Count -gt 0) {
 $packageInfos = @{}
 foreach ($file in $nupkgs) {
   $info = Get-ZipPackageInfo -File $file
-  Assert-CommonPackageMetadata -PackageInfo $info -ExpectedId ($file.Name.Substring(0, $file.Name.Length - ".$Version.nupkg".Length))
+  $expectedId = $file.Name.Substring(0, $file.Name.Length - ".$Version.nupkg".Length)
+  Assert-CommonPackageMetadata -PackageInfo $info -ExpectedId $expectedId
+
+  if (-not $expectedDependencies.ContainsKey($info.Id)) {
+    Fail "Unexpected package ID '$($info.Id)' has no dependency contract."
+  }
+
   Assert-Dependencies -PackageId $info.Id -Actual $info.Dependencies -Expected $expectedDependencies[$info.Id]
 
   if ($packageInfos.ContainsKey($info.Id)) {
@@ -430,20 +429,21 @@ $manifest = [ordered]@{
   packages = @($manifestPackages)
 }
 
-$manifestDirectory = Split-Path -Parent $ManifestPath
+$manifestFullPath = [System.IO.Path]::GetFullPath($ManifestPath)
+$manifestDirectory = Split-Path -Parent $manifestFullPath
 if (-not [string]::IsNullOrWhiteSpace($manifestDirectory)) {
   New-Item -ItemType Directory -Force -Path $manifestDirectory | Out-Null
 }
 
 $manifestJson = $manifest | ConvertTo-Json -Depth 8
 [System.IO.File]::WriteAllText(
-  (Resolve-Path -LiteralPath (Split-Path -Parent $ManifestPath)).Path + [System.IO.Path]::DirectorySeparatorChar + (Split-Path -Leaf $ManifestPath),
+  $manifestFullPath,
   $manifestJson + [Environment]::NewLine,
   [System.Text.UTF8Encoding]::new($false))
 
-$validatedManifest = Get-Content -Raw -Path $ManifestPath | ConvertFrom-Json
+$validatedManifest = Get-Content -Raw -Path $manifestFullPath | ConvertFrom-Json
 if ($validatedManifest.version -ne $Version -or @($validatedManifest.packages).Count -ne 8) {
-  Fail "Generated manifest '$ManifestPath' did not round-trip with the expected version and package count."
+  Fail "Generated manifest '$manifestFullPath' did not round-trip with the expected version and package count."
 }
 
-Write-Host "Validated 5 .nupkg files, 3 .snupkg files and wrote manifest '$ManifestPath' for $Version."
+Write-Host "Validated 5 .nupkg files, 3 .snupkg files and wrote manifest '$manifestFullPath' for $Version."
