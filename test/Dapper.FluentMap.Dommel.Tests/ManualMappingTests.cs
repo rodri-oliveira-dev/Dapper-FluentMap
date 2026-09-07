@@ -6,7 +6,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using Xunit;
 
-[assembly: CollectionBehavior(DisableTestParallelization = true)]
+[assembly: Parallelization(Mode = ParallelMode.None)]
 namespace Dapper.FluentMap.Dommel.Tests
 {
     public class ManualMappingTests
