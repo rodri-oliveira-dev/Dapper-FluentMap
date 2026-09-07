@@ -3,7 +3,7 @@ using System.Linq;
 using Dapper.FluentMap.Mapping;
 using Xunit;
 
-[assembly: CollectionBehavior(DisableTestParallelization = true)]
+[assembly: Parallelization(Mode = ParallelMode.None)]
 namespace Dapper.FluentMap.Tests
 {
     public class ManualMappingTests
