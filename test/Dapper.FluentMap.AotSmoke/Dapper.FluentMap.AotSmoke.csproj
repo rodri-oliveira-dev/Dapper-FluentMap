@@ -19,7 +19,7 @@
     <PackageReference Include="Dapper" Version="$(DapperPackageVersion)" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.10" />
     <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="10.0.10" />
-    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.12" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.5" />
   </ItemGroup>
   <ItemGroup Condition="('$(DefineConstants)' == 'AOT_SMOKE_GENERATED' Or '$(DefineConstants)' == 'AOT_SMOKE_DI_GENERATED') And ('$(PublishTrimmed)' == 'true' Or '$(PublishAot)' == 'true')">
     <Analyzer Include="..\..\src\Dapper.FluentMap.Generators\bin\$(Configuration)\netstandard2.0\Dapper.FluentMap.Generators.dll" />
