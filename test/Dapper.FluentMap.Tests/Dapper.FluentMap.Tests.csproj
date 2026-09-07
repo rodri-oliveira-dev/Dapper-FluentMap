@@ -14,4 +14,8 @@
     </PackageReference>
     <PackageReference Include="xunit.v3" Version="4.0.0" />
   </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit.Sdk" />
+    <Using Include="Xunit.v3" />
+  </ItemGroup>
 </Project>
