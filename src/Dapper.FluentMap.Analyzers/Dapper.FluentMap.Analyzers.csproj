@@ -1,13 +1,13 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Description>Roslyn analyzers for Dapper.FluentMap configuration.</Description>
+    <Title>Dapper.FluentMap Analyzers</Title>
+    <Description>Roslyn analyzers for Dapper.FluentMap that detect statically provable mapping and configuration problems at build time.</Description>
     <VersionPrefix>$(FluentMapPackageVersionPrefix)</VersionPrefix>
-    <Authors>Henk Mollema</Authors>
     <TargetFramework>netstandard2.0</TargetFramework>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <PackageId>Dapper.FluentMap.Analyzers</PackageId>
-    <PackageTags>c#;dapper;mapping;fluentmap;roslyn;analyzers</PackageTags>
+    <PackageTags>dapper;roslyn;analyzers;mapping;diagnostics;fluent-mapping;fluentmap</PackageTags>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <IncludeSymbols>false</IncludeSymbols>
   </PropertyGroup>
