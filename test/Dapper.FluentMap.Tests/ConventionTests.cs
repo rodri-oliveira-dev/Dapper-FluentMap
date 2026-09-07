@@ -10,8 +10,7 @@ namespace Dapper.FluentMap.Tests
         public ConventionTests()
         {
             // Clear configurations
-            FluentMapper.EntityMaps.Clear();
-            FluentMapper.TypeConventions.Clear();
+            FluentMapper.Reset(typeof(TestEntity), typeof(TestEntityWithNullable), typeof(DerivedTestEntity), typeof(Bar));
         }
 
         public class Bar

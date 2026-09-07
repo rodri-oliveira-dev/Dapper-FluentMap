@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Dapper.FluentMap\Dapper.FluentMap.csproj" Condition="'$(PublishTrimmed)' != 'true' And '$(PublishAot)' != 'true'" />
+    <ProjectReference Include="..\..\src\Dapper.FluentMap.DependencyInjection\Dapper.FluentMap.DependencyInjection.csproj" Condition="'$(PublishTrimmed)' != 'true' And '$(PublishAot)' != 'true'" />
+    <ProjectReference Include="..\..\src\Dapper.FluentMap.Generators\Dapper.FluentMap.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" Condition="('$(DefineConstants)' == 'AOT_SMOKE_GENERATED' Or '$(DefineConstants)' == 'AOT_SMOKE_DI_GENERATED') And '$(PublishTrimmed)' != 'true' And '$(PublishAot)' != 'true'" />
+    <Reference Include="Dapper.FluentMap" Condition="'$(PublishTrimmed)' == 'true' Or '$(PublishAot)' == 'true'">
+      <HintPath>..\..\src\Dapper.FluentMap\bin\$(Configuration)\netstandard2.0\Dapper.FluentMap.dll</HintPath>
+    </Reference>
+    <Reference Include="Dapper.FluentMap.DependencyInjection" Condition="'$(PublishTrimmed)' == 'true' Or '$(PublishAot)' == 'true'">
+      <HintPath>..\..\src\Dapper.FluentMap.DependencyInjection\bin\$(Configuration)\netstandard2.0\Dapper.FluentMap.DependencyInjection.dll</HintPath>
+    </Reference>
+    <PackageReference Include="Dapper" Version="$(DapperPackageVersion)" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.10" />
+    <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="10.0.10" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.12" />
+  </ItemGroup>
+  <ItemGroup Condition="('$(DefineConstants)' == 'AOT_SMOKE_GENERATED' Or '$(DefineConstants)' == 'AOT_SMOKE_DI_GENERATED') And ('$(PublishTrimmed)' == 'true' Or '$(PublishAot)' == 'true')">
+    <Analyzer Include="..\..\src\Dapper.FluentMap.Generators\bin\$(Configuration)\netstandard2.0\Dapper.FluentMap.Generators.dll" />
+  </ItemGroup>
+</Project>

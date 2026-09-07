@@ -40,17 +40,20 @@ namespace Dapper.FluentMap.Dommel.Resolvers
                 foreach (var property in FilterComplexTypes(type.GetProperties()))
                 {
                     // Determine whether the property should be ignored.
-                    var propertyMap = entityMap.PropertyMaps.FirstOrDefault(p => p.PropertyInfo.Name == property.Name);
+                    var propertyMap = DommelPersistenceMetadata.ResolvePropertyMap(type, entityMap, property.Name);
                     if (propertyMap == null || !propertyMap.Ignored)
                     {
                         var dommelPropertyMap = propertyMap as DommelPropertyMap;
                         if (dommelPropertyMap != null)
                         {
-                            yield return new ColumnPropertyInfo(property, dommelPropertyMap.GeneratedOption ?? (dommelPropertyMap.Key ? DatabaseGeneratedOption.Identity : DatabaseGeneratedOption.None));
+                            yield return new ColumnPropertyInfo(property, dommelPropertyMap.EffectiveUpdateGeneratedOption);
                         }
                         else
                         {
-                            yield return new ColumnPropertyInfo(property);
+                            var mapWithPersistence = propertyMap as IPropertyMapWithPersistenceMetadata;
+                            yield return mapWithPersistence == null
+                                ? new ColumnPropertyInfo(property)
+                                : new ColumnPropertyInfo(property, ResolveGeneratedOption(mapWithPersistence.Persistence));
                         }
                     }
                 }
@@ -62,6 +65,21 @@ namespace Dapper.FluentMap.Dommel.Resolvers
                     yield return property;
                 }
             }
+        }
+
+        private static DatabaseGeneratedOption ResolveGeneratedOption(PropertyPersistenceMetadata persistence)
+        {
+            if (persistence.IsIdentity)
+            {
+                return DatabaseGeneratedOption.Identity;
+            }
+
+            if (!persistence.ParticipatesInUpdate)
+            {
+                return DatabaseGeneratedOption.Computed;
+            }
+
+            return DatabaseGeneratedOption.None;
         }
     }
 }

@@ -30,6 +30,11 @@ namespace Dapper.FluentMap.Conventions
         /// <returns>The same instance of <see cref="T:Dapper.FluentMap.Conventions.PropertyConventionConfiguration"/>.</returns>
         public PropertyConventionConfiguration Where(Func<PropertyInfo, bool> predicate)
         {
+            if (predicate == null)
+            {
+                throw new ArgumentNullException(nameof(predicate));
+            }
+
             PropertyPredicates.Add(predicate);
             return this;
         }
@@ -43,6 +48,11 @@ namespace Dapper.FluentMap.Conventions
         /// </param>
         public void Configure(Action<ConventionPropertyConfiguration> configure)
         {
+            if (configure == null)
+            {
+                throw new ArgumentNullException(nameof(configure));
+            }
+
             var config = new ConventionPropertyConfiguration();
             PropertyConfiguration = config;
             configure(config);

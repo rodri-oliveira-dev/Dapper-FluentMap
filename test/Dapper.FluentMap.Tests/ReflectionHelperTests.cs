@@ -32,7 +32,8 @@ namespace Dapper.FluentMap.Tests
             var memberInfo = ReflectionHelper.GetMemberInfo(expression);
 
             // Assert
-            Assert.Equal(typeof(DerivedTestEntity).GetProperty("Id"), memberInfo);
+            Assert.Equal(typeof(TestEntity).GetProperty("Id"), memberInfo);
+            Assert.Equal(typeof(TestEntity), memberInfo.DeclaringType);
             Assert.Equal(typeof(int), ((PropertyInfo)memberInfo).PropertyType);
         }
 
@@ -79,6 +80,57 @@ namespace Dapper.FluentMap.Tests
             Assert.Equal(typeof(SameMemberAsStringObject).GetProperty(nameof(SameMemberAsStringObject.Length)), memberInfo);
             Assert.Equal(typeof(SameMemberAsStringObject), memberInfo.DeclaringType);
             Assert.Equal(typeof(string), ((PropertyInfo)memberInfo).PropertyType);
+        }
+
+        [Fact]
+        public void GetMemberInfo_ReturnsProperty_WhenPropertyNameMatchesSystemMember()
+        {
+            // Arrange
+            Expression<Func<EntityWithStringFormatProperty, object>> expression = e => e.Format;
+
+            // Act
+            var memberInfo = ReflectionHelper.GetMemberInfo(expression);
+
+            // Assert
+            Assert.Equal(typeof(EntityWithStringFormatProperty).GetProperty(nameof(EntityWithStringFormatProperty.Format)), memberInfo);
+            Assert.Equal(typeof(string), ((PropertyInfo)memberInfo).PropertyType);
+        }
+
+        [Fact]
+        public void GetMemberInfo_ReturnsValueTypeProperty_WhenPropertyNameMatchesSystemMember()
+        {
+            // Arrange
+            Expression<Func<EntityWithTimeSpanDurationProperty, object>> expression = e => e.Duration;
+
+            // Act
+            var memberInfo = ReflectionHelper.GetMemberInfo(expression);
+
+            // Assert
+            Assert.Equal(typeof(EntityWithTimeSpanDurationProperty).GetProperty(nameof(EntityWithTimeSpanDurationProperty.Duration)), memberInfo);
+            Assert.Equal(typeof(TimeSpan), ((PropertyInfo)memberInfo).PropertyType);
+        }
+
+        [Fact]
+        public void GetMemberInfo_ThrowsArgumentException_WhenExpressionIsNotPropertyAccess()
+        {
+            // Arrange
+            Expression<Func<TestEntity, object>> expression = e => e.Id.ToString();
+
+            // Act
+            var exception = Assert.Throws<ArgumentException>(() => ReflectionHelper.GetMemberInfo(expression));
+
+            // Assert
+            Assert.Contains("property", exception.Message);
+        }
+
+        private class EntityWithStringFormatProperty
+        {
+            public string Format { get; set; }
+        }
+
+        private class EntityWithTimeSpanDurationProperty
+        {
+            public TimeSpan Duration { get; set; }
         }
     }
 }

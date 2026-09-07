@@ -1,0 +1,54 @@
+{
+  "folders": [
+    {
+      "path": "."
+    }
+  ],
+  "settings": {
+    "dotnet.defaultSolution": "Dapper.FluentMap.sln",
+    "dotnet.server.useOmnisharp": false,
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.organizeImports": "explicit"
+    },
+    "files.exclude": {
+      "**/bin": true,
+      "**/obj": true,
+      "**/.vs": true,
+      "**/.git": true,
+      "**/.dotnet": true,
+      "**/.nuget": true,
+      "**/TestResults": true,
+      "**/artifacts": true,
+      "**/coverage": true,
+      "**/coverage-report": true
+    },
+    "search.exclude": {
+      "**/bin": true,
+      "**/obj": true,
+      "**/.vs": true,
+      "**/.git": true,
+      "**/.dotnet": true,
+      "**/.nuget": true,
+      "**/TestResults": true,
+      "**/artifacts": true,
+      "**/coverage": true,
+      "**/coverage-report": true
+    },
+    "files.watcherExclude": {
+      "**/bin/**": true,
+      "**/obj/**": true,
+      "**/.vs/**": true,
+      "**/.git/**": true,
+      "**/.dotnet/**": true,
+      "**/.nuget/**": true,
+      "**/TestResults/**": true,
+      "**/artifacts/**": true,
+      "**/coverage/**": true,
+      "**/coverage-report/**": true
+    },
+    "search.useIgnoreFiles": true,
+    "search.useGlobalIgnoreFiles": true,
+    "markdown.validate.enabled": true
+  }
+}

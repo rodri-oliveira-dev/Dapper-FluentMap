@@ -1,0 +1,13 @@
+{
+  "recommendations": [
+    "ms-dotnettools.csharp",
+    "ms-dotnettools.csdevkit",
+    "ms-dotnettools.vscode-dotnet-runtime",
+    "editorconfig.editorconfig",
+    "redhat.vscode-yaml",
+    "yzhang.markdown-all-in-one",
+    "davidanson.vscode-markdownlint",
+    "eamodio.gitlens",
+    "ryanluker.vscode-coverage-gutters"
+  ]
+}

@@ -1,11 +1,29 @@
 version: '{build}'
 pull_requests:
   do_not_increment_build_number: true
-image: Visual Studio 2019
+image: Visual Studio 2022
+install:
+  - ps: |
+      $ErrorActionPreference = 'Stop'
+      $installDir = "$env:USERPROFILE\.dotnet"
+      $installScript = "$env:TEMP\dotnet-install.ps1"
+      New-Item -ItemType Directory -Force -Path $installDir | Out-Null
+      Invoke-WebRequest https://dot.net/v1/dotnet-install.ps1 -OutFile $installScript
+      & $installScript -Channel 10.0 -Quality ga -InstallDir $installDir
+      $env:PATH = "$installDir;$installDir\tools;$env:PATH"
+      dotnet --info
 build_script:
-  - cmd: dotnet test
+  - ps: dotnet restore .\Dapper.FluentMap.sln
+  - ps: dotnet build .\Dapper.FluentMap.sln --configuration Release --no-restore
+  - ps: dotnet test .\Dapper.FluentMap.sln --configuration Release --no-build
+  - ps: dotnet pack .\Dapper.FluentMap.sln --configuration Release --no-build --output .\artifacts\packages
 test: off
+artifacts:
+  - path: artifacts\packages\*.nupkg
+    name: NuGet packages
 environment:
+  DOTNET_ROOT: $(USERPROFILE)\.dotnet
+  PATH: $(USERPROFILE)\.dotnet;$(USERPROFILE)\.dotnet\tools;%PATH%
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
   CI: true

@@ -1,0 +1,165 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - release/3.0.0-rc.1
+  workflow_dispatch:
+    inputs:
+      package-version:
+        description: "NuGet package version to validate and pack, for example 3.0.0-rc.1."
+        required: true
+        default: "3.0.0-rc.1"
+      publish:
+        description: "Reserved for a future approval-based NuGet publish flow. Publishing is disabled in this workflow."
+        required: true
+        type: boolean
+        default: false
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
+  CI: "true"
+  PACKAGE_VERSION: ${{ inputs.package-version || '3.0.0-rc.1' }}
+  PUBLISH_REQUESTED: ${{ inputs.publish && 'true' || 'false' }}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.package-version }}
+  cancel-in-progress: false
+
+jobs:
+  validate-package:
+    name: Validate release package
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          show-progress: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+
+      - name: Validate release input
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = '${{ env.PACKAGE_VERSION }}'
+
+          if ($version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z][0-9A-Za-z.-]*)$') {
+            throw "Package version '$version' is not a supported SemVer value."
+          }
+
+          if ($version -ne '3.0.0-rc.1') {
+            throw "This release workflow is locked to 3.0.0-rc.1. Received '$version'."
+          }
+
+          $ref = '${{ github.ref }}'
+          if ($ref -ne 'refs/heads/release/3.0.0-rc.1') {
+            throw "This release workflow is locked to refs/heads/release/3.0.0-rc.1. Received '$ref'."
+          }
+
+      - name: Guard disabled publish path
+        if: ${{ env.PUBLISH_REQUESTED == 'true' }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          throw "NuGet publishing is intentionally disabled. Configure NuGet trusted publishing/OIDC and an approval environment before enabling publish."
+
+      - name: Show .NET info
+        run: dotnet --info
+
+      - name: Restore
+        run: dotnet restore ./Dapper.FluentMap.sln
+
+      - name: Audit NuGet dependencies
+        run: dotnet list ./Dapper.FluentMap.sln package --vulnerable --include-transitive
+
+      - name: Build Release
+        run: dotnet build ./Dapper.FluentMap.sln --configuration Release --no-restore -p:Version=${{ env.PACKAGE_VERSION }}
+
+      - name: Test Release
+        run: dotnet test ./Dapper.FluentMap.sln --configuration Release --no-build
+
+      - name: Pack Release
+        run: dotnet pack ./Dapper.FluentMap.sln --configuration Release --no-build --output ./artifacts/packages -p:Version=${{ env.PACKAGE_VERSION }}
+
+      - name: Validate release artifacts and write manifest
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./eng/validate-release-artifacts.ps1 `
+            -PackageDirectory './artifacts/packages' `
+            -Version '${{ env.PACKAGE_VERSION }}' `
+            -ManifestPath './artifacts/release-metadata/artifact-manifest.json' `
+            -Repository '${{ github.repository }}' `
+            -RepositoryUrl 'https://github.com/${{ github.repository }}' `
+            -Commit '${{ github.sha }}' `
+            -Branch '${{ github.ref }}'
+
+      - name: Consumer smoke release packages
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./eng/consumer-smoke/run-consumer-smoke.ps1 `
+            -PackageDirectory './artifacts/packages'
+
+      - name: Write dependency inventory
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path './artifacts/release-metadata' | Out-Null
+          dotnet list ./Dapper.FluentMap.sln package --include-transitive --format json |
+            Set-Content -Encoding utf8NoBOM -Path './artifacts/release-metadata/dependencies.json'
+
+      - name: Upload release package artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: release-packages-${{ env.PACKAGE_VERSION }}
+          path: |
+            ./artifacts/packages/*.nupkg
+            ./artifacts/packages/*.snupkg
+            ./artifacts/release-metadata/*.json
+          if-no-files-found: error
+          retention-days: 90
+
+  provenance:
+    name: Attest release package provenance
+    runs-on: ubuntu-latest
+    needs: validate-package
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+
+    steps:
+      - name: Download release package artifacts
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with:
+          name: release-packages-${{ env.PACKAGE_VERSION }}
+          path: ./artifacts/release
+
+      - name: Collect package subjects
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path './artifacts/attestation-subjects' | Out-Null
+          Get-ChildItem -Path './artifacts/release' -Recurse -File -Include '*.nupkg', '*.snupkg' |
+            Copy-Item -Destination './artifacts/attestation-subjects'
+
+      - name: Attest package provenance
+        uses: actions/attest-build-provenance@43d14bc2b83dec42d39ecae14e916627a18bb661 # v3
+        with:
+          subject-path: |
+            ./artifacts/attestation-subjects/*.nupkg
+            ./artifacts/attestation-subjects/*.snupkg

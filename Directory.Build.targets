@@ -1,0 +1,8 @@
+<Project>
+  <Target Name="BlockUnsafeFluentMapPackageVersions" BeforeTargets="Pack" Condition="'$(IsPackable)' != 'false'">
+    <Error Condition="'$(PackageVersion)' == '2.0.0' or ('$(PackageVersion)' == '' and '$(Version)' == '2.0.0')"
+           Text="Version 2.0.0 already exists for historical FluentMap package IDs and must not be produced by this fork." />
+    <Error Condition="'$(PackageVersion)' == '3.0.0' or ('$(PackageVersion)' == '' and '$(Version)' == '3.0.0')"
+           Text="Stable version 3.0.0 is disabled during the 3.0.0-rc.1 release freeze. Use the local default 3.0.0-dev or an explicit prerelease version such as 3.0.0-rc.1." />
+  </Target>
+</Project>

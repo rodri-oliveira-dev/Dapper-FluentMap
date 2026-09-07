@@ -1,0 +1,111 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "dotnet: restore solution",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "restore",
+        "${workspaceFolder}/Dapper.FluentMap.sln"
+      ],
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "dotnet: build solution",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "build",
+        "${workspaceFolder}/Dapper.FluentMap.sln",
+        "--configuration",
+        "Debug"
+      ],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "dotnet: build release",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "build",
+        "${workspaceFolder}/Dapper.FluentMap.sln",
+        "--configuration",
+        "Release"
+      ],
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "test: FluentMap core",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "test",
+        "${workspaceFolder}/test/Dapper.FluentMap.Tests/Dapper.FluentMap.Tests.csproj",
+        "--configuration",
+        "Release"
+      ],
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "problemMatcher": "$msCompile",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "test: all",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "test",
+        "${workspaceFolder}/Dapper.FluentMap.sln",
+        "--configuration",
+        "Release"
+      ],
+      "group": "test",
+      "problemMatcher": "$msCompile",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "dotnet: pack FluentMap",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "pack",
+        "${workspaceFolder}/src/Dapper.FluentMap/Dapper.FluentMap.csproj",
+        "--configuration",
+        "Release",
+        "--output",
+        "${workspaceFolder}/artifacts/packages"
+      ],
+      "problemMatcher": "$msCompile",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "clear": true
+      }
+    },
+    {
+      "label": "dotnet: clean solution",
+      "type": "process",
+      "command": "dotnet",
+      "args": [
+        "clean",
+        "${workspaceFolder}/Dapper.FluentMap.sln"
+      ],
+      "problemMatcher": "$msCompile"
+    }
+  ]
+}

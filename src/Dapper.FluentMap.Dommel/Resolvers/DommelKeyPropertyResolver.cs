@@ -27,10 +27,10 @@ namespace Dapper.FluentMap.Dommel.Resolvers
             var mapping = entityMap as IDommelEntityMap;
             if (mapping != null)
             {
-                var allPropertyMaps = entityMap.PropertyMaps.OfType<DommelPropertyMap>();
+                var allPropertyMaps = DommelPersistenceMetadata.ResolvePropertyMaps(type, entityMap).OfType<DommelPropertyMap>().ToList();
                 var keyPropertyInfos = allPropertyMaps
                      .Where(e => e.Key)
-                     .Select(x => new ColumnPropertyInfo(x.PropertyInfo, x.GeneratedOption ?? (x.Key ? DatabaseGeneratedOption.Identity : DatabaseGeneratedOption.None)))
+                     .Select(x => new ColumnPropertyInfo(x.PropertyInfo, x.EffectiveKeyGeneratedOption))
                      .ToArray();
 
                 // Now make sure there aren't any missing key properties that weren't explicitly defined in the mapping.

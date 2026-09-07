@@ -1,7 +1,8 @@
-﻿using System;
-using System.Linq;
+using System;
+using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Reflection;
+using Dapper.FluentMap.Mapping;
 
 namespace Dapper.FluentMap.Utils
 {
@@ -17,62 +18,70 @@ namespace Dapper.FluentMap.Utils
         /// <returns>A <see cref="MemberInfo"/> object for the member in the specified lambda expression.</returns>
         public static MemberInfo GetMemberInfo(LambdaExpression lambda)
         {
-            Expression expr = lambda;
+            return GetMemberPath(lambda).PropertyInfo;
+        }
+
+        internal static MemberPath GetMemberPath(LambdaExpression lambda)
+        {
+            if (lambda == null)
+            {
+                throw new ArgumentNullException(nameof(lambda));
+            }
+
+            var properties = new Stack<PropertyInfo>();
+            var expr = RemoveConvert(lambda.Body);
+
             while (true)
             {
+                if (expr == null)
+                {
+                    throw new ArgumentException($"Expression '{lambda}' must resolve to a property path.", nameof(lambda));
+                }
+
                 switch (expr.NodeType)
                 {
-                    case ExpressionType.Lambda:
-                        expr = ((LambdaExpression)expr).Body;
-                        break;
-
-                    case ExpressionType.Convert:
-                        expr = ((UnaryExpression)expr).Operand;
-                        break;
-
                     case ExpressionType.MemberAccess:
                         var memberExpression = (MemberExpression)expr;
                         var member = memberExpression.Member;
-                        Type paramType;
 
-                        while (memberExpression != null)
+                        if (member is PropertyInfo propertyInfo)
                         {
-                            paramType = memberExpression.Type;
-
-                            // Find the member on the base type of the member type
-                            // E.g. EmailAddress.Value
-                            var baseMember = paramType.GetMembers().FirstOrDefault(m => m.Name == member.Name);
-                            if (baseMember != null)
+                            if (propertyInfo.GetIndexParameters().Length > 0)
                             {
-                                // Don't use the base type if it's just the nullable type of the derived type
-                                // or when the same member exists on a different type
-                                // E.g. Nullable<decimal> -> decimal
-                                // or:  SomeType { string Length; } -> string.Length
-                                if (baseMember is PropertyInfo baseProperty && member is PropertyInfo property)
-                                {
-                                    if (baseProperty.DeclaringType == property.DeclaringType &&
-                                        baseProperty.PropertyType != Nullable.GetUnderlyingType(property.PropertyType))
-                                    {
-                                        return baseMember;
-                                    }
-                                }
-                                else
-                                {
-                                    return baseMember;
-                                }
+                                throw new ArgumentException($"Expression '{lambda}' refers to indexed property '{member.Name}', which is not supported.", nameof(lambda));
                             }
 
-                            memberExpression = memberExpression.Expression as MemberExpression;
+                            properties.Push(propertyInfo);
+                            expr = RemoveConvert(memberExpression.Expression);
+                            break;
                         }
 
-                        // Make sure we get the property from the derived type.
-                        paramType = lambda.Parameters[0].Type;
-                        return paramType.GetMember(member.Name)[0];
+                        throw new ArgumentException($"Expression '{lambda}' refers to member '{member.Name}', which is not a property.", nameof(lambda));
+
+                    case ExpressionType.Parameter:
+                        if (properties.Count == 0)
+                        {
+                            throw new ArgumentException($"Expression '{lambda}' must resolve to a property path.", nameof(lambda));
+                        }
+
+                        return MemberPath.FromProperties(properties);
 
                     default:
-                        return null;
+                        throw new ArgumentException($"Expression '{lambda}' must resolve to a property path.", nameof(lambda));
                 }
             }
+        }
+
+        private static Expression RemoveConvert(Expression expression)
+        {
+            while (expression != null &&
+                   (expression.NodeType == ExpressionType.Convert ||
+                    expression.NodeType == ExpressionType.ConvertChecked))
+            {
+                expression = ((UnaryExpression)expression).Operand;
+            }
+
+            return expression;
         }
     }
 }

@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Linq;
 using Dapper.FluentMap.Mapping;
-using Dapper.FluentMap.TypeMaps;
 using Xunit;
 
 [assembly: CollectionBehavior(DisableTestParallelization = true)]
@@ -16,7 +15,8 @@ namespace Dapper.FluentMap.Tests
             PreTest();
 
             // Act & Assert
-            Assert.Throws<Exception>(() => new MapWithDuplicateMapping());
+            var exception = Assert.Throws<FluentMapConfigurationException>(() => new MapWithDuplicateMapping());
+            Assert.Contains(nameof(TestEntity.Id), exception.Message);
         }
 
         [Fact]
@@ -117,7 +117,8 @@ namespace Dapper.FluentMap.Tests
 
             // Assert
             Assert.NotNull(typeMap);
-            Assert.IsType<FluentMapTypeMap<TestEntity>>(typeMap);
+            var member = typeMap.GetMember("test");
+            Assert.Equal(typeof(TestEntity).GetProperty(nameof(TestEntity.Id)), member.Property);
         }
 
         [Fact]
@@ -147,10 +148,28 @@ namespace Dapper.FluentMap.Tests
             Assert.Equal(typeof(EmailTestValueObject), email.PropertyInfo.DeclaringType);
         }
 
+        [Fact]
+        public void PropertyMapShouldDistinguishNestedPropertiesWithSameTerminalName()
+        {
+            PreTest();
+
+            var map = new NestedLevelMap();
+
+            Assert.Equal(2, map.PropertyMaps.Count);
+        }
+
+        [Fact]
+        public void DuplicateNestedPropertyPathShouldThrow_Exception()
+        {
+            PreTest();
+
+            var exception = Assert.Throws<FluentMapConfigurationException>(() => new DuplicateNestedLevelMap());
+            Assert.Contains("Rank.Level", exception.Message);
+        }
+
         private static void PreTest()
         {
-            FluentMapper.EntityMaps.Clear();
-            FluentMapper.TypeConventions.Clear();
+            FluentMapper.Reset(typeof(TestEntity), typeof(DerivedTestEntity), typeof(ValueObjectTestEntity));
         }
 
         private class IgnoreMap : EntityMap<TestEntity>
@@ -205,6 +224,41 @@ namespace Dapper.FluentMap.Tests
             {
                 Map(x => x.Email.Address).ToColumn("email");
             }
+        }
+
+        private class NestedLevelMap : EntityMap<NestedLevelEntity>
+        {
+            public NestedLevelMap()
+            {
+                Map(x => x.Rank.Level).ToColumn("rank_level");
+                Map(x => x.Seniority.Level).ToColumn("seniority_level");
+            }
+        }
+
+        private class DuplicateNestedLevelMap : EntityMap<NestedLevelEntity>
+        {
+            public DuplicateNestedLevelMap()
+            {
+                Map(x => x.Rank.Level).ToColumn("rank_level");
+                Map(x => x.Rank.Level).ToColumn("rank_level_again");
+            }
+        }
+
+        private class NestedLevelEntity
+        {
+            public RankInfo Rank { get; set; }
+
+            public SeniorityInfo Seniority { get; set; }
+        }
+
+        private class RankInfo
+        {
+            public int Level { get; set; }
+        }
+
+        private class SeniorityInfo
+        {
+            public int Level { get; set; }
         }
     }
 }

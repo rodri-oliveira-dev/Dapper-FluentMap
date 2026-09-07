@@ -20,6 +20,7 @@ namespace Dapper.FluentMap.Dommel
             DommelMapper.SetKeyPropertyResolver(new DommelKeyPropertyResolver());
             DommelMapper.SetTableNameResolver(new DommelTableNameResolver());
             DommelMapper.SetPropertyResolver(new DommelPropertyResolver());
+            DommelPersistenceSqlBuilder.RegisterDefaults();
             return config;
         }
     }

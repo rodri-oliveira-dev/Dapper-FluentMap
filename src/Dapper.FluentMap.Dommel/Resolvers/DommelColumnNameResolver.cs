@@ -28,7 +28,10 @@ namespace Dapper.FluentMap.Dommel.Resolvers
                     var mapping = entityMap as IDommelEntityMap;
                     if (mapping != null)
                     {
-                        var propertyMaps = entityMap.PropertyMaps.Where(m => m.PropertyInfo.Name == propertyInfo.Name).ToList();
+                        var propertyMaps = DommelPersistenceMetadata
+                            .ResolvePropertyMaps(propertyInfo.ReflectedType ?? propertyInfo.DeclaringType, entityMap)
+                            .Where(m => m.PropertyInfo.Name == propertyInfo.Name)
+                            .ToList();
                         if (propertyMaps.Count == 1)
                         {
                             return propertyMaps[0].ColumnName;

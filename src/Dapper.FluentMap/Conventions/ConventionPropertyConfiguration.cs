@@ -23,6 +23,11 @@ namespace Dapper.FluentMap.Conventions
         /// <returns>The same instance of <see cref="T:Dapper.FluentMap.Conventions.ConventionPropertyConfiguration"/>.</returns>
         public ConventionPropertyConfiguration HasColumnName(string columnName)
         {
+            if (string.IsNullOrEmpty(columnName))
+            {
+                throw new ArgumentException("Column name cannot be null or empty.", nameof(columnName));
+            }
+
             ColumnName = columnName;
             return this;
         }
@@ -34,6 +39,11 @@ namespace Dapper.FluentMap.Conventions
         /// <returns>The same instance of <see cref="T:Dapper.FluentMap.Conventions.ConventionPropertyConfiguration"/>.</returns>
         public ConventionPropertyConfiguration HasPrefix(string prefix)
         {
+            if (prefix == null)
+            {
+                throw new ArgumentNullException(nameof(prefix));
+            }
+
             Prefix = prefix;
             return this;
         }
@@ -55,6 +65,11 @@ namespace Dapper.FluentMap.Conventions
         /// <returns>The same instance of <see cref="T:Dapper.FluentMap.Conventions.ConventionPropertyConfiguration"/>.</returns>
         public ConventionPropertyConfiguration Transform(Func<string, string> transformer)
         {
+            if (transformer == null)
+            {
+                throw new ArgumentNullException(nameof(transformer));
+            }
+
             PropertyTransformer = transformer;
             return this;
         }
