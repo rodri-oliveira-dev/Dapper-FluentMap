@@ -1,79 +1,98 @@
 name: Release
 
+run-name: "Release ${{ inputs.version || 'dry-run' }} from ${{ github.ref_name }}"
+
 on:
-  push:
+  pull_request:
     branches:
-      - release/3.0.0-rc.1
+      - master
+    paths:
+      - .github/workflows/release.yml
+      - Directory.Build.props
+      - global.json
+      - Dapper.FluentMap.sln
+      - README.md
+      - eng/validate-release-artifacts.ps1
+      - eng/consumer-smoke/**
+      - src/**
   workflow_dispatch:
     inputs:
-      package-version:
-        description: "NuGet package version to validate and pack, for example 3.0.0-rc.1."
+      version:
+        description: "Exact Semantic Version to publish, for example 3.0.0-rc.1 or 3.0.0."
         required: true
-        default: "3.0.0-rc.1"
+        type: string
       publish:
-        description: "Reserved for a future approval-based NuGet publish flow. Publishing is disabled in this workflow."
+        description: "Publish the validated packages and GitHub Release."
         required: true
-        type: boolean
         default: false
-
-env:
-  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
-  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
-  CI: "true"
-  PACKAGE_VERSION: ${{ inputs.package-version || '3.0.0-rc.1' }}
-  PUBLISH_REQUESTED: ${{ inputs.publish && 'true' || 'false' }}
+        type: boolean
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ inputs.package-version }}
+  group: "release-${{ github.ref }}"
   cancel-in-progress: false
 
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
+  DOTNET_NOLOGO: "true"
+  CI: "true"
+
 jobs:
-  validate-package:
-    name: Validate release package
+  build:
+    name: Build release artifacts
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    outputs:
+      version: "${{ steps.release-metadata.outputs.version }}"
+      tag: "${{ steps.release-metadata.outputs.tag }}"
+      is-prerelease: "${{ steps.release-metadata.outputs.is_prerelease }}"
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 1
           persist-credentials: false
           show-progress: false
 
-      - name: Setup .NET
+      - name: Setup .NET SDK
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           global-json-file: global.json
 
-      - name: Validate release input
-        shell: pwsh
+      - name: Resolve release metadata
+        id: release-metadata
+        shell: bash
+        env:
+          REQUESTED_VERSION: "${{ inputs.version || format('0.0.0-ci.{0}', github.run_number) }}"
         run: |
-          $ErrorActionPreference = 'Stop'
-          $version = '${{ env.PACKAGE_VERSION }}'
+          set -euo pipefail
 
-          if ($version -notmatch '^\d+\.\d+\.\d+(-[0-9A-Za-z][0-9A-Za-z.-]*)$') {
-            throw "Package version '$version' is not a supported SemVer value."
-          }
+          version="${REQUESTED_VERSION}"
+          if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
+            echo "Version '${version}' is not a supported Semantic Version. Build metadata (+...) is intentionally not accepted." >&2
+            exit 2
+          fi
 
-          if ($version -ne '3.0.0-rc.1') {
-            throw "This release workflow is locked to 3.0.0-rc.1. Received '$version'."
-          }
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            major="${version%%.*}"
+            if (( major < 3 )); then
+              echo "Official FluentMap releases from this workflow must use major version 3 or later." >&2
+              exit 2
+            fi
+          fi
 
-          $ref = '${{ github.ref }}'
-          if ($ref -ne 'refs/heads/release/3.0.0-rc.1') {
-            throw "This release workflow is locked to refs/heads/release/3.0.0-rc.1. Received '$ref'."
-          }
+          is_prerelease=false
+          if [[ "${version}" == *-* ]]; then
+            is_prerelease=true
+          fi
 
-      - name: Guard disabled publish path
-        if: ${{ env.PUBLISH_REQUESTED == 'true' }}
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          throw "NuGet publishing is intentionally disabled. Configure NuGet trusted publishing/OIDC and an approval environment before enabling publish."
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+          echo "tag=v${version}" >> "${GITHUB_OUTPUT}"
+          echo "is_prerelease=${is_prerelease}" >> "${GITHUB_OUTPUT}"
 
       - name: Show .NET info
         run: dotnet --info
@@ -85,28 +104,50 @@ jobs:
         run: dotnet list ./Dapper.FluentMap.sln package --vulnerable --include-transitive
 
       - name: Build Release
-        run: dotnet build ./Dapper.FluentMap.sln --configuration Release --no-restore -p:Version=${{ env.PACKAGE_VERSION }}
+        env:
+          RELEASE_VERSION: "${{ steps.release-metadata.outputs.version }}"
+        run: >-
+          dotnet build ./Dapper.FluentMap.sln
+          --configuration Release
+          --no-restore
+          -p:Version=${RELEASE_VERSION}
+          -p:RepositoryCommit=${GITHUB_SHA}
+          -p:RepositoryBranch=${GITHUB_REF}
+          -p:ContinuousIntegrationBuild=true
 
       - name: Test Release
-        run: dotnet test ./Dapper.FluentMap.sln --configuration Release --no-build
+        run: dotnet test ./Dapper.FluentMap.sln --configuration Release --no-build --no-restore
 
-      - name: Pack Release
-        run: dotnet pack ./Dapper.FluentMap.sln --configuration Release --no-build --output ./artifacts/packages -p:Version=${{ env.PACKAGE_VERSION }}
+      - name: Pack exact release version
+        env:
+          RELEASE_VERSION: "${{ steps.release-metadata.outputs.version }}"
+        run: >-
+          dotnet pack ./Dapper.FluentMap.sln
+          --configuration Release
+          --no-build
+          --no-restore
+          --output ./artifacts/packages
+          -p:Version=${RELEASE_VERSION}
+          -p:RepositoryCommit=${GITHUB_SHA}
+          -p:RepositoryBranch=${GITHUB_REF}
+          -p:ContinuousIntegrationBuild=true
 
       - name: Validate release artifacts and write manifest
         shell: pwsh
+        env:
+          RELEASE_VERSION: "${{ steps.release-metadata.outputs.version }}"
         run: |
           $ErrorActionPreference = 'Stop'
           ./eng/validate-release-artifacts.ps1 `
             -PackageDirectory './artifacts/packages' `
-            -Version '${{ env.PACKAGE_VERSION }}' `
+            -Version $env:RELEASE_VERSION `
             -ManifestPath './artifacts/release-metadata/artifact-manifest.json' `
             -Repository '${{ github.repository }}' `
             -RepositoryUrl 'https://github.com/${{ github.repository }}' `
             -Commit '${{ github.sha }}' `
             -Branch '${{ github.ref }}'
 
-      - name: Consumer smoke release packages
+      - name: Consumer smoke test release packages
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -121,45 +162,201 @@ jobs:
           dotnet list ./Dapper.FluentMap.sln package --include-transitive --format json |
             Set-Content -Encoding utf8NoBOM -Path './artifacts/release-metadata/dependencies.json'
 
-      - name: Upload release package artifacts
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: release-packages-${{ env.PACKAGE_VERSION }}
-          path: |
-            ./artifacts/packages/*.nupkg
-            ./artifacts/packages/*.snupkg
-            ./artifacts/release-metadata/*.json
-          if-no-files-found: error
-          retention-days: 90
-
-  provenance:
-    name: Attest release package provenance
-    runs-on: ubuntu-latest
-    needs: validate-package
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      id-token: write
-      attestations: write
-
-    steps:
-      - name: Download release package artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: release-packages-${{ env.PACKAGE_VERSION }}
-          path: ./artifacts/release
-
-      - name: Collect package subjects
+      - name: Generate release checksums
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          New-Item -ItemType Directory -Force -Path './artifacts/attestation-subjects' | Out-Null
-          Get-ChildItem -Path './artifacts/release' -Recurse -File -Include '*.nupkg', '*.snupkg' |
-            Copy-Item -Destination './artifacts/attestation-subjects'
+          $artifactRoot = (Resolve-Path './artifacts').Path
+          $files = @(
+            Get-ChildItem './artifacts/packages' -File -Include '*.nupkg', '*.snupkg'
+            Get-Item './artifacts/release-metadata/artifact-manifest.json'
+            Get-Item './artifacts/release-metadata/dependencies.json'
+          ) | Sort-Object FullName
 
-      - name: Attest package provenance
-        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+          $lines = foreach ($file in $files) {
+            $relative = [System.IO.Path]::GetRelativePath($artifactRoot, $file.FullName).Replace('\', '/')
+            $hash = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $relative"
+          }
+
+          $checksumPath = Join-Path $artifactRoot 'release-metadata/SHA256SUMS'
+          [System.IO.File]::WriteAllLines($checksumPath, $lines, [System.Text.UTF8Encoding]::new($false))
+
+      - name: Upload validated release candidate
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: "release-candidate-${{ steps.release-metadata.outputs.version }}"
+          path: ./artifacts
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Publish official release
+    if: "${{ github.event_name == 'workflow_dispatch' && inputs.publish }}"
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: release
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+
+    steps:
+      - name: Validate protected publication request
+        shell: bash
+        env:
+          RELEASE_VERSION: "${{ needs.build.outputs.version }}"
+          RELEASE_TAG: "${{ needs.build.outputs.tag }}"
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_REF}" != "refs/heads/master" ]]; then
+            echo "Official publication is allowed only from refs/heads/master." >&2
+            exit 2
+          fi
+
+          if [[ "${RELEASE_TAG}" != "v${RELEASE_VERSION}" ]]; then
+            echo "Resolved release tag must be exactly v${RELEASE_VERSION}." >&2
+            exit 2
+          fi
+
+      - name: Checkout exact release commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: "${{ github.sha }}"
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Download validated release candidate
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: "release-candidate-${{ needs.build.outputs.version }}"
+          path: ./artifacts
+
+      - name: Verify downloaded release candidate checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd ./artifacts
+          sha256sum --check ./release-metadata/SHA256SUMS
+
+      - name: Revalidate downloaded package set
+        shell: pwsh
+        env:
+          RELEASE_VERSION: "${{ needs.build.outputs.version }}"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./eng/validate-release-artifacts.ps1 `
+            -PackageDirectory './artifacts/packages' `
+            -Version $env:RELEASE_VERSION `
+            -ManifestPath (Join-Path $env:RUNNER_TEMP 'reverified-artifact-manifest.json') `
+            -Repository '${{ github.repository }}' `
+            -RepositoryUrl 'https://github.com/${{ github.repository }}' `
+            -Commit '${{ github.sha }}' `
+            -Branch 'refs/heads/master'
+
+      - name: Attest release artifacts
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: |
-            ./artifacts/attestation-subjects/*.nupkg
-            ./artifacts/attestation-subjects/*.snupkg
+            ./artifacts/packages/*.nupkg
+            ./artifacts/packages/*.snupkg
+            ./artifacts/release-metadata/artifact-manifest.json
+            ./artifacts/release-metadata/dependencies.json
+            ./artifacts/release-metadata/SHA256SUMS
+
+      - name: Create or resume draft GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: "${{ github.token }}"
+          RELEASE_TAG: "${{ needs.build.outputs.tag }}"
+          IS_PRERELEASE: "${{ needs.build.outputs.is-prerelease }}"
+        run: |
+          set -euo pipefail
+
+          git fetch --force --tags origin
+          if git show-ref --tags --verify --quiet "refs/tags/${RELEASE_TAG}"; then
+            existing_commit="$(git rev-list -n 1 "${RELEASE_TAG}")"
+            if [[ "${existing_commit}" != "${GITHUB_SHA}" ]]; then
+              echo "Tag ${RELEASE_TAG} already points to ${existing_commit}, not ${GITHUB_SHA}." >&2
+              exit 3
+            fi
+          fi
+
+          release_state="$(gh release view "${RELEASE_TAG}" --json isDraft --jq '.isDraft' 2>/dev/null || true)"
+          if [[ "${release_state}" == "false" ]]; then
+            echo "Release ${RELEASE_TAG} is already published; refusing to mutate an immutable release." >&2
+            exit 3
+          fi
+
+          prerelease_args=()
+          if [[ "${IS_PRERELEASE}" == "true" ]]; then
+            prerelease_args+=(--prerelease)
+          fi
+
+          if [[ -z "${release_state}" ]]; then
+            if git show-ref --tags --verify --quiet "refs/tags/${RELEASE_TAG}"; then
+              gh release create "${RELEASE_TAG}" \
+                --verify-tag \
+                --draft \
+                --generate-notes \
+                --title "${RELEASE_TAG}" \
+                "${prerelease_args[@]}"
+            else
+              gh release create "${RELEASE_TAG}" \
+                --target "${GITHUB_SHA}" \
+                --draft \
+                --generate-notes \
+                --title "${RELEASE_TAG}" \
+                "${prerelease_args[@]}"
+            fi
+          fi
+
+          gh release upload "${RELEASE_TAG}" \
+            ./artifacts/packages/* \
+            ./artifacts/release-metadata/* \
+            --clobber
+
+      - name: Authenticate to NuGet.org with trusted publishing
+        id: nuget-login
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
+        with:
+          user: "${{ vars.NUGET_USER }}"
+
+      - name: Publish NuGet packages
+        shell: pwsh
+        env:
+          NUGET_API_KEY: "${{ steps.nuget-login.outputs.NUGET_API_KEY }}"
+          RELEASE_VERSION: "${{ needs.build.outputs.version }}"
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $packageIds = @(
+            'Dapper.FluentMap',
+            'Dapper.FluentMap.Dommel',
+            'Dapper.FluentMap.DependencyInjection',
+            'Dapper.FluentMap.Analyzers',
+            'Dapper.FluentMap.Generators'
+          )
+
+          foreach ($packageId in $packageIds) {
+            $package = "./artifacts/packages/$packageId.$env:RELEASE_VERSION.nupkg"
+            dotnet nuget push $package `
+              --source 'https://api.nuget.org/v3/index.json' `
+              --api-key $env:NUGET_API_KEY `
+              --skip-duplicate
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "NuGet publication failed for $packageId."
+            }
+          }
+
+      - name: Publish GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: "${{ github.token }}"
+          RELEASE_TAG: "${{ needs.build.outputs.tag }}"
+        run: |
+          set -euo pipefail
+          gh release edit "${RELEASE_TAG}" --draft=false
