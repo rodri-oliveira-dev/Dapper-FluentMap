@@ -52,7 +52,21 @@ function Get-ChildText {
   return $child.InnerText
 }
 
-function Split-MetadataList {
+function Split-Authors {
+  param([string]$Value)
+
+  if ([string]::IsNullOrWhiteSpace($Value)) {
+    return @()
+  }
+
+  return @(
+    $Value -split '[;,]' |
+      ForEach-Object { $_.Trim() } |
+      Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+  )
+}
+
+function Split-Tags {
   param([string]$Value)
 
   if ([string]::IsNullOrWhiteSpace($Value)) {
@@ -121,14 +135,14 @@ foreach ($file in $nupkgs) {
       Fail "$id must have a meaningful package description."
     }
 
-    $authors = Split-MetadataList -Value (Get-ChildText -Node $metadata -Name 'authors')
+    $authors = Split-Authors -Value (Get-ChildText -Node $metadata -Name 'authors')
     foreach ($expectedAuthor in $expectedAuthors) {
       if ($expectedAuthor -notin $authors) {
         Fail "$id authors '$($authors -join ', ')' must include '$expectedAuthor'."
       }
     }
 
-    $tags = Split-MetadataList -Value (Get-ChildText -Node $metadata -Name 'tags')
+    $tags = Split-Tags -Value (Get-ChildText -Node $metadata -Name 'tags')
     foreach ($requiredTag in $expected.RequiredTags) {
       if ($requiredTag -notin $tags) {
         Fail "$id tags are missing '$requiredTag'."
