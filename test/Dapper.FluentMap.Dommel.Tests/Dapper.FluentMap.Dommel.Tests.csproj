@@ -19,4 +19,8 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
   </ItemGroup>
+  <ItemGroup>
+    <Using Include="Xunit.Sdk" />
+    <Using Include="Xunit.v3" />
+  </ItemGroup>
 </Project>
