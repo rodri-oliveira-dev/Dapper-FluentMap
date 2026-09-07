@@ -7,9 +7,9 @@
     <ProjectReference Include="..\..\src\Dapper.FluentMap.Analyzers\Dapper.FluentMap.Analyzers.csproj" />
     <ProjectReference Include="..\..\src\Dapper.FluentMap.Dommel\Dapper.FluentMap.Dommel.csproj" />
     <ProjectReference Include="..\..\src\Dapper.FluentMap\Dapper.FluentMap.csproj" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.8.1" />
-    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="10.0.8" />
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.6.0" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
+    <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="10.0.11" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="5.9.0" PrivateAssets="all" />
     <PackageReference Include="xunit.v3" Version="3.2.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
