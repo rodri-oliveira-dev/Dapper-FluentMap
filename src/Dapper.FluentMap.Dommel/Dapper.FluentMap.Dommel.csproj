@@ -1,12 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Description>Dapper.FluentMap extension for Dommel support.</Description>
+    <Title>Dapper.FluentMap - Dommel Integration</Title>
+    <Description>Dommel integration for Dapper.FluentMap, providing fluent table, key, generated-column, and persistence metadata mappings.</Description>
     <Copyright>Copyright © Henk Mollema 2014</Copyright>
     <VersionPrefix>$(FluentMapPackageVersionPrefix)</VersionPrefix>
-    <Authors>Henk Mollema</Authors>
     <TargetFramework>netstandard2.0</TargetFramework>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <PackageTags>dapper;fluentmap;dommel</PackageTags>
+    <PackageTags>dapper;dommel;fluent-mapping;mapping;crud;database;sql;fluentmap</PackageTags>
     <EnablePackageValidation>true</EnablePackageValidation>
     <PackageValidationBaselineVersion Condition="'$(EnableFluentMapHistoricalApiCompatValidation)' == 'true'">2.0.0</PackageValidationBaselineVersion>
   </PropertyGroup>

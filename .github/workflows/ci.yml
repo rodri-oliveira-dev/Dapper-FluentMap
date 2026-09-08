@@ -136,6 +136,12 @@ jobs:
       - name: Pack Release
         run: dotnet pack ./Dapper.FluentMap.sln --configuration Release --no-build --output ./artifacts/packages
 
+      - name: Validate NuGet presentation metadata
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./eng/validate-package-metadata.ps1 -PackageDirectory './artifacts/packages'
+
       - name: Validate package artifact set
         shell: pwsh
         run: |
