@@ -252,7 +252,7 @@ jobs:
       - repository-configuration
       - compatibility
       - roslyn-components
-    if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch' }}
+    if: ${{ vars.SONAR_CI_ENABLED == 'true' && ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch') }}
     permissions:
       contents: read
       issues: write
