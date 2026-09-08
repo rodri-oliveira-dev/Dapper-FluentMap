@@ -1,5 +1,10 @@
 # FluentMap
 
+[![CI](https://github.com/rodri-oliveira-dev/Dapper-FluentMap/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/rodri-oliveira-dev/Dapper-FluentMap/actions/workflows/ci.yml)
+[![.NET Standard 2.0](https://img.shields.io/badge/.NET%20Standard-2.0-512BD4?logo=dotnet&logoColor=white)](https://learn.microsoft.com/dotnet/standard/net-standard)
+[![License: MIT](https://img.shields.io/github/license/rodri-oliveira-dev/Dapper-FluentMap)](LICENSE)
+[![GitHub stars](https://img.shields.io/github/stars/rodri-oliveira-dev/Dapper-FluentMap?style=flat&logo=github)](https://github.com/rodri-oliveira-dev/Dapper-FluentMap/stargazers)
+
 English | [Português (Brasil)](README.pt-BR.md)
 
 FluentMap is an advanced mapping layer for Dapper. It lets you describe how .NET object properties map to database columns with fluent, strongly typed code, while keeping persistence attributes out of your POCOs.
