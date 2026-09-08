@@ -5,9 +5,12 @@ on:
     branches:
       - master
   pull_request:
+  workflow_dispatch:
 
 env:
   DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+  DOTNET_COVERAGE_NOLOGO: "true"
+  DOTNET_COVERAGE_TELEMETRY_OPTOUT: "true"
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
   CI: "true"
 
@@ -241,6 +244,284 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  sonar:
+    name: SonarQube Cloud
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    needs:
+      - repository-configuration
+      - compatibility
+      - roslyn-components
+    if: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch' }}
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          show-progress: false
+
+      - name: Verify SONAR_TOKEN
+        shell: bash
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          if [ -z "${SONAR_TOKEN}" ]; then
+            echo "SONAR_TOKEN repository secret is required."
+            exit 1
+          fi
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+
+      - name: Setup Java
+        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      - name: Restore
+        run: dotnet restore ./Dapper.FluentMap.slnx
+
+      - name: Begin Sonar analysis
+        shell: bash
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: >
+          dotnet sonarscanner begin
+          /k:"rodri-oliveira-dev_Dapper-FluentMap"
+          /o:"rodri-oliveira-dev"
+          /d:sonar.token="${SONAR_TOKEN}"
+          /d:sonar.host.url="https://sonarcloud.io"
+          /d:sonar.projectBaseDir="${GITHUB_WORKSPACE}"
+          /d:sonar.cs.vscoveragexml.reportsPaths="artifacts/coverage/sonar/coverage.xml"
+          /d:sonar.exclusions="benchmarks/**,test/Dapper.FluentMap.AotSmoke/**,eng/consumer-smoke/**,**/bin/**,**/obj/**,**/*.g.cs,**/*.generated.cs"
+          /d:sonar.coverage.exclusions="test/**,benchmarks/**,eng/consumer-smoke/**,**/*.g.cs,**/*.generated.cs"
+          /d:sonar.qualitygate.wait=true
+          /d:sonar.qualitygate.timeout=300
+
+      - name: Build Release
+        run: >
+          dotnet build ./Dapper.FluentMap.slnx
+          --configuration Release
+          --no-restore
+          --no-incremental
+          --disable-build-servers
+
+      - name: Test with coverage
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path './artifacts/coverage/sonar' | Out-Null
+          dotnet tool run dotnet-coverage -- collect `
+            --settings './eng/sonar-coverage.settings.xml' `
+            --output './artifacts/coverage/sonar/coverage.xml' `
+            --output-format xml `
+            pwsh -NoLogo -NoProfile -File './eng/run-sonar-tests.ps1'
+
+      - name: Verify coverage report
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $coveragePath = './artifacts/coverage/sonar/coverage.xml'
+          if (-not (Test-Path -LiteralPath $coveragePath)) {
+            throw "Coverage report was not created: $coveragePath"
+          }
+
+          [xml] $coverage = Get-Content -Raw -LiteralPath $coveragePath
+          $moduleNames = if ($coverage.results.modules.module) {
+            @($coverage.results.modules.module | ForEach-Object { $_.name })
+          } else {
+            @($coverage.CoverageSession.Modules.Module | ForEach-Object { $_.ModuleName })
+          }
+
+          if ($moduleNames -notcontains 'Dapper.FluentMap.dll') {
+            throw 'Coverage report does not contain production assembly Dapper.FluentMap.'
+          }
+
+          $unexpectedModules = @($moduleNames | Where-Object { $_ -match '(Tests|Benchmarks|AotSmoke)(\.dll)?$' })
+          if ($unexpectedModules.Count -gt 0) {
+            throw "Coverage report contains non-production modules: $($unexpectedModules -join ', ')"
+          }
+
+      - name: End Sonar analysis
+        id: sonar_end
+        shell: bash
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: dotnet sonarscanner end /d:sonar.token="${SONAR_TOKEN}"
+
+      - name: Report Sonar quality gate conditions
+        id: sonar_quality_gate
+        if: ${{ always() && github.event_name == 'pull_request' }}
+        shell: bash
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_PROJECT_KEY: rodri-oliveira-dev_Dapper-FluentMap
+          SONAR_PULL_REQUEST: ${{ github.event.pull_request.number }}
+        run: |
+          set -uo pipefail
+          marker="<!-- Dapper-FluentMap:sonar-quality-gate -->"
+          dashboard_url="https://sonarcloud.io/dashboard?id=${SONAR_PROJECT_KEY}&pullRequest=${SONAR_PULL_REQUEST}"
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          comment_file="sonar-quality-gate-comment.md"
+
+          if [ -z "${SONAR_TOKEN:-}" ]; then
+            echo "status=UNKNOWN" >> "${GITHUB_OUTPUT}"
+            echo "lookup_failed=true" >> "${GITHUB_OUTPUT}"
+            {
+              echo "${marker}"
+              echo "### SonarQube Cloud failure"
+              echo
+              echo "The SonarQube Cloud job failed before Quality Gate conditions could be fetched."
+              echo
+              echo "Cause: \`SONAR_TOKEN\` was not available to the workflow."
+              echo
+              echo "- [Open workflow run](${run_url})"
+              echo "- [Open SonarQube Cloud dashboard](${dashboard_url})"
+            } > "${comment_file}"
+            exit 0
+          fi
+
+          if ! response=$(curl --fail-with-body --silent --show-error \
+            -u "${SONAR_TOKEN}:" \
+            --get "https://sonarcloud.io/api/qualitygates/project_status" \
+            --data-urlencode "projectKey=${SONAR_PROJECT_KEY}" \
+            --data-urlencode "pullRequest=${SONAR_PULL_REQUEST}"); then
+            echo "status=UNKNOWN" >> "${GITHUB_OUTPUT}"
+            echo "lookup_failed=true" >> "${GITHUB_OUTPUT}"
+            {
+              echo "${marker}"
+              echo "### SonarQube Cloud failure"
+              echo
+              echo "The SonarQube Cloud job failed, and the workflow could not fetch Quality Gate conditions from SonarCloud."
+              echo
+              echo "Cause: SonarCloud Quality Gate API lookup failed."
+              echo
+              echo "- [Open workflow run](${run_url})"
+              echo "- [Open SonarQube Cloud dashboard](${dashboard_url})"
+            } > "${comment_file}"
+            exit 0
+          fi
+
+          status=$(echo "${response}" | jq -r '.projectStatus.status // "UNKNOWN"')
+          echo "status=${status}" >> "${GITHUB_OUTPUT}"
+          echo "lookup_failed=false" >> "${GITHUB_OUTPUT}"
+          echo "SonarQube Cloud quality gate conditions:"
+          echo "${response}" | jq '{
+            status: .projectStatus.status,
+            conditions: [.projectStatus.conditions[]? | {
+              metricKey,
+              status,
+              errorThreshold,
+              actualValue
+            }]
+          }'
+
+          failed_conditions=$(echo "${response}" | jq -r '
+            [.projectStatus.conditions[]? | select(.status != "OK") |
+              "- `" + .metricKey + "`: status `" + .status + "`, actual `" + (.actualValue // "n/a") + "`, threshold `" + (.errorThreshold // "n/a") + "`"
+            ] | join("\n")
+          ')
+          condition_rows=$(echo "${response}" | jq -r '
+            [.projectStatus.conditions[]? |
+              "| `" + (.metricKey // "unknown") + "` | **" + (.status // "UNKNOWN") + "** | `" + (.actualValue // "n/a") + "` | `" + (.errorThreshold // "n/a") + "` |"
+            ] | join("\n")
+          ')
+
+          if [ "${status}" = "OK" ]; then
+            {
+              echo "${marker}"
+              echo "### SonarQube Cloud success"
+              echo
+              echo "The SonarQube Cloud Quality Gate passed for this PR."
+              echo
+              echo "Quality Gate status: **${status}**"
+              echo
+              if [ -n "${condition_rows}" ]; then
+                echo "| Metric | Status | Actual | Threshold |"
+                echo "| --- | --- | --- | --- |"
+                echo "${condition_rows}"
+                echo
+              fi
+              echo "- [Open workflow run](${run_url})"
+              echo "- [Open SonarQube Cloud dashboard](${dashboard_url})"
+            } > "${comment_file}"
+          else
+            {
+              echo "${marker}"
+              echo "### SonarQube Cloud failure"
+              echo
+              echo "The SonarQube Cloud Quality Gate failed for this PR."
+              echo
+              echo "Quality Gate status: **${status}**"
+              echo
+              if [ -n "${failed_conditions}" ]; then
+                echo "Failed conditions:"
+                echo "${failed_conditions}"
+              else
+                echo "No failing Quality Gate condition was returned by SonarCloud."
+              fi
+              echo
+              echo "- [Open workflow run](${run_url})"
+              echo "- [Open SonarQube Cloud dashboard](${dashboard_url})"
+            } > "${comment_file}"
+          fi
+
+      - name: Comment Sonar quality gate on PR
+        if: ${{ always() && github.event_name == 'pull_request' && (steps.sonar_quality_gate.outcome == 'success' || failure()) }}
+        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553 # v9
+        with:
+          script: |
+            const fs = require("fs");
+            const marker = "<!-- Dapper-FluentMap:sonar-quality-gate -->";
+            const fallbackBody = [
+              marker,
+              "### SonarQube Cloud failure",
+              "",
+              "The SonarQube Cloud job failed before the workflow could prepare Quality Gate details.",
+              "",
+              `- [Open workflow run](${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID})`
+            ].join("\n");
+            const body = fs.existsSync("sonar-quality-gate-comment.md")
+              ? fs.readFileSync("sonar-quality-gate-comment.md", "utf8")
+              : fallbackBody;
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+            const { data: comments } = await github.rest.issues.listComments({
+              owner,
+              repo,
+              issue_number,
+              per_page: 100
+            });
+            const existing = comments.find(comment =>
+              comment.user?.type === "Bot" && comment.body?.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body
+              });
+            }
+
   ci-gate:
     name: CI Gate
     runs-on: ubuntu-latest
@@ -251,6 +532,7 @@ jobs:
       - compatibility
       - roslyn-components
       - pack
+      - sonar
 
     steps:
       - name: Verify required jobs
@@ -260,11 +542,18 @@ jobs:
           echo "compatibility=${{ needs.compatibility.result }}"
           echo "roslyn-components=${{ needs.roslyn-components.result }}"
           echo "pack=${{ needs.pack.result }}"
+          echo "sonar=${{ needs.sonar.result }}"
 
           if [[ "${{ needs.repository-configuration.result }}" != "success" || \
                 "${{ needs.compatibility.result }}" != "success" || \
                 "${{ needs.roslyn-components.result }}" != "success" || \
                 "${{ needs.pack.result }}" != "success" ]]; then
             echo "One or more required CI jobs did not complete successfully."
+            exit 1
+          fi
+
+          if [[ "${{ needs.sonar.result }}" != "success" && \
+                "${{ needs.sonar.result }}" != "skipped" ]]; then
+            echo "SonarQube Cloud did not complete successfully."
             exit 1
           fi
