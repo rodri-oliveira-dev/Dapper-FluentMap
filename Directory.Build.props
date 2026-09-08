@@ -18,11 +18,13 @@
   </PropertyGroup>
 
   <PropertyGroup>
+    <Authors>Henk Mollema;Rodrigo de Oliveira</Authors>
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/rodri-oliveira-dev/Dapper-FluentMap</RepositoryUrl>
     <PackageProjectUrl>$(RepositoryUrl)</PackageProjectUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes>https://github.com/rodri-oliveira-dev/Dapper-FluentMap/releases</PackageReleaseNotes>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <Deterministic>true</Deterministic>
