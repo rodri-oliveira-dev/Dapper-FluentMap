@@ -13,10 +13,11 @@ install:
       $env:PATH = "$installDir;$installDir\tools;$env:PATH"
       dotnet --info
 build_script:
-  - ps: dotnet restore .\Dapper.FluentMap.sln
-  - ps: dotnet build .\Dapper.FluentMap.sln --configuration Release --no-restore
-  - ps: dotnet test .\Dapper.FluentMap.sln --configuration Release --no-build
-  - ps: dotnet pack .\Dapper.FluentMap.sln --configuration Release --no-build --output .\artifacts\packages
+  - ps: .\eng\validate-slnx-equivalence.ps1
+  - ps: dotnet restore .\Dapper.FluentMap.slnx
+  - ps: dotnet build .\Dapper.FluentMap.slnx --configuration Release --no-restore
+  - ps: dotnet test .\Dapper.FluentMap.slnx --configuration Release --no-build
+  - ps: dotnet pack .\Dapper.FluentMap.slnx --configuration Release --no-build --output .\artifacts\packages
 test: off
 artifacts:
   - path: artifacts\packages\*.nupkg

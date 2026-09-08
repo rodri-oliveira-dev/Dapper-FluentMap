@@ -7,7 +7,7 @@ env:
     - DOTNET_SKIP_FIRST_TIME_EXPERIENCE=true
     - DOTNET_CLI_TELEMETRY_OPTOUT=true
 script:
-    - dotnet restore ./Dapper.FluentMap.sln
-    - dotnet build ./Dapper.FluentMap.sln --configuration Release --no-restore
-    - dotnet test ./Dapper.FluentMap.sln --configuration Release --no-build
-    - dotnet pack ./Dapper.FluentMap.sln --configuration Release --no-build --output ./artifacts/packages
+    - dotnet restore ./Dapper.FluentMap.slnx
+    - dotnet build ./Dapper.FluentMap.slnx --configuration Release --no-restore
+    - dotnet test ./Dapper.FluentMap.slnx --configuration Release --no-build
+    - dotnet pack ./Dapper.FluentMap.slnx --configuration Release --no-build --output ./artifacts/packages

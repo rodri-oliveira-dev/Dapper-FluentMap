@@ -153,17 +153,23 @@ jobs:
       - name: Show .NET info
         run: dotnet --info
 
+      - name: Validate SLNX equivalence
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./eng/validate-slnx-equivalence.ps1
+
       - name: Restore
-        run: dotnet restore ./Dapper.FluentMap.sln
+        run: dotnet restore ./Dapper.FluentMap.slnx
 
       - name: Audit NuGet dependencies
-        run: dotnet list ./Dapper.FluentMap.sln package --vulnerable --include-transitive
+        run: dotnet list ./Dapper.FluentMap.slnx package --vulnerable --include-transitive
 
       - name: Build release
         env:
           PACKAGE_VERSION: ${{ steps.version.outputs.package_version }}
         run: >-
-          dotnet build ./Dapper.FluentMap.sln
+          dotnet build ./Dapper.FluentMap.slnx
           --configuration Release
           --no-restore
           -p:Version=${PACKAGE_VERSION}
@@ -172,13 +178,13 @@ jobs:
           -p:ContinuousIntegrationBuild=true
 
       - name: Run tests
-        run: dotnet test ./Dapper.FluentMap.sln --configuration Release --no-build --no-restore
+        run: dotnet test ./Dapper.FluentMap.slnx --configuration Release --no-build --no-restore
 
       - name: Pack release
         env:
           PACKAGE_VERSION: ${{ steps.version.outputs.package_version }}
         run: >-
-          dotnet pack ./Dapper.FluentMap.sln
+          dotnet pack ./Dapper.FluentMap.slnx
           --configuration Release
           --no-build
           --no-restore
@@ -228,7 +234,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force -Path './artifacts/release-metadata' | Out-Null
-          dotnet list ./Dapper.FluentMap.sln package --include-transitive --format json |
+          dotnet list ./Dapper.FluentMap.slnx package --include-transitive --format json |
             Set-Content -Encoding utf8NoBOM -Path './artifacts/release-metadata/dependencies.json'
 
       - name: Generate release checksums

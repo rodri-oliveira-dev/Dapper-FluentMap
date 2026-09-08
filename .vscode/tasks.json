@@ -7,7 +7,7 @@
       "command": "dotnet",
       "args": [
         "restore",
-        "${workspaceFolder}/Dapper.FluentMap.sln"
+        "${workspaceFolder}/Dapper.FluentMap.slnx"
       ],
       "problemMatcher": "$msCompile"
     },
@@ -17,7 +17,7 @@
       "command": "dotnet",
       "args": [
         "build",
-        "${workspaceFolder}/Dapper.FluentMap.sln",
+        "${workspaceFolder}/Dapper.FluentMap.slnx",
         "--configuration",
         "Debug"
       ],
@@ -33,7 +33,7 @@
       "command": "dotnet",
       "args": [
         "build",
-        "${workspaceFolder}/Dapper.FluentMap.sln",
+        "${workspaceFolder}/Dapper.FluentMap.slnx",
         "--configuration",
         "Release"
       ],
@@ -66,7 +66,7 @@
       "command": "dotnet",
       "args": [
         "test",
-        "${workspaceFolder}/Dapper.FluentMap.sln",
+        "${workspaceFolder}/Dapper.FluentMap.slnx",
         "--configuration",
         "Release"
       ],
@@ -103,7 +103,7 @@
       "command": "dotnet",
       "args": [
         "clean",
-        "${workspaceFolder}/Dapper.FluentMap.sln"
+        "${workspaceFolder}/Dapper.FluentMap.slnx"
       ],
       "problemMatcher": "$msCompile"
     }
