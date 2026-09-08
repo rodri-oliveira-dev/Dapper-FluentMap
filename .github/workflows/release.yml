@@ -492,3 +492,56 @@ jobs:
             "${assets[@]}" \
             --repo "$GH_REPO" \
             "${release_args[@]}"
+
+  rollback:
+    name: Roll back failed release
+    if: >-
+      ${{ always() &&
+          needs.build-and-pack.result == 'success' &&
+          (needs.ensure-release-tag.result == 'failure' ||
+           needs.publish-nuget.result == 'failure' ||
+           needs.publish-github-packages.result == 'failure' ||
+           needs.github-release.result == 'failure') }}
+    needs:
+      - build-and-pack
+      - ensure-release-tag
+      - publish-nuget
+      - publish-github-packages
+      - github-release
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+
+    steps:
+      - name: Checkout rollback tooling
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          show-progress: false
+
+      - name: Exchange GitHub OIDC token for rollback NuGet API key
+        id: rollback-nuget-login
+        continue-on-error: true
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
+        with:
+          user: "${{ vars.NUGET_USER }}"
+
+      - name: Compensate failed release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NUGET_API_KEY: ${{ steps.rollback-nuget-login.outputs.NUGET_API_KEY }}
+          PACKAGE_VERSION: ${{ needs.build-and-pack.outputs.package-version }}
+          RELEASE_TAG: ${{ needs.build-and-pack.outputs.release-tag }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./eng/rollback-release.ps1 `
+            -Version $env:PACKAGE_VERSION `
+            -ReleaseTag $env:RELEASE_TAG `
+            -Repository '${{ github.repository }}' `
+            -RepositoryOwner '${{ github.repository_owner }}' `
+            -GitHubToken $env:GH_TOKEN `
+            -NuGetApiKey $env:NUGET_API_KEY
