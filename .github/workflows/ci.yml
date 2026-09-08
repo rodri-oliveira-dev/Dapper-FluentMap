@@ -19,6 +19,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  repository-configuration:
+    name: Repository configuration
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          show-progress: false
+
+      - name: Install configuration validator
+        run: python3 -m pip install --disable-pip-version-check check-jsonschema==0.38.0
+
+      - name: Validate GitHub workflows
+        run: check-jsonschema --builtin-schema vendor.github-workflows .github/workflows/*.yml
+
+      - name: Validate Dependabot configuration
+        run: check-jsonschema --builtin-schema vendor.dependabot .github/dependabot.yml
+
   compatibility:
     name: Compatibility (${{ matrix.dapper-lane }}, Dapper ${{ matrix.dapper-version }})
     runs-on: ubuntu-latest
@@ -219,6 +241,7 @@ jobs:
     timeout-minutes: 5
     if: ${{ always() }}
     needs:
+      - repository-configuration
       - compatibility
       - roslyn-components
       - pack
@@ -227,11 +250,13 @@ jobs:
       - name: Verify required jobs
         shell: bash
         run: |
+          echo "repository-configuration=${{ needs.repository-configuration.result }}"
           echo "compatibility=${{ needs.compatibility.result }}"
           echo "roslyn-components=${{ needs.roslyn-components.result }}"
           echo "pack=${{ needs.pack.result }}"
 
-          if [[ "${{ needs.compatibility.result }}" != "success" || \
+          if [[ "${{ needs.repository-configuration.result }}" != "success" || \
+                "${{ needs.compatibility.result }}" != "success" || \
                 "${{ needs.roslyn-components.result }}" != "success" || \
                 "${{ needs.pack.result }}" != "success" ]]; then
             echo "One or more required CI jobs did not complete successfully."
