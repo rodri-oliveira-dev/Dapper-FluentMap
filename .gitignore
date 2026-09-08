@@ -1,41 +1,77 @@
-[Oo]bj/
+# Build output
 [Bb]in/
-TestResults/
-.nuget/
-*.sln.ide/
-_ReSharper.*/
-packages/
+[Oo]bj/
 artifacts/
-PublishProfiles/
+
+# Tests and coverage
+TestResults/
+**/TestResults/
+*.trx
+*.coverage
+*.coveragexml
+coverage/
+CodeCoverage/
+
+# BenchmarkDotNet
+BenchmarkDotNet.Artifacts/
+**/BenchmarkDotNet.Artifacts/
+
+# IDEs and local workspace state
 .vs/
-bower_components/
-node_modules/
-**/wwwroot/lib/
-debugSettings.json
-project.lock.json
+.idea/
 *.user
 *.suo
-*.cache
-*.docstates
-_ReSharper.*
-nuget.exe
-*net45.csproj
-*net451.csproj
-*k10.csproj
-*.psess
-*.vsp
-*.pidb
-*.userprefs
-*DS_Store
-*.ncrunchsolution
-*.*sdf
-*.ipch
-.settings
-*.sln.ide
-node_modules
-**/[Cc]ompiler/[Rr]esources/**/*.js
-deploy/
-/.build
-/.agents/
-/docs/
-/.tmp/
+*.userosscache
+*.sln.docstates
+*.DotSettings.user
+
+# .NET and NuGet local caches
+.dotnet/
+.dotnet-home/
+.nuget/
+packages/
+*.binlog
+
+# Locally produced packages
+*.nupkg
+*.snupkg
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+.secrets/
+
+# Credentials and private cryptographic material
+credentials.json
+service-account*.json
+*.key
+*.pem
+*.crt
+*.cer
+*.p8
+*.p12
+*.pfx
+
+# Local configuration
+appsettings.Local.json
+appsettings.*.Local.json
+debugSettings.json
+
+# Local tooling and temporary files
+.tmp/
+.tools/
+tmp/
+temp/
+*.log
+*.tmp
+*.temp
+~$*
+*~
+
+# Operating system
+.DS_Store
+Thumbs.db
+Desktop.ini
