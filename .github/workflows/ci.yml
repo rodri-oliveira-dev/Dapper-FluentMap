@@ -297,6 +297,7 @@ jobs:
         shell: bash
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_QUALITY_GATE_WAIT: ${{ github.event_name == 'pull_request' }}
         run: >
           dotnet sonarscanner begin
           /k:"rodri-oliveira-dev_Dapper-FluentMap"
@@ -307,7 +308,7 @@ jobs:
           /d:sonar.cs.vscoveragexml.reportsPaths="artifacts/coverage/sonar/coverage.xml"
           /d:sonar.exclusions="test/**,benchmarks/**,eng/consumer-smoke/**,**/bin/**,**/obj/**,**/*.g.cs,**/*.generated.cs"
           /d:sonar.coverage.exclusions="test/**,benchmarks/**,eng/consumer-smoke/**,**/*.g.cs,**/*.generated.cs"
-          /d:sonar.qualitygate.wait=true
+          /d:sonar.qualitygate.wait="${SONAR_QUALITY_GATE_WAIT}"
           /d:sonar.qualitygate.timeout=300
 
       - name: Build Release
