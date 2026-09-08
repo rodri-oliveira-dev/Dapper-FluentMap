@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Configuration>
+  <CodeCoverage>
+    <ModulePaths>
+      <Include>
+        <ModulePath>(^|.*[\\/])Dapper\.FluentMap(\.(Analyzers|DependencyInjection|Dommel|Generators))?\.dll$</ModulePath>
+      </Include>
+      <Exclude>
+        <ModulePath>(^|.*[\\/])Dapper\.FluentMap\..*Tests\.dll$</ModulePath>
+        <ModulePath>(^|.*[\\/])Dapper\.FluentMap\.AotSmoke\.dll$</ModulePath>
+        <ModulePath>(^|.*[\\/])Dapper\.FluentMap\.Benchmarks\.dll$</ModulePath>
+      </Exclude>
+    </ModulePaths>
+    <Attributes>
+      <Exclude>
+        <Attribute>^System\.CodeDom\.Compiler\.GeneratedCodeAttribute$</Attribute>
+        <Attribute>^System\.Diagnostics\.CodeAnalysis\.ExcludeFromCodeCoverageAttribute$</Attribute>
+      </Exclude>
+    </Attributes>
+    <Sources>
+      <Exclude>
+        <Source>.*[\\/]test[\\/].*</Source>
+        <Source>.*[\\/]benchmarks[\\/].*</Source>
+        <Source>.*[\\/]obj[\\/].*</Source>
+        <Source>.*\.g\.cs$</Source>
+        <Source>.*\.generated\.cs$</Source>
+      </Exclude>
+    </Sources>
+    <EnableStaticManagedInstrumentation>True</EnableStaticManagedInstrumentation>
+    <EnableDynamicManagedInstrumentation>True</EnableDynamicManagedInstrumentation>
+  </CodeCoverage>
+</Configuration>
