@@ -369,6 +369,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_PROJECT_KEY: rodri-oliveira-dev_Dapper-FluentMap
           SONAR_PULL_REQUEST: ${{ github.event.pull_request.number }}
+          SONAR_END_OUTCOME: ${{ steps.sonar_end.outcome }}
         run: |
           set -uo pipefail
           marker="<!-- Dapper-FluentMap:sonar-quality-gate -->"
@@ -457,7 +458,7 @@ jobs:
               echo "- [Open workflow run](${run_url})"
               echo "- [Open SonarQube Cloud dashboard](${dashboard_url})"
             } > "${comment_file}"
-          else
+          elif [ "${status}" = "ERROR" ]; then
             {
               echo "${marker}"
               echo "### SonarQube Cloud failure"
@@ -472,6 +473,19 @@ jobs:
               else
                 echo "No failing Quality Gate condition was returned by SonarCloud."
               fi
+              echo
+              echo "- [Open workflow run](${run_url})"
+              echo "- [Open SonarQube Cloud dashboard](${dashboard_url})"
+            } > "${comment_file}"
+          else
+            {
+              echo "${marker}"
+              echo "### SonarQube Cloud not computed"
+              echo
+              echo "The SonarQube Cloud job did not produce computed Quality Gate conditions for this PR."
+              echo
+              echo "Quality Gate status: **${status}**"
+              echo "Scanner end outcome: **${SONAR_END_OUTCOME:-unknown}**"
               echo
               echo "- [Open workflow run](${run_url})"
               echo "- [Open SonarQube Cloud dashboard](${dashboard_url})"

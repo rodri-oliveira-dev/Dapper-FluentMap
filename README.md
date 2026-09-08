@@ -483,7 +483,7 @@ For users moving from FluentMap 2.x, see [MIGRATION.md](MIGRATION.md).
 
 Keep changes small, compatible with the public API and covered by focused tests. `Dapper.FluentMap.slnx` is the preferred solution for current .NET SDKs; `Dapper.FluentMap.sln` remains available as a compatibility fallback. Typical local validation:
 
-SonarQube Cloud is part of the CI quality gate, with results published at the [project dashboard](https://sonarcloud.io/summary/new_code?id=rodri-oliveira-dev_Dapper-FluentMap). Authorized SonarQube analysis requires the `SONAR_TOKEN` repository secret.
+SonarQube Cloud is part of the CI quality gate, with results published at the [project dashboard](https://sonarcloud.io/summary/new_code?id=rodri-oliveira-dev_Dapper-FluentMap). Authorized SonarQube analysis requires the `SONAR_TOKEN` repository secret and the project configured for CI-based analysis.
 
 ```bash
 dotnet restore ./Dapper.FluentMap.slnx
