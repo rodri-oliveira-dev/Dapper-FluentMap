@@ -159,9 +159,19 @@ foreach ($file in $nupkgs) {
       Fail "$id releaseNotes is '$releaseNotes', expected '$expectedReleaseNotesUrl'."
     }
 
+    $requireLicenseAcceptance = Get-ChildText -Node $metadata -Name 'requireLicenseAcceptance'
+    if ($requireLicenseAcceptance -eq 'true') {
+      Fail "$id must not require license acceptance."
+    }
+
     $readme = Get-ChildText -Node $metadata -Name 'readme'
     if ($readme -ne 'README.md' -or 'README.md' -notin @($archive.Entries.FullName)) {
       Fail "$id must reference and include README.md."
+    }
+
+    $icon = Get-ChildText -Node $metadata -Name 'icon'
+    if ($icon -ne 'package-icon.png' -or 'package-icon.png' -notin @($archive.Entries.FullName)) {
+      Fail "$id must reference and include package-icon.png."
     }
 
     $licenseNode = $metadata.ChildNodes | Where-Object { $_.LocalName -eq 'license' } | Select-Object -First 1
@@ -170,7 +180,7 @@ foreach ($file in $nupkgs) {
     }
 
     $repositoryNode = $metadata.ChildNodes | Where-Object { $_.LocalName -eq 'repository' } | Select-Object -First 1
-    if ($null -eq $repositoryNode -or $repositoryNode.GetAttribute('url') -ne $expectedRepositoryUrl) {
+    if ($null -eq $repositoryNode -or $repositoryNode.GetAttribute('url') -ne $expectedRepositoryUrl -or $repositoryNode.GetAttribute('type') -ne 'git') {
       Fail "$id must point repository metadata to '$expectedRepositoryUrl'."
     }
   }

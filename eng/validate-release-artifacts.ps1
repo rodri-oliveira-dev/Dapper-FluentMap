@@ -154,8 +154,11 @@ function Get-ZipPackageInfo {
       LicenseType = if ($null -eq $licenseNode) { $null } else { $licenseNode.GetAttribute('type') }
       License = Get-ChildText -Node $metadata -Name 'license'
       Readme = Get-ChildText -Node $metadata -Name 'readme'
+      Icon = Get-ChildText -Node $metadata -Name 'icon'
       ProjectUrl = Get-ChildText -Node $metadata -Name 'projectUrl'
+      RequireLicenseAcceptance = Get-ChildText -Node $metadata -Name 'requireLicenseAcceptance'
       RepositoryUrl = if ($null -eq $repositoryNode) { $null } else { $repositoryNode.GetAttribute('url') }
+      RepositoryType = if ($null -eq $repositoryNode) { $null } else { $repositoryNode.GetAttribute('type') }
       RepositoryCommit = if ($null -eq $repositoryNode) { $null } else { $repositoryNode.GetAttribute('commit') }
       RepositoryBranch = if ($null -eq $repositoryNode) { $null } else { $repositoryNode.GetAttribute('branch') }
       Dependencies = $dependencies
@@ -222,6 +225,14 @@ function Assert-CommonPackageMetadata {
     if ($PackageInfo.Readme -ne 'README.md' -or 'README.md' -notin $PackageInfo.Entries) {
       Fail "$ExpectedId must include README.md and reference it from the nuspec."
     }
+
+    if ($PackageInfo.Icon -ne 'package-icon.png' -or 'package-icon.png' -notin $PackageInfo.Entries) {
+      Fail "$ExpectedId must include package-icon.png and reference it from the nuspec."
+    }
+  }
+
+  if ($PackageInfo.RequireLicenseAcceptance -eq 'true') {
+    Fail "$ExpectedId must not require license acceptance."
   }
 
   if ($PackageInfo.ProjectUrl -ne $expectedRepositoryUrl) {
@@ -230,6 +241,10 @@ function Assert-CommonPackageMetadata {
 
   if ($PackageInfo.RepositoryUrl -ne $RepositoryUrl) {
     Fail "$ExpectedId repository URL is '$($PackageInfo.RepositoryUrl)', expected '$RepositoryUrl'."
+  }
+
+  if ($PackageInfo.RepositoryType -ne 'git') {
+    Fail "$ExpectedId repository type is '$($PackageInfo.RepositoryType)', expected 'git'."
   }
 
   if ($PackageInfo.RepositoryCommit -ne $Commit) {
