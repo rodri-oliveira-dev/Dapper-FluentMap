@@ -1,7 +1,9 @@
 # FluentMap
 
 [![CI](https://github.com/rodri-oliveira-dev/Dapper-FluentMap/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/rodri-oliveira-dev/Dapper-FluentMap/actions/workflows/ci.yml)
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=rodri-oliveira-dev_Dapper-FluentMap&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=rodri-oliveira-dev_Dapper-FluentMap)
 [![.NET Standard 2.0](https://img.shields.io/badge/.NET%20Standard-2.0-512BD4?logo=dotnet&logoColor=white)](https://learn.microsoft.com/dotnet/standard/net-standard)
+[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=rodri-oliveira-dev_Dapper-FluentMap&metric=coverage)](https://sonarcloud.io/summary/new_code?id=rodri-oliveira-dev_Dapper-FluentMap)
 [![License: MIT](https://img.shields.io/github/license/rodri-oliveira-dev/Dapper-FluentMap)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/rodri-oliveira-dev/Dapper-FluentMap?style=flat&logo=github)](https://github.com/rodri-oliveira-dev/Dapper-FluentMap/stargazers)
 
@@ -480,6 +482,8 @@ For users moving from FluentMap 2.x, see [MIGRATION.md](MIGRATION.md).
 ## Contributing
 
 Keep changes small, compatible with the public API and covered by focused tests. `Dapper.FluentMap.slnx` is the preferred solution for current .NET SDKs; `Dapper.FluentMap.sln` remains available as a compatibility fallback. Typical local validation:
+
+SonarQube Cloud is part of the CI quality gate, with results published at the [project dashboard](https://sonarcloud.io/summary/new_code?id=rodri-oliveira-dev_Dapper-FluentMap). Authorized SonarQube analysis requires the `SONAR_TOKEN` repository secret.
 
 ```bash
 dotnet restore ./Dapper.FluentMap.slnx

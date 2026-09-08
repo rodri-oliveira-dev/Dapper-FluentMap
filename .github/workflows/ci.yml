@@ -305,7 +305,7 @@ jobs:
           /d:sonar.host.url="https://sonarcloud.io"
           /d:sonar.projectBaseDir="${GITHUB_WORKSPACE}"
           /d:sonar.cs.vscoveragexml.reportsPaths="artifacts/coverage/sonar/coverage.xml"
-          /d:sonar.exclusions="benchmarks/**,test/Dapper.FluentMap.AotSmoke/**,eng/consumer-smoke/**,**/bin/**,**/obj/**,**/*.g.cs,**/*.generated.cs"
+          /d:sonar.exclusions="test/**,benchmarks/**,eng/consumer-smoke/**,**/bin/**,**/obj/**,**/*.g.cs,**/*.generated.cs"
           /d:sonar.coverage.exclusions="test/**,benchmarks/**,eng/consumer-smoke/**,**/*.g.cs,**/*.generated.cs"
           /d:sonar.qualitygate.wait=true
           /d:sonar.qualitygate.timeout=300
