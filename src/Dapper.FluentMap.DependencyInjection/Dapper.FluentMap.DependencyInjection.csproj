@@ -1,8 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <Title>Dapper.FluentMap - Dependency Injection</Title>
-    <Description>Microsoft.Extensions.DependencyInjection integration for Dapper.FluentMap isolated configuration, registration, and mapping services.</Description>
-    <Copyright>Copyright © Henk Mollema 2014</Copyright>
+    <Description>Dependency injection integration for Dapper.FluentMap that registers isolated configuration, mapping services, and generated registration support.</Description>
     <VersionPrefix>$(FluentMapPackageVersionPrefix)</VersionPrefix>
     <TargetFramework>netstandard2.0</TargetFramework>
     <LangVersion>8.0</LangVersion>
@@ -14,8 +13,5 @@
   <ItemGroup>
     <ProjectReference Include="..\Dapper.FluentMap\Dapper.FluentMap.csproj" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.11" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 </Project>

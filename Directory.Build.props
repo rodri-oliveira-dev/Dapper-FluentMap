@@ -19,12 +19,16 @@
 
   <PropertyGroup>
     <Authors>Henk Mollema;Rodrigo de Oliveira</Authors>
+    <Company>Dapper.FluentMap contributors</Company>
+    <Copyright>Copyright (c) Henk Mollema 2014</Copyright>
     <RepositoryType>git</RepositoryType>
     <RepositoryUrl>https://github.com/rodri-oliveira-dev/Dapper-FluentMap</RepositoryUrl>
     <PackageProjectUrl>$(RepositoryUrl)</PackageProjectUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>package-icon.png</PackageIcon>
     <PackageReleaseNotes>https://github.com/rodri-oliveira-dev/Dapper-FluentMap/releases</PackageReleaseNotes>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
     <Deterministic>true</Deterministic>
@@ -33,4 +37,14 @@
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
+
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'Dapper.FluentMap' or '$(MSBuildProjectName)' == 'Dapper.FluentMap.Dommel'">
+    <None Include="$(MSBuildThisFileDirectory)README.md" Pack="true" PackagePath="\" Visible="false" />
+    <None Include="$(MSBuildThisFileDirectory)assets\package-icon.png" Pack="true" PackagePath="\" Visible="false" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'Dapper.FluentMap.DependencyInjection' or '$(MSBuildProjectName)' == 'Dapper.FluentMap.Analyzers' or '$(MSBuildProjectName)' == 'Dapper.FluentMap.Generators'">
+    <None Include="$(MSBuildProjectDirectory)\README.md" Pack="true" PackagePath="\" Visible="false" />
+    <None Include="$(MSBuildThisFileDirectory)assets\package-icon.png" Pack="true" PackagePath="\" Visible="false" />
+  </ItemGroup>
 </Project>

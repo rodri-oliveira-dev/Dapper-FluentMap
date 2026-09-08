@@ -1,0 +1,142 @@
+# Shared conventions for Dapper.FluentMap.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Markdown can use two trailing spaces for intentional line breaks.
+[*.md]
+trim_trailing_whitespace = false
+
+# Structured files use two spaces to reduce visual noise.
+[*.{json,yml,yaml,xml,csproj,props,targets,slnx}]
+indent_size = 2
+
+[*.cs]
+# Using organization.
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+csharp_using_directive_placement = outside_namespace:suggestion
+
+# General .NET conventions.
+dotnet_style_require_accessibility_modifiers = for_non_interface_members:suggestion
+dotnet_style_qualification_for_field = false:suggestion
+dotnet_style_qualification_for_property = false:suggestion
+dotnet_style_qualification_for_method = false:suggestion
+dotnet_style_qualification_for_event = false:suggestion
+dotnet_style_predefined_type_for_locals_parameters_members = true:suggestion
+dotnet_style_predefined_type_for_member_access = true:suggestion
+dotnet_style_object_initializer = true:suggestion
+dotnet_style_collection_initializer = true:suggestion
+dotnet_style_explicit_tuple_names = true:suggestion
+dotnet_style_coalesce_expression = true:suggestion
+dotnet_style_null_propagation = true:suggestion
+dotnet_style_prefer_auto_properties = true:suggestion
+dotnet_style_prefer_is_null_check_over_reference_equality_method = true:suggestion
+dotnet_style_prefer_simplified_boolean_expressions = true:suggestion
+dotnet_style_prefer_simplified_interpolation = true:suggestion
+dotnet_style_readonly_field = true:suggestion
+dotnet_style_namespace_match_folder = true:suggestion
+
+# General C# conventions.
+csharp_style_namespace_declarations = file_scoped:suggestion
+csharp_prefer_braces = true:suggestion
+csharp_style_var_for_built_in_types = false:suggestion
+csharp_style_var_when_type_is_apparent = false:suggestion
+csharp_style_var_elsewhere = false:suggestion
+csharp_style_prefer_switch_expression = true:suggestion
+csharp_style_pattern_matching_over_is_with_cast_check = true:suggestion
+csharp_style_pattern_matching_over_as_with_null_check = true:suggestion
+csharp_style_prefer_not_pattern = true:suggestion
+csharp_style_inlined_variable_declaration = true:suggestion
+csharp_style_throw_expression = true:suggestion
+csharp_style_conditional_delegate_call = true:suggestion
+csharp_prefer_simple_default_expression = true:suggestion
+csharp_style_implicit_object_creation_when_type_is_apparent = true:suggestion
+csharp_style_prefer_index_operator = true:suggestion
+csharp_style_prefer_range_operator = true:suggestion
+csharp_preferred_modifier_order = file,public,protected,internal,private,static,abstract,virtual,override,sealed,readonly,required,extern,new,unsafe,volatile,async:suggestion
+
+# C# formatting.
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+csharp_indent_block_contents = true
+csharp_indent_braces = false
+csharp_indent_case_contents = true
+csharp_indent_switch_labels = true
+csharp_preserve_single_line_blocks = false
+csharp_preserve_single_line_statements = false
+
+# Interfaces use the I prefix.
+dotnet_naming_rule.interfaces_must_start_with_i.severity = suggestion
+dotnet_naming_rule.interfaces_must_start_with_i.symbols = interfaces
+dotnet_naming_rule.interfaces_must_start_with_i.style = interface_style
+
+dotnet_naming_symbols.interfaces.applicable_kinds = interface
+dotnet_naming_symbols.interfaces.applicable_accessibilities = *
+
+dotnet_naming_style.interface_style.required_prefix = I
+dotnet_naming_style.interface_style.capitalization = pascal_case
+
+# Types use PascalCase.
+dotnet_naming_rule.types_must_be_pascal_case.severity = suggestion
+dotnet_naming_rule.types_must_be_pascal_case.symbols = types
+dotnet_naming_rule.types_must_be_pascal_case.style = pascal_case_style
+
+dotnet_naming_symbols.types.applicable_kinds = class,struct,interface,enum,delegate
+dotnet_naming_symbols.types.applicable_accessibilities = *
+
+# Public and extensible contracts use PascalCase.
+dotnet_naming_rule.public_contract_members_must_be_pascal_case.severity = suggestion
+dotnet_naming_rule.public_contract_members_must_be_pascal_case.symbols = public_contract_members
+dotnet_naming_rule.public_contract_members_must_be_pascal_case.style = pascal_case_style
+
+dotnet_naming_symbols.public_contract_members.applicable_kinds = property,method,event
+dotnet_naming_symbols.public_contract_members.applicable_accessibilities = public,protected,protected_internal
+
+# Internal implementation members also use PascalCase, without describing them as public API.
+dotnet_naming_rule.implementation_members_must_be_pascal_case.severity = suggestion
+dotnet_naming_rule.implementation_members_must_be_pascal_case.symbols = implementation_members
+dotnet_naming_rule.implementation_members_must_be_pascal_case.style = pascal_case_style
+
+dotnet_naming_symbols.implementation_members.applicable_kinds = property,method,event
+dotnet_naming_symbols.implementation_members.applicable_accessibilities = internal,private_protected
+
+# Constants use PascalCase.
+dotnet_naming_rule.constants_must_be_pascal_case.severity = suggestion
+dotnet_naming_rule.constants_must_be_pascal_case.symbols = constants
+dotnet_naming_rule.constants_must_be_pascal_case.style = pascal_case_style
+
+dotnet_naming_symbols.constants.applicable_kinds = field
+dotnet_naming_symbols.constants.applicable_accessibilities = *
+dotnet_naming_symbols.constants.required_modifiers = const
+
+dotnet_naming_style.pascal_case_style.capitalization = pascal_case
+
+# Generated files should not influence conventions for manually maintained code.
+[*.{designer.cs,Designer.cs,g.cs,g.i.cs,generated.cs,Generated.cs}]
+generated_code = true
+
+[src/**/*.cs]
+# Reliability and performance analyzers stay as suggestions to avoid turning
+# existing technical debt into build noise in this repository-configuration step.
+dotnet_diagnostic.CA1062.severity = suggestion
+dotnet_code_quality.CA1062.api_surface = public, protected
+dotnet_diagnostic.CA2000.severity = suggestion
+dotnet_diagnostic.CA2007.severity = suggestion
+dotnet_diagnostic.CA2012.severity = suggestion
+dotnet_diagnostic.CA2014.severity = suggestion
+dotnet_diagnostic.CA2016.severity = suggestion
+dotnet_diagnostic.CA2022.severity = suggestion
+dotnet_diagnostic.CA1851.severity = suggestion
+dotnet_diagnostic.CA1859.severity = suggestion
+dotnet_diagnostic.CA1860.severity = suggestion
+dotnet_diagnostic.CA1861.severity = suggestion
+dotnet_diagnostic.CA1862.severity = suggestion

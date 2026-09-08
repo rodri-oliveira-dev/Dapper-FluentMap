@@ -474,12 +474,12 @@ Para migrar do FluentMap 2.x, consulte [MIGRATION.md](MIGRATION.md).
 
 ## Contribuição
 
-Mantenha mudanças pequenas, compatíveis com a API pública e cobertas por testes focados. Validação local típica:
+Mantenha mudanças pequenas, compatíveis com a API pública e cobertas por testes focados. `Dapper.FluentMap.slnx` é a solução preferencial para SDKs .NET atuais; `Dapper.FluentMap.sln` permanece disponível como fallback de compatibilidade. Validação local típica:
 
 ```bash
-dotnet restore ./Dapper.FluentMap.sln
-dotnet build ./Dapper.FluentMap.sln --configuration Release --no-restore
-dotnet test ./Dapper.FluentMap.sln --configuration Release --no-build
+dotnet restore ./Dapper.FluentMap.slnx
+dotnet build ./Dapper.FluentMap.slnx --configuration Release --no-restore
+dotnet test ./Dapper.FluentMap.slnx --configuration Release --no-build
 ```
 
 ## Licença

@@ -69,13 +69,13 @@ jobs:
         run: dotnet --info
 
       - name: Restore
-        run: dotnet restore ./Dapper.FluentMap.sln -p:DapperPackageVersion=${{ matrix.dapper-version }}
+        run: dotnet restore ./Dapper.FluentMap.slnx -p:DapperPackageVersion=${{ matrix.dapper-version }}
 
       - name: Audit NuGet dependencies
-        run: dotnet list ./Dapper.FluentMap.sln package --vulnerable --include-transitive
+        run: dotnet list ./Dapper.FluentMap.slnx package --vulnerable --include-transitive
 
       - name: Build Release
-        run: dotnet build ./Dapper.FluentMap.sln --configuration Release --no-restore -p:DapperPackageVersion=${{ matrix.dapper-version }}
+        run: dotnet build ./Dapper.FluentMap.slnx --configuration Release --no-restore -p:DapperPackageVersion=${{ matrix.dapper-version }}
 
       - name: Test core compatibility
         run: dotnet test ./test/Dapper.FluentMap.Tests/Dapper.FluentMap.Tests.csproj --configuration Release --no-build
@@ -111,10 +111,10 @@ jobs:
           global-json-file: global.json
 
       - name: Restore
-        run: dotnet restore ./Dapper.FluentMap.sln
+        run: dotnet restore ./Dapper.FluentMap.slnx
 
       - name: Audit NuGet dependencies
-        run: dotnet list ./Dapper.FluentMap.sln package --vulnerable --include-transitive
+        run: dotnet list ./Dapper.FluentMap.slnx package --vulnerable --include-transitive
 
       - name: Build analyzers
         run: dotnet build ./src/Dapper.FluentMap.Analyzers/Dapper.FluentMap.Analyzers.csproj --configuration Release --no-restore
@@ -149,14 +149,20 @@ jobs:
         with:
           global-json-file: global.json
 
+      - name: Validate SLNX equivalence
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./eng/validate-slnx-equivalence.ps1
+
       - name: Restore
-        run: dotnet restore ./Dapper.FluentMap.sln
+        run: dotnet restore ./Dapper.FluentMap.slnx
 
       - name: Build Release
-        run: dotnet build ./Dapper.FluentMap.sln --configuration Release --no-restore
+        run: dotnet build ./Dapper.FluentMap.slnx --configuration Release --no-restore
 
       - name: Pack Release
-        run: dotnet pack ./Dapper.FluentMap.sln --configuration Release --no-build --output ./artifacts/packages
+        run: dotnet pack ./Dapper.FluentMap.slnx --configuration Release --no-build --output ./artifacts/packages
 
       - name: Validate NuGet presentation metadata
         shell: pwsh
@@ -195,7 +201,7 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force -Path './artifacts/release-metadata' | Out-Null
-          dotnet list ./Dapper.FluentMap.sln package --include-transitive --format json |
+          dotnet list ./Dapper.FluentMap.slnx package --include-transitive --format json |
             Set-Content -Encoding utf8NoBOM -Path './artifacts/release-metadata/dependencies.json'
 
           $packageFiles = @(

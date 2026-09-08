@@ -1,8 +1,8 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
+    <PackageId>Dapper.FluentMap</PackageId>
     <Title>Dapper.FluentMap</Title>
-    <Description>Fluent mapping for Dapper, including explicit property-to-column maps, conventions, immutable object materialization, profiles, diagnostics, and opt-in modern mapping capabilities.</Description>
-    <Copyright>Copyright © Henk Mollema 2014</Copyright>
+    <Description>Fluent property-to-column mapping for Dapper, including explicit maps, naming conventions, profiles, diagnostics, and supported immutable object materialization.</Description>
     <VersionPrefix>$(FluentMapPackageVersionPrefix)</VersionPrefix>
     <TargetFramework>netstandard2.0</TargetFramework>
     <LangVersion>8.0</LangVersion>
@@ -14,8 +14,5 @@
   <ItemGroup>
     <PackageReference Include="Dapper" Version="$(DapperPackageVersion)" />
     <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="10.0.11" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 </Project>

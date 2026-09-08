@@ -5,7 +5,7 @@
     }
   ],
   "settings": {
-    "dotnet.defaultSolution": "Dapper.FluentMap.sln",
+    "dotnet.defaultSolution": "Dapper.FluentMap.slnx",
     "dotnet.server.useOmnisharp": false,
     "editor.formatOnSave": true,
     "editor.codeActionsOnSave": {

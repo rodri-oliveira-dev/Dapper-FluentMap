@@ -1,0 +1,30 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/benchmarks/">
+    <Project Path="benchmarks/Dapper.FluentMap.Benchmarks/Dapper.FluentMap.Benchmarks.csproj" />
+  </Folder>
+  <Folder Name="/Solution Items/">
+    <File Path="NuGet.Config" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/Dapper.FluentMap.Analyzers/Dapper.FluentMap.Analyzers.csproj" />
+    <Project Path="src/Dapper.FluentMap.DependencyInjection/Dapper.FluentMap.DependencyInjection.csproj" />
+    <Project Path="src/Dapper.FluentMap.Dommel/Dapper.FluentMap.Dommel.csproj" />
+    <Project Path="src/Dapper.FluentMap.Generators/Dapper.FluentMap.Generators.csproj" />
+    <Project Path="src/Dapper.FluentMap/Dapper.FluentMap.csproj" />
+  </Folder>
+  <Folder Name="/test/">
+    <Project Path="test/Dapper.FluentMap.Analyzers.Tests/Dapper.FluentMap.Analyzers.Tests.csproj" />
+    <Project Path="test/Dapper.FluentMap.AotSmoke/Dapper.FluentMap.AotSmoke.csproj" />
+    <Project Path="test/Dapper.FluentMap.DependencyInjection.Tests/Dapper.FluentMap.DependencyInjection.Tests.csproj" />
+    <Project Path="test/Dapper.FluentMap.Dommel.Tests/Dapper.FluentMap.Dommel.Tests.csproj" />
+    <Project Path="test/Dapper.FluentMap.GeneratedRegistration.Tests/Dapper.FluentMap.GeneratedRegistration.Tests.csproj" />
+    <Project Path="test/Dapper.FluentMap.Generators.Tests/Dapper.FluentMap.Generators.Tests.csproj" />
+    <Project Path="test/Dapper.FluentMap.ProviderCompatibility.Tests/Dapper.FluentMap.ProviderCompatibility.Tests.csproj" />
+    <Project Path="test/Dapper.FluentMap.Tests/Dapper.FluentMap.Tests.csproj" />
+  </Folder>
+</Solution>
