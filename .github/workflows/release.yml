@@ -48,7 +48,7 @@ jobs:
         with:
           global-json-file: global.json
 
-      - name: Validate release version
+      - name: Validate release version and availability
         id: version
         shell: bash
         env:
@@ -84,15 +84,63 @@ jobs:
             is_prerelease=true
           fi
 
+          echo "Checking whether release tag '$release_tag' already exists..."
           git fetch --tags --force
           if git rev-parse -q --verify "refs/tags/$release_tag" >/dev/null; then
             tag_sha="$(git rev-list -n 1 "$release_tag")"
-            if [[ "$tag_sha" != "$GITHUB_SHA" ]]; then
-              echo "::error::Tag '$release_tag' already exists and points to $tag_sha instead of $GITHUB_SHA."
+            echo "::error::Release tag '$release_tag' already exists and points to $tag_sha. Choose a new version before building."
+            exit 1
+          fi
+
+          package_ids=(
+            'Dapper.FluentMap'
+            'Dapper.FluentMap.Dommel'
+            'Dapper.FluentMap.DependencyInjection'
+            'Dapper.FluentMap.Analyzers'
+            'Dapper.FluentMap.Generators'
+          )
+          version_lower="$(printf '%s' "$VERSION" | tr '[:upper:]' '[:lower:]')"
+          published_packages=()
+
+          echo "Checking NuGet.org for version '$VERSION' before build..."
+          for package_id in "${package_ids[@]}"; do
+            package_id_lower="$(printf '%s' "$package_id" | tr '[:upper:]' '[:lower:]')"
+            package_url="https://api.nuget.org/v3-flatcontainer/$package_id_lower/$version_lower/$package_id_lower.$version_lower.nupkg"
+
+            if ! http_status="$(curl \
+              --silent \
+              --show-error \
+              --location \
+              --retry 3 \
+              --retry-delay 2 \
+              --retry-all-errors \
+              --connect-timeout 10 \
+              --max-time 30 \
+              --output /dev/null \
+              --write-out '%{http_code}' \
+              "$package_url")"; then
+              echo "::error::Unable to verify NuGet.org availability for $package_id $VERSION. Failing closed before build."
               exit 1
             fi
 
-            echo "Tag '$release_tag' already exists on the validated commit; this run can be safely retried."
+            case "$http_status" in
+              200)
+                echo "::error::$package_id $VERSION is already published on NuGet.org."
+                published_packages+=("$package_id")
+                ;;
+              404)
+                echo "$package_id $VERSION is available on NuGet.org."
+                ;;
+              *)
+                echo "::error::Unexpected NuGet.org response $http_status while checking $package_id $VERSION. Failing closed before build."
+                exit 1
+                ;;
+            esac
+          done
+
+          if (( ${#published_packages[@]} > 0 )); then
+            echo "::error::Release version '$VERSION' is already published for: ${published_packages[*]}. Choose a new version."
+            exit 1
           fi
 
           echo "package_version=$VERSION" >> "$GITHUB_OUTPUT"
@@ -100,6 +148,7 @@ jobs:
           echo "is_prerelease=$is_prerelease" >> "$GITHUB_OUTPUT"
           echo "Release version: $VERSION"
           echo "Release tag: $release_tag"
+          echo "Preflight passed: tag is unused and the version is unpublished for all FluentMap NuGet packages."
 
       - name: Show .NET info
         run: dotnet --info
