@@ -233,6 +233,21 @@ namespace Dapper.FluentMap.Dommel.Tests
         }
 
         [Fact]
+        public void ResolvePropertiesShouldDeferGlobalMapLookupUntilEnumeration()
+        {
+            PreTest();
+
+            var propertyResolver = new Dommel.Resolvers.DommelPropertyResolver();
+            var properties = propertyResolver.ResolveProperties(typeof(DoubleIdEntity));
+
+            FluentMapper.Initialize(c => c.AddMap(new CoreReadOnlyMap()));
+
+            var name = properties.Single(p => p.Property.Name == nameof(DoubleIdEntity.Name));
+
+            Assert.True(name.IsGenerated);
+        }
+
+        [Fact]
         public void DommelResolversShouldUseOnlyLegacyProcessWideConfiguration()
         {
             PreTest();

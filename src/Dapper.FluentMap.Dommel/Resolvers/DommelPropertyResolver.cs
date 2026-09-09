@@ -34,12 +34,20 @@ namespace Dapper.FluentMap.Dommel.Resolvers
         /// <inheritdoc/>
         public override IEnumerable<ColumnPropertyInfo> ResolveProperties(Type type)
         {
-            if (!FluentMapper.EntityMaps.TryGetValue(type, out var entityMap))
+            if (FluentMapper.EntityMaps.TryGetValue(type, out var entityMap))
             {
-                return DefaultResolver.ResolveProperties(type);
+                foreach (var property in ResolveMappedProperties(type, entityMap))
+                {
+                    yield return property;
+                }
+
+                yield break;
             }
 
-            return ResolveMappedProperties(type, entityMap);
+            foreach (var property in DefaultResolver.ResolveProperties(type))
+            {
+                yield return property;
+            }
         }
 
         private IEnumerable<ColumnPropertyInfo> ResolveMappedProperties(Type type, IEntityMap entityMap)
