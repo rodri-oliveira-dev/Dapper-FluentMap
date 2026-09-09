@@ -1,4 +1,4 @@
-﻿using System.Linq;
+using System.Linq;
 using System.Reflection;
 using Dapper.FluentMap.Dommel.Mapping;
 using Dapper.FluentMap.Mapping;
@@ -16,47 +16,84 @@ namespace Dapper.FluentMap.Dommel.Resolvers
         /// <inheritdoc/>
         public string ResolveColumnName(PropertyInfo propertyInfo)
         {
-            if (propertyInfo.DeclaringType != null)
+            if (TryResolveConfiguredColumnName(propertyInfo, out var columnName))
             {
-#if NETSTANDARD1_3
-                if (FluentMapper.EntityMaps.TryGetValue(propertyInfo.DeclaringType, out var entityMap))
+                return columnName;
+            }
 
-#else
-                if (FluentMapper.EntityMaps.TryGetValue(propertyInfo.ReflectedType, out var entityMap))
-#endif
-                {
-                    var mapping = entityMap as IDommelEntityMap;
-                    if (mapping != null)
-                    {
-                        var propertyMaps = DommelPersistenceMetadata
-                            .ResolvePropertyMaps(propertyInfo.ReflectedType ?? propertyInfo.DeclaringType, entityMap)
-                            .Where(m => m.PropertyInfo.Name == propertyInfo.Name)
-                            .ToList();
-                        if (propertyMaps.Count == 1)
-                        {
-                            return propertyMaps[0].ColumnName;
-                        }
-                    }
-                }
-#if NETSTANDARD1_3
-                else if (FluentMapper.TypeConventions.TryGetValue(propertyInfo.DeclaringType, out var conventions))
+            return DefaultResolver.ResolveColumnName(propertyInfo);
+        }
 
-#else
-                else if (FluentMapper.TypeConventions.TryGetValue(propertyInfo.ReflectedType, out var conventions))
-#endif
+        private static bool TryResolveConfiguredColumnName(PropertyInfo propertyInfo, out string columnName)
+        {
+            columnName = null;
+
+            if (propertyInfo.DeclaringType == null)
+            {
+                return false;
+            }
+
+            var mappedType = GetMappedType(propertyInfo);
+            if (mappedType == null)
+            {
+                return false;
+            }
+
+            if (FluentMapper.EntityMaps.TryGetValue(mappedType, out var entityMap))
+            {
+                return TryResolveEntityMapColumnName(mappedType, entityMap, propertyInfo, out columnName);
+            }
+
+            if (FluentMapper.TypeConventions.TryGetValue(mappedType, out var conventions))
+            {
+                foreach (var convention in conventions)
                 {
-                    foreach (var convention in conventions)
+                    var propertyMaps = convention.PropertyMaps.Where(m => m.PropertyInfo.Name == propertyInfo.Name).ToList();
+                    if (propertyMaps.Count == 1)
                     {
-                        var propertyMaps = convention.PropertyMaps.Where(m => m.PropertyInfo.Name == propertyInfo.Name).ToList();
-                        if (propertyMaps.Count == 1)
-                        {
-                            return propertyMaps[0].ColumnName;
-                        }
+                        columnName = propertyMaps[0].ColumnName;
+                        return true;
                     }
                 }
             }
 
-            return DefaultResolver.ResolveColumnName(propertyInfo);
+            return false;
+        }
+
+        private static bool TryResolveEntityMapColumnName(
+            System.Type mappedType,
+            IEntityMap entityMap,
+            PropertyInfo propertyInfo,
+            out string columnName)
+        {
+            columnName = null;
+
+            if (!(entityMap is IDommelEntityMap))
+            {
+                return false;
+            }
+
+            var propertyMaps = DommelPersistenceMetadata
+                .ResolvePropertyMaps(mappedType, entityMap)
+                .Where(m => m.PropertyInfo.Name == propertyInfo.Name)
+                .ToList();
+
+            if (propertyMaps.Count != 1)
+            {
+                return false;
+            }
+
+            columnName = propertyMaps[0].ColumnName;
+            return true;
+        }
+
+        private static System.Type GetMappedType(PropertyInfo propertyInfo)
+        {
+#if NETSTANDARD1_3
+            return propertyInfo.DeclaringType;
+#else
+            return propertyInfo.ReflectedType ?? propertyInfo.DeclaringType;
+#endif
         }
     }
 }

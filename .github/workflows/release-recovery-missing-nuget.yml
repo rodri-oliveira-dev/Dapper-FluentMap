@@ -86,6 +86,8 @@ jobs:
               --silent \
               --show-error \
               --location \
+              --proto '=https' \
+              --proto-redir '=https' \
               --retry 3 \
               --retry-delay 2 \
               --retry-all-errors \
@@ -229,6 +231,8 @@ jobs:
               --silent `
               --show-error `
               --location `
+              --proto '=https' `
+              --proto-redir '=https' `
               --retry 3 `
               --retry-delay 2 `
               --retry-all-errors `
@@ -279,6 +283,8 @@ jobs:
               --silent \
               --show-error \
               --location \
+              --proto '=https' \
+              --proto-redir '=https' \
               --retry 6 \
               --retry-delay 5 \
               --retry-all-errors \

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
@@ -34,37 +34,46 @@ namespace Dapper.FluentMap.Dommel.Resolvers
         /// <inheritdoc/>
         public override IEnumerable<ColumnPropertyInfo> ResolveProperties(Type type)
         {
-            IEntityMap entityMap;
-            if (FluentMapper.EntityMaps.TryGetValue(type, out entityMap))
+            if (FluentMapper.EntityMaps.TryGetValue(type, out var entityMap))
             {
-                foreach (var property in FilterComplexTypes(type.GetProperties()))
-                {
-                    // Determine whether the property should be ignored.
-                    var propertyMap = DommelPersistenceMetadata.ResolvePropertyMap(type, entityMap, property.Name);
-                    if (propertyMap == null || !propertyMap.Ignored)
-                    {
-                        var dommelPropertyMap = propertyMap as DommelPropertyMap;
-                        if (dommelPropertyMap != null)
-                        {
-                            yield return new ColumnPropertyInfo(property, dommelPropertyMap.EffectiveUpdateGeneratedOption);
-                        }
-                        else
-                        {
-                            var mapWithPersistence = propertyMap as IPropertyMapWithPersistenceMetadata;
-                            yield return mapWithPersistence == null
-                                ? new ColumnPropertyInfo(property)
-                                : new ColumnPropertyInfo(property, ResolveGeneratedOption(mapWithPersistence.Persistence));
-                        }
-                    }
-                }
-            }
-            else
-            {
-                foreach (var property in DefaultResolver.ResolveProperties(type))
+                foreach (var property in ResolveMappedProperties(type, entityMap))
                 {
                     yield return property;
                 }
+
+                yield break;
             }
+
+            foreach (var property in DefaultResolver.ResolveProperties(type))
+            {
+                yield return property;
+            }
+        }
+
+        private IEnumerable<ColumnPropertyInfo> ResolveMappedProperties(Type type, IEntityMap entityMap)
+        {
+            foreach (var property in FilterComplexTypes(type.GetProperties()))
+            {
+                var propertyMap = DommelPersistenceMetadata.ResolvePropertyMap(type, entityMap, property.Name);
+                if (propertyMap == null || !propertyMap.Ignored)
+                {
+                    yield return CreateColumnPropertyInfo(property, propertyMap);
+                }
+            }
+        }
+
+        private static ColumnPropertyInfo CreateColumnPropertyInfo(PropertyInfo property, IPropertyMap propertyMap)
+        {
+            var dommelPropertyMap = propertyMap as DommelPropertyMap;
+            if (dommelPropertyMap != null)
+            {
+                return new ColumnPropertyInfo(property, dommelPropertyMap.EffectiveUpdateGeneratedOption);
+            }
+
+            var mapWithPersistence = propertyMap as IPropertyMapWithPersistenceMetadata;
+            return mapWithPersistence == null
+                ? new ColumnPropertyInfo(property)
+                : new ColumnPropertyInfo(property, ResolveGeneratedOption(mapWithPersistence.Persistence));
         }
 
         private static DatabaseGeneratedOption ResolveGeneratedOption(PropertyPersistenceMetadata persistence)

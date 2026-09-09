@@ -473,11 +473,7 @@ namespace Dapper.FluentMap.Analyzers
                 return false;
             }
 
-            var column = memberPath.TerminalName;
-            var columnKnown = true;
-            var caseSensitive = true;
-            var ignored = false;
-            var columnLocation = mapInvocation.GetLocation();
+            var chainState = new MapInvocationChainState(memberPath.TerminalName, mapInvocation.GetLocation());
             var persistenceState = new PersistenceChainState();
             var conversionState = new ConversionChainState();
 
@@ -492,54 +488,16 @@ namespace Dapper.FluentMap.Analyzers
                     return false;
                 }
 
-                if (IsToColumnInvocation(chainedMethod))
-                {
-                    columnLocation = chainedInvocation.GetLocation();
-                    if (!TryGetColumn(chainedInvocation, semanticModel, cancellationToken, out column, out caseSensitive))
-                    {
-                        columnKnown = false;
-                    }
-                }
-                else if (IsIgnoreInvocation(chainedMethod))
-                {
-                    ignored = true;
-                    persistenceState.ApplyIgnore();
-                }
-                else if (TryGetPersistenceAction(chainedMethod, chainedInvocation, semanticModel, cancellationToken, out var persistenceAction))
-                {
-                    if (!persistenceState.TryApply(persistenceAction, out var reason))
-                    {
-                        context.ReportDiagnostic(Diagnostic.Create(
-                            InvalidPersistenceBehaviorRule,
-                            GetInvocationNameLocation(chainedInvocation),
-                            memberPath.Display,
-                            reason));
-                    }
-                }
-                else if (TryGetConversionAction(chainedMethod, out var conversionAction))
-                {
-                    foreach (var direction in conversionAction.Directions)
-                    {
-                        if (!conversionState.TryApply(direction))
-                        {
-                            context.ReportDiagnostic(Diagnostic.Create(
-                                DuplicatePropertyConverterRule,
-                                GetInvocationNameLocation(chainedInvocation),
-                                memberPath.Display,
-                                FormatDirection(direction)));
-                        }
-                    }
-
-                    if (IsTypeBasedConversionInvocation(chainedMethod))
-                    {
-                        ValidateTypeBasedConverter(
-                            context,
-                            chainedInvocation,
-                            chainedMethod,
-                            memberPath,
-                            conversionAction);
-                    }
-                }
+                AnalyzeChainedMapInvocation(
+                    context,
+                    chainedInvocation,
+                    chainedMethod,
+                    semanticModel,
+                    cancellationToken,
+                    memberPath,
+                    chainState,
+                    persistenceState,
+                    conversionState);
 
                 current = chainedInvocation;
             }
@@ -552,13 +510,105 @@ namespace Dapper.FluentMap.Analyzers
             result = new MapInvocation(
                 constructorSymbol,
                 memberPath,
-                column,
-                columnKnown,
-                caseSensitive,
-                ignored,
+                chainState.ColumnName,
+                chainState.ColumnKnown,
+                chainState.CaseSensitive,
+                chainState.Ignored,
                 mapInvocation.GetLocation(),
-                columnLocation);
+                chainState.ColumnLocation);
             return true;
+        }
+
+        private static void AnalyzeChainedMapInvocation(
+            SyntaxNodeAnalysisContext context,
+            InvocationExpressionSyntax chainedInvocation,
+            IMethodSymbol chainedMethod,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            MemberPathInfo memberPath,
+            MapInvocationChainState chainState,
+            PersistenceChainState persistenceState,
+            ConversionChainState conversionState)
+        {
+            if (IsToColumnInvocation(chainedMethod))
+            {
+                chainState.ApplyColumn(chainedInvocation, semanticModel, cancellationToken);
+                return;
+            }
+
+            if (IsIgnoreInvocation(chainedMethod))
+            {
+                chainState.ApplyIgnore();
+                persistenceState.ApplyIgnore();
+                return;
+            }
+
+            if (TryGetPersistenceAction(chainedMethod, chainedInvocation, semanticModel, cancellationToken, out var persistenceAction))
+            {
+                ReportInvalidPersistenceAction(context, chainedInvocation, memberPath, persistenceState, persistenceAction);
+                return;
+            }
+
+            if (TryGetConversionAction(chainedMethod, out var conversionAction))
+            {
+                AnalyzeConversionAction(
+                    context,
+                    chainedInvocation,
+                    chainedMethod,
+                    memberPath,
+                    conversionState,
+                    conversionAction);
+            }
+        }
+
+        private static void ReportInvalidPersistenceAction(
+            SyntaxNodeAnalysisContext context,
+            InvocationExpressionSyntax chainedInvocation,
+            MemberPathInfo memberPath,
+            PersistenceChainState persistenceState,
+            PersistenceAction persistenceAction)
+        {
+            if (persistenceState.TryApply(persistenceAction, out var reason))
+            {
+                return;
+            }
+
+            context.ReportDiagnostic(Diagnostic.Create(
+                InvalidPersistenceBehaviorRule,
+                GetInvocationNameLocation(chainedInvocation),
+                memberPath.Display,
+                reason));
+        }
+
+        private static void AnalyzeConversionAction(
+            SyntaxNodeAnalysisContext context,
+            InvocationExpressionSyntax chainedInvocation,
+            IMethodSymbol chainedMethod,
+            MemberPathInfo memberPath,
+            ConversionChainState conversionState,
+            ConversionAction conversionAction)
+        {
+            foreach (var direction in conversionAction.Directions)
+            {
+                if (!conversionState.TryApply(direction))
+                {
+                    context.ReportDiagnostic(Diagnostic.Create(
+                        DuplicatePropertyConverterRule,
+                        GetInvocationNameLocation(chainedInvocation),
+                        memberPath.Display,
+                        FormatDirection(direction)));
+                }
+            }
+
+            if (IsTypeBasedConversionInvocation(chainedMethod))
+            {
+                ValidateTypeBasedConverter(
+                    context,
+                    chainedInvocation,
+                    chainedMethod,
+                    memberPath,
+                    conversionAction);
+            }
         }
 
         private static bool TryGetColumn(
@@ -629,48 +679,86 @@ namespace Dapper.FluentMap.Analyzers
 
             while (expression != null)
             {
-                if (expression is MemberAccessExpressionSyntax memberAccess)
+                var memberAccess = expression as MemberAccessExpressionSyntax;
+                if (memberAccess != null)
                 {
-                    var symbol = semanticModel.GetSymbolInfo(memberAccess, cancellationToken).Symbol;
-                    var property = symbol as IPropertySymbol;
-                    if (property == null)
+                    if (!TryPushMemberPathProperty(memberAccess, semanticModel, cancellationToken, properties, out expression, out reason))
                     {
-                        reason = symbol == null
-                            ? "the member could not be resolved statically"
-                            : $"member '{symbol.Name}' is not a property";
                         return false;
                     }
 
-                    if (property.IsIndexer || property.Parameters.Length > 0)
-                    {
-                        reason = $"indexed property '{property.Name}' is not supported";
-                        return false;
-                    }
-
-                    properties.Push(property);
-                    expression = StripCastsAndParentheses(memberAccess.Expression);
                     continue;
                 }
 
-                if (expression is IdentifierNameSyntax identifier)
+                if (TryCompleteMemberPath(expression, semanticModel, cancellationToken, properties, out memberPath))
                 {
-                    var symbol = semanticModel.GetSymbolInfo(identifier, cancellationToken).Symbol;
-                    if (symbol is IParameterSymbol && properties.Count > 0)
-                    {
-                        memberPath = MemberPathInfo.Create(properties);
-                        return true;
-                    }
-
-                    reason = "the expression must resolve to a property path rooted in the entity parameter";
-                    return false;
+                    return true;
                 }
 
-                reason = "the expression must resolve to a property path";
+                reason = expression is IdentifierNameSyntax
+                    ? "the expression must resolve to a property path rooted in the entity parameter"
+                    : "the expression must resolve to a property path";
                 return false;
             }
 
             reason = "the expression must resolve to a property path";
             return false;
+        }
+
+        private static bool TryPushMemberPathProperty(
+            MemberAccessExpressionSyntax memberAccess,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            Stack<IPropertySymbol> properties,
+            out ExpressionSyntax nextExpression,
+            out string reason)
+        {
+            nextExpression = null;
+            reason = null;
+
+            var symbol = semanticModel.GetSymbolInfo(memberAccess, cancellationToken).Symbol;
+            var property = symbol as IPropertySymbol;
+            if (property == null)
+            {
+                reason = symbol == null
+                    ? "the member could not be resolved statically"
+                    : $"member '{symbol.Name}' is not a property";
+                return false;
+            }
+
+            if (property.IsIndexer || property.Parameters.Length > 0)
+            {
+                reason = $"indexed property '{property.Name}' is not supported";
+                return false;
+            }
+
+            properties.Push(property);
+            nextExpression = StripCastsAndParentheses(memberAccess.Expression);
+            return true;
+        }
+
+        private static bool TryCompleteMemberPath(
+            ExpressionSyntax expression,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            Stack<IPropertySymbol> properties,
+            out MemberPathInfo memberPath)
+        {
+            memberPath = null;
+            var identifier = expression as IdentifierNameSyntax;
+            if (identifier == null || properties.Count == 0)
+            {
+                return false;
+            }
+
+            var symbol = semanticModel.GetSymbolInfo(identifier, cancellationToken).Symbol;
+            if (!(symbol is IParameterSymbol))
+            {
+                return false;
+            }
+
+            memberPath = MemberPathInfo.Create(properties);
+            return true;
         }
 
         private static ExpressionSyntax StripCastsAndParentheses(ExpressionSyntax expression)
@@ -913,44 +1001,22 @@ namespace Dapper.FluentMap.Analyzers
 
             var databaseMatches = converterType.AllInterfaces
                 .Where(type => IsType(type.OriginalDefinition, MappingNamespace, interfaceName))
-                .Where(type =>
-                {
-                    var converterDatabaseType = direction == PropertyConversionDirection.Read
-                        ? type.TypeArguments[0]
-                        : type.TypeArguments[1];
-
-                    return IsSameOrNullableEquivalent(converterDatabaseType, databaseType);
-                })
+                .Where(type => IsSameOrNullableEquivalent(GetConverterDatabaseType(type, direction), databaseType))
                 .ToList();
 
             if (databaseMatches.Count == 0)
             {
-                reason = direction == PropertyConversionDirection.Read
-                    ? $"it does not implement IReadPropertyConverter<{FormatSymbol(databaseType)}, TProperty>"
-                    : $"it does not implement IWritePropertyConverter<TProperty, {FormatSymbol(databaseType)}>";
+                reason = CreateMissingConverterContractReason(direction, databaseType);
                 return false;
             }
 
             var matches = databaseMatches
-                .Where(type =>
-                {
-                    var converterPropertyType = direction == PropertyConversionDirection.Read
-                        ? type.TypeArguments[1]
-                        : type.TypeArguments[0];
-
-                    return direction == PropertyConversionDirection.Read
-                        ? CanAssignValue(compilation, mappedPropertyType, converterPropertyType)
-                        : CanAssignValue(compilation, converterPropertyType, mappedPropertyType);
-                })
+                .Where(type => ConverterPropertyTypeMatches(compilation, type, mappedPropertyType, direction))
                 .ToList();
 
             if (matches.Count == 0)
             {
-                var converterPropertyType = databaseMatches[0].TypeArguments[
-                    direction == PropertyConversionDirection.Read ? 1 : 0];
-                reason = direction == PropertyConversionDirection.Read
-                    ? $"it returns '{FormatSymbol(converterPropertyType)}', which cannot be assigned to mapped property type '{FormatSymbol(mappedPropertyType)}'"
-                    : $"it accepts '{FormatSymbol(converterPropertyType)}', which is not compatible with mapped property type '{FormatSymbol(mappedPropertyType)}'";
+                reason = CreateIncompatibleConverterPropertyReason(databaseMatches[0], mappedPropertyType, direction);
                 return false;
             }
 
@@ -961,6 +1027,56 @@ namespace Dapper.FluentMap.Analyzers
             }
 
             return true;
+        }
+
+        private static ITypeSymbol GetConverterDatabaseType(
+            INamedTypeSymbol converterInterface,
+            PropertyConversionDirection direction)
+        {
+            return direction == PropertyConversionDirection.Read
+                ? converterInterface.TypeArguments[0]
+                : converterInterface.TypeArguments[1];
+        }
+
+        private static ITypeSymbol GetConverterPropertyType(
+            INamedTypeSymbol converterInterface,
+            PropertyConversionDirection direction)
+        {
+            return direction == PropertyConversionDirection.Read
+                ? converterInterface.TypeArguments[1]
+                : converterInterface.TypeArguments[0];
+        }
+
+        private static bool ConverterPropertyTypeMatches(
+            Compilation compilation,
+            INamedTypeSymbol converterInterface,
+            ITypeSymbol mappedPropertyType,
+            PropertyConversionDirection direction)
+        {
+            var converterPropertyType = GetConverterPropertyType(converterInterface, direction);
+            return direction == PropertyConversionDirection.Read
+                ? CanAssignValue(compilation, mappedPropertyType, converterPropertyType)
+                : CanAssignValue(compilation, converterPropertyType, mappedPropertyType);
+        }
+
+        private static string CreateMissingConverterContractReason(
+            PropertyConversionDirection direction,
+            ITypeSymbol databaseType)
+        {
+            return direction == PropertyConversionDirection.Read
+                ? $"it does not implement IReadPropertyConverter<{FormatSymbol(databaseType)}, TProperty>"
+                : $"it does not implement IWritePropertyConverter<TProperty, {FormatSymbol(databaseType)}>";
+        }
+
+        private static string CreateIncompatibleConverterPropertyReason(
+            INamedTypeSymbol converterInterface,
+            ITypeSymbol mappedPropertyType,
+            PropertyConversionDirection direction)
+        {
+            var converterPropertyType = GetConverterPropertyType(converterInterface, direction);
+            return direction == PropertyConversionDirection.Read
+                ? $"it returns '{FormatSymbol(converterPropertyType)}', which cannot be assigned to mapped property type '{FormatSymbol(mappedPropertyType)}'"
+                : $"it accepts '{FormatSymbol(converterPropertyType)}', which is not compatible with mapped property type '{FormatSymbol(mappedPropertyType)}'";
         }
 
         private static bool IsPropertyMapMethod(IMethodSymbol method)
@@ -1142,6 +1258,48 @@ namespace Dapper.FluentMap.Analyzers
             internal Location ColumnLocation { get; }
         }
 
+        private sealed class MapInvocationChainState
+        {
+            internal MapInvocationChainState(string columnName, Location columnLocation)
+            {
+                ColumnName = columnName;
+                ColumnKnown = true;
+                CaseSensitive = true;
+                ColumnLocation = columnLocation;
+            }
+
+            internal string ColumnName { get; private set; }
+
+            internal bool ColumnKnown { get; private set; }
+
+            internal bool CaseSensitive { get; private set; }
+
+            internal bool Ignored { get; private set; }
+
+            internal Location ColumnLocation { get; private set; }
+
+            internal void ApplyColumn(
+                InvocationExpressionSyntax invocation,
+                SemanticModel semanticModel,
+                System.Threading.CancellationToken cancellationToken)
+            {
+                ColumnLocation = invocation.GetLocation();
+                if (!TryGetColumn(invocation, semanticModel, cancellationToken, out var column, out var caseSensitive))
+                {
+                    ColumnKnown = false;
+                    return;
+                }
+
+                ColumnName = column;
+                CaseSensitive = caseSensitive;
+            }
+
+            internal void ApplyIgnore()
+            {
+                Ignored = true;
+            }
+        }
+
         private sealed class MemberPathInfo
         {
             private MemberPathInfo(string key, string display, string terminalName, ITypeSymbol terminalType)
@@ -1288,67 +1446,14 @@ namespace Dapper.FluentMap.Analyzers
                 {
                     case PersistenceAction.Computed:
                     case PersistenceAction.GeneratedComputed:
-                        if (_databaseDefaultOnInsert)
-                        {
-                            reason = "computed values cannot also be configured with DatabaseDefaultOnInsert().";
-                            return false;
-                        }
-
-                        if (_key)
-                        {
-                            reason = "computed values cannot also be configured as keys.";
-                            return false;
-                        }
-
-                        if (_identity)
-                        {
-                            reason = "computed values cannot also be configured as identity values.";
-                            return false;
-                        }
-
-                        _computed = true;
-                        return true;
+                        return TryApplyComputed(out reason);
                     case PersistenceAction.DatabaseDefaultOnInsert:
-                        if (_computed)
-                        {
-                            reason = "DatabaseDefaultOnInsert() cannot be combined with computed persistence semantics.";
-                            return false;
-                        }
-
-                        if (_identity)
-                        {
-                            reason = "DatabaseDefaultOnInsert() cannot be combined with identity persistence semantics.";
-                            return false;
-                        }
-
-                        _databaseDefaultOnInsert = true;
-                        return true;
+                        return TryApplyDatabaseDefaultOnInsert(out reason);
                     case PersistenceAction.Key:
-                        if (_computed)
-                        {
-                            reason = "key persistence semantics cannot be combined with computed values.";
-                            return false;
-                        }
-
-                        _key = true;
-                        return true;
+                        return TryApplyKey(out reason);
                     case PersistenceAction.Identity:
                     case PersistenceAction.GeneratedIdentity:
-                        if (_computed)
-                        {
-                            reason = "identity persistence semantics cannot be combined with computed values.";
-                            return false;
-                        }
-
-                        if (_databaseDefaultOnInsert)
-                        {
-                            reason = "identity persistence semantics cannot be combined with DatabaseDefaultOnInsert().";
-                            return false;
-                        }
-
-                        _key = true;
-                        _identity = true;
-                        return true;
+                        return TryApplyIdentity(out reason);
                     case PersistenceAction.GeneratedNone:
                         _identity = false;
                         _computed = false;
@@ -1357,6 +1462,83 @@ namespace Dapper.FluentMap.Analyzers
                     default:
                         return true;
                 }
+            }
+
+            private bool TryApplyComputed(out string reason)
+            {
+                if (_databaseDefaultOnInsert)
+                {
+                    reason = "computed values cannot also be configured with DatabaseDefaultOnInsert().";
+                    return false;
+                }
+
+                if (_key)
+                {
+                    reason = "computed values cannot also be configured as keys.";
+                    return false;
+                }
+
+                if (_identity)
+                {
+                    reason = "computed values cannot also be configured as identity values.";
+                    return false;
+                }
+
+                _computed = true;
+                reason = null;
+                return true;
+            }
+
+            private bool TryApplyDatabaseDefaultOnInsert(out string reason)
+            {
+                if (_computed)
+                {
+                    reason = "DatabaseDefaultOnInsert() cannot be combined with computed persistence semantics.";
+                    return false;
+                }
+
+                if (_identity)
+                {
+                    reason = "DatabaseDefaultOnInsert() cannot be combined with identity persistence semantics.";
+                    return false;
+                }
+
+                _databaseDefaultOnInsert = true;
+                reason = null;
+                return true;
+            }
+
+            private bool TryApplyKey(out string reason)
+            {
+                if (_computed)
+                {
+                    reason = "key persistence semantics cannot be combined with computed values.";
+                    return false;
+                }
+
+                _key = true;
+                reason = null;
+                return true;
+            }
+
+            private bool TryApplyIdentity(out string reason)
+            {
+                if (_computed)
+                {
+                    reason = "identity persistence semantics cannot be combined with computed values.";
+                    return false;
+                }
+
+                if (_databaseDefaultOnInsert)
+                {
+                    reason = "identity persistence semantics cannot be combined with DatabaseDefaultOnInsert().";
+                    return false;
+                }
+
+                _key = true;
+                _identity = true;
+                reason = null;
+                return true;
             }
         }
     }

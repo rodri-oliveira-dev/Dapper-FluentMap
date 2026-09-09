@@ -111,6 +111,8 @@ jobs:
               --silent \
               --show-error \
               --location \
+              --proto '=https' \
+              --proto-redir '=https' \
               --retry 3 \
               --retry-delay 2 \
               --retry-all-errors \
@@ -198,16 +200,20 @@ jobs:
         shell: pwsh
         env:
           PACKAGE_VERSION: ${{ steps.version.outputs.package_version }}
+          REPOSITORY: ${{ github.repository }}
+          REPOSITORY_URL: https://github.com/${{ github.repository }}
+          COMMIT: ${{ github.sha }}
+          BRANCH: ${{ github.ref }}
         run: |
           $ErrorActionPreference = 'Stop'
           ./eng/validate-release-artifacts.ps1 `
             -PackageDirectory './artifacts/packages' `
             -Version $env:PACKAGE_VERSION `
             -ManifestPath './artifacts/release-metadata/artifact-manifest.json' `
-            -Repository '${{ github.repository }}' `
-            -RepositoryUrl 'https://github.com/${{ github.repository }}' `
-            -Commit '${{ github.sha }}' `
-            -Branch '${{ github.ref }}'
+            -Repository $env:REPOSITORY `
+            -RepositoryUrl $env:REPOSITORY_URL `
+            -Commit $env:COMMIT `
+            -Branch $env:BRANCH
 
       - name: Consumer smoke test release packages
         shell: pwsh
@@ -542,12 +548,14 @@ jobs:
           NUGET_API_KEY: ${{ steps.rollback-nuget-login.outputs.NUGET_API_KEY }}
           PACKAGE_VERSION: ${{ needs.build-and-pack.outputs.package-version }}
           RELEASE_TAG: ${{ needs.build-and-pack.outputs.release-tag }}
+          REPOSITORY: ${{ github.repository }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
         run: |
           $ErrorActionPreference = 'Stop'
           ./eng/rollback-release.ps1 `
             -Version $env:PACKAGE_VERSION `
             -ReleaseTag $env:RELEASE_TAG `
-            -Repository '${{ github.repository }}' `
-            -RepositoryOwner '${{ github.repository_owner }}' `
+            -Repository $env:REPOSITORY `
+            -RepositoryOwner $env:REPOSITORY_OWNER `
             -GitHubToken $env:GH_TOKEN `
             -NuGetApiKey $env:NUGET_API_KEY

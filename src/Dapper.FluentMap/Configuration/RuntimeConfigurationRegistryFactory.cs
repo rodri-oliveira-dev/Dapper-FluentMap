@@ -19,14 +19,14 @@ namespace Dapper.FluentMap.Configuration
 
             foreach (var map in configuration.EntityMaps.Values)
             {
-                registry.EntityMaps.TryAdd(map.EntityType, SnapshotEntityMap.Create(map));
+                registry.EntityMaps.TryAdd(map.EntityType, SnapshotEntityMap.FromEntityConfiguration(map));
             }
 
             foreach (var profile in configuration.ProfileMaps)
             {
                 registry.ProfileMaps.TryAdd(
                     new MappingProfileKey(profile.EntityType, profile.ProfileType),
-                    SnapshotEntityMap.Create(profile));
+                    SnapshotEntityMap.FromProfileConfiguration(profile));
             }
 
             foreach (var conventions in configuration.TypeConventions)
@@ -34,7 +34,7 @@ namespace Dapper.FluentMap.Configuration
                 registry.TypeConventions.TryAdd(
                     conventions.Key,
                     conventions.Value
-                        .Select(convention => (Convention)SnapshotConvention.Create(convention))
+                        .Select(convention => (Convention)SnapshotConvention.FromConfiguration(convention))
                         .ToList());
             }
 
@@ -69,19 +69,19 @@ namespace Dapper.FluentMap.Configuration
 
             public Type MapType { get; }
 
-            internal static SnapshotEntityMap Create(EntityMappingConfiguration map)
+            internal static SnapshotEntityMap FromEntityConfiguration(EntityMappingConfiguration map)
             {
                 return new SnapshotEntityMap(
                     map.MapType,
-                    map.PropertyMaps.Select(SnapshotPropertyMap.Create).Cast<IPropertyMap>().ToList(),
+                    map.PropertyMaps.Select(SnapshotPropertyMap.FromConfiguration).Cast<IPropertyMap>().ToList(),
                     map.IncludedBaseTypes.ToList());
             }
 
-            internal static SnapshotEntityMap Create(ProfileMappingConfiguration map)
+            internal static SnapshotEntityMap FromProfileConfiguration(ProfileMappingConfiguration map)
             {
                 return new SnapshotEntityMap(
                     map.MapType,
-                    map.PropertyMaps.Select(SnapshotPropertyMap.Create).Cast<IPropertyMap>().ToList(),
+                    map.PropertyMaps.Select(SnapshotPropertyMap.FromConfiguration).Cast<IPropertyMap>().ToList(),
                     map.IncludedBaseTypes.ToList());
             }
         }
@@ -122,7 +122,7 @@ namespace Dapper.FluentMap.Configuration
                 MemberPath = memberPath;
             }
 
-            internal static SnapshotPropertyMap Create(PropertyMappingConfiguration propertyMap)
+            internal static SnapshotPropertyMap FromConfiguration(PropertyMappingConfiguration propertyMap)
             {
                 return new SnapshotPropertyMap(propertyMap);
             }
@@ -158,7 +158,7 @@ namespace Dapper.FluentMap.Configuration
 
             public Type ConventionType { get; }
 
-            internal static SnapshotConvention Create(ConventionMappingConfiguration convention)
+            internal static SnapshotConvention FromConfiguration(ConventionMappingConfiguration convention)
             {
                 return new SnapshotConvention(convention);
             }

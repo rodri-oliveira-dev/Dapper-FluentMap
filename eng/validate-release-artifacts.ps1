@@ -209,6 +209,21 @@ function Assert-CommonPackageMetadata {
     [bool]$RequireReadmeAndLicense = $true
   )
 
+  Assert-PackageIdentity -PackageInfo $PackageInfo -ExpectedId $ExpectedId
+
+  if ($RequireReadmeAndLicense) {
+    Assert-PackageAssets -PackageInfo $PackageInfo -ExpectedId $ExpectedId
+  }
+
+  Assert-RepositoryMetadata -PackageInfo $PackageInfo -ExpectedId $ExpectedId
+}
+
+function Assert-PackageIdentity {
+  param(
+    [pscustomobject]$PackageInfo,
+    [string]$ExpectedId
+  )
+
   if ($PackageInfo.Id -ne $ExpectedId) {
     Fail "$($PackageInfo.File.Name) has package ID '$($PackageInfo.Id)', expected '$ExpectedId'."
   }
@@ -216,20 +231,32 @@ function Assert-CommonPackageMetadata {
   if ($PackageInfo.Version -ne $Version) {
     Fail "$ExpectedId has version '$($PackageInfo.Version)', expected '$Version'."
   }
+}
 
-  if ($RequireReadmeAndLicense) {
-    if ($PackageInfo.LicenseType -ne 'expression' -or $PackageInfo.License -ne 'MIT') {
-      Fail "$ExpectedId must use MIT license expression."
-    }
+function Assert-PackageAssets {
+  param(
+    [pscustomobject]$PackageInfo,
+    [string]$ExpectedId
+  )
 
-    if ($PackageInfo.Readme -ne 'README.md' -or 'README.md' -notin $PackageInfo.Entries) {
-      Fail "$ExpectedId must include README.md and reference it from the nuspec."
-    }
-
-    if ($PackageInfo.Icon -ne 'package-icon.png' -or 'package-icon.png' -notin $PackageInfo.Entries) {
-      Fail "$ExpectedId must include package-icon.png and reference it from the nuspec."
-    }
+  if ($PackageInfo.LicenseType -ne 'expression' -or $PackageInfo.License -ne 'MIT') {
+    Fail "$ExpectedId must use MIT license expression."
   }
+
+  if ($PackageInfo.Readme -ne 'README.md' -or 'README.md' -notin $PackageInfo.Entries) {
+    Fail "$ExpectedId must include README.md and reference it from the nuspec."
+  }
+
+  if ($PackageInfo.Icon -ne 'package-icon.png' -or 'package-icon.png' -notin $PackageInfo.Entries) {
+    Fail "$ExpectedId must include package-icon.png and reference it from the nuspec."
+  }
+}
+
+function Assert-RepositoryMetadata {
+  param(
+    [pscustomobject]$PackageInfo,
+    [string]$ExpectedId
+  )
 
   if ($PackageInfo.RequireLicenseAcceptance -eq 'true') {
     Fail "$ExpectedId must not require license acceptance."

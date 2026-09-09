@@ -33,43 +33,50 @@ namespace Dapper.FluentMap.Utils
 
             while (true)
             {
-                if (expr == null)
+                if (TryReadPropertyAccess(lambda, expr, properties, out var nextExpression))
                 {
-                    throw new ArgumentException($"Expression '{lambda}' must resolve to a property path.", nameof(lambda));
+                    expr = nextExpression;
+                    continue;
                 }
 
-                switch (expr.NodeType)
+                if (expr != null && expr.NodeType == ExpressionType.Parameter && properties.Count > 0)
                 {
-                    case ExpressionType.MemberAccess:
-                        var memberExpression = (MemberExpression)expr;
-                        var member = memberExpression.Member;
-
-                        if (member is PropertyInfo propertyInfo)
-                        {
-                            if (propertyInfo.GetIndexParameters().Length > 0)
-                            {
-                                throw new ArgumentException($"Expression '{lambda}' refers to indexed property '{member.Name}', which is not supported.", nameof(lambda));
-                            }
-
-                            properties.Push(propertyInfo);
-                            expr = RemoveConvert(memberExpression.Expression);
-                            break;
-                        }
-
-                        throw new ArgumentException($"Expression '{lambda}' refers to member '{member.Name}', which is not a property.", nameof(lambda));
-
-                    case ExpressionType.Parameter:
-                        if (properties.Count == 0)
-                        {
-                            throw new ArgumentException($"Expression '{lambda}' must resolve to a property path.", nameof(lambda));
-                        }
-
-                        return MemberPath.FromProperties(properties);
-
-                    default:
-                        throw new ArgumentException($"Expression '{lambda}' must resolve to a property path.", nameof(lambda));
+                    return MemberPath.FromProperties(properties);
                 }
+
+                throw new ArgumentException($"Expression '{lambda}' must resolve to a property path.", nameof(lambda));
             }
+        }
+
+        private static bool TryReadPropertyAccess(
+            LambdaExpression lambda,
+            Expression expression,
+            Stack<PropertyInfo> properties,
+            out Expression nextExpression)
+        {
+            nextExpression = null;
+
+            if (expression == null || expression.NodeType != ExpressionType.MemberAccess)
+            {
+                return false;
+            }
+
+            var memberExpression = (MemberExpression)expression;
+            var member = memberExpression.Member;
+
+            if (!(member is PropertyInfo propertyInfo))
+            {
+                throw new ArgumentException($"Expression '{lambda}' refers to member '{member.Name}', which is not a property.", nameof(lambda));
+            }
+
+            if (propertyInfo.GetIndexParameters().Length > 0)
+            {
+                throw new ArgumentException($"Expression '{lambda}' refers to indexed property '{member.Name}', which is not supported.", nameof(lambda));
+            }
+
+            properties.Push(propertyInfo);
+            nextExpression = RemoveConvert(memberExpression.Expression);
+            return true;
         }
 
         private static Expression RemoveConvert(Expression expression)
