@@ -589,12 +589,13 @@ if ($snupkgs.Count -ne $expectedSnupkgIds.Count) {
 
 $expectedNupkgNames = @($catalogPackages | ForEach-Object { Get-FluentMapPackageFileName -Package $_ -Version $Version })
 $expectedSnupkgNames = @($symbolCatalogPackages | ForEach-Object { Get-FluentMapPackageFileName -Package $_ -Version $Version -Kind symbols })
-Assert-SetEquals -Expected $expectedNupkgNames -Actual ([string[]]@($nupkgs.Name)) -Description '.nupkg file set'
-Assert-SetEquals -Expected $expectedSnupkgNames -Actual ([string[]]@($snupkgs.Name)) -Description '.snupkg file set'
+Assert-SetEquals -Expected $expectedNupkgNames -Actual ([string[]]@($nupkgs | ForEach-Object { $_.Name })) -Description '.nupkg file set'
+Assert-SetEquals -Expected $expectedSnupkgNames -Actual ([string[]]@($snupkgs | ForEach-Object { $_.Name })) -Description '.snupkg file set'
 
 $forbiddenArtifacts = @($allArtifacts | Where-Object { $_.Name -match '(?i)(Tests|Benchmarks|AotSmoke)' })
 if ($forbiddenArtifacts.Count -gt 0) {
-  Fail "Unexpected test/benchmark/smoke artifacts: $($forbiddenArtifacts.Name -join ', ')."
+  $forbiddenArtifactNames = @($forbiddenArtifacts | ForEach-Object { $_.Name })
+  Fail "Unexpected test/benchmark/smoke artifacts: $($forbiddenArtifactNames -join ', ')."
 }
 
 $packageInfos = @{}
