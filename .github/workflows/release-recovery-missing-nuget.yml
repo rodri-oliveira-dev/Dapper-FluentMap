@@ -138,6 +138,62 @@ jobs:
           persist-credentials: false
           show-progress: false
 
+      - name: Verify partial release evidence
+        shell: pwsh
+        env:
+          PACKAGE_VERSION: ${{ inputs.version }}
+          RELEASE_TAG_EXISTS: ${{ steps.release-tag.outputs.release_tag_exists }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Import-Module './eng/PackageCatalog.psm1' -Force
+
+          $versionLower = $env:PACKAGE_VERSION.ToLowerInvariant()
+          $existingPackages = 0
+          $missingPackages = 0
+          foreach ($package in @(Get-FluentMapPackages -CatalogPath './validated-source/eng/package-catalog.json')) {
+            $packageId = [string]$package.packageId
+            $packageIdLower = $packageId.ToLowerInvariant()
+            $packageUrl = "https://api.nuget.org/v3-flatcontainer/$packageIdLower/$versionLower/$packageIdLower.$versionLower.nupkg"
+            $httpStatus = (& curl `
+              --silent `
+              --show-error `
+              --location `
+              --proto '=https' `
+              --proto-redir '=https' `
+              --retry 3 `
+              --retry-delay 2 `
+              --retry-all-errors `
+              --connect-timeout 10 `
+              --max-time 30 `
+              --output /dev/null `
+              --write-out '%{http_code}' `
+              $packageUrl).Trim()
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "Unable to query NuGet.org for $packageId $env:PACKAGE_VERSION. Failing closed before recovery build."
+            }
+
+            switch ($httpStatus) {
+              '200' {
+                $existingPackages++
+                Write-Host "NuGet.org already has $packageId $env:PACKAGE_VERSION; recovery publication will validate the artifact before skipping it."
+              }
+              '404' {
+                $missingPackages++
+                Write-Host "NuGet.org does not currently have $packageId $env:PACKAGE_VERSION."
+              }
+              default {
+                throw "Unexpected NuGet.org response HTTP $httpStatus while checking $packageId $env:PACKAGE_VERSION. Failing closed before recovery build."
+              }
+            }
+          }
+
+          if ($env:RELEASE_TAG_EXISTS -eq 'false' -and $existingPackages -eq 0) {
+            throw "Release tag v$env:PACKAGE_VERSION is absent and NuGet.org has no governed package for this version. Use the normal release workflow for unreleased versions."
+          }
+
+          Write-Host "Recovery preflight accepted: NuGet.org has $existingPackages existing package identity or identities and $missingPackages missing package identity or identities for $env:PACKAGE_VERSION."
+
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
@@ -202,7 +258,8 @@ jobs:
             -RepositoryUrl $env:REPOSITORY_URL `
             -Commit $env:COMMIT `
             -Branch 'refs/heads/master' `
-            -CatalogPath './validated-source/eng/package-catalog.json'
+            -CatalogPath './validated-source/eng/package-catalog.json' `
+            -SourceRoot './validated-source'
 
       - name: Consumer smoke test release packages
         shell: pwsh
