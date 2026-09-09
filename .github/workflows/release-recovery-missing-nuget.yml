@@ -40,6 +40,8 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    outputs:
+      release-tag-exists: ${{ steps.release-tag.outputs.release_tag_exists }}
 
     steps:
       - name: Validate recovery request
@@ -88,15 +90,15 @@ jobs:
             exit 1
           fi
 
-      - name: Checkout validated release commit
+      - name: Checkout recovery tooling
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ inputs.validated_commit }}
           fetch-depth: 0
           persist-credentials: false
           show-progress: false
 
-      - name: Verify release tag
+      - name: Verify release tag state
+        id: release-tag
         shell: bash
         env:
           VERSION: ${{ inputs.version }}
@@ -105,40 +107,59 @@ jobs:
           set -euo pipefail
 
           release_tag="v$VERSION"
+          git fetch origin master:refs/remotes/origin/master
           git fetch --tags
-          if ! git rev-parse -q --verify "refs/tags/$release_tag" >/dev/null; then
-            echo "::error::Expected recovery tag '$release_tag' does not exist. Run the normal release workflow for unreleased versions."
+
+          if ! git merge-base --is-ancestor "$VALIDATED_COMMIT" origin/master; then
+            echo "::error::validated_commit $VALIDATED_COMMIT is not reachable from origin/master."
             exit 1
           fi
 
-          tag_sha="$(git rev-list -n 1 "$release_tag")"
-          if [[ "$tag_sha" != "$VALIDATED_COMMIT" ]]; then
-            echo "::error::Tag '$release_tag' points to $tag_sha instead of validated commit $VALIDATED_COMMIT. Refusing to move the tag."
-            exit 1
+          if git rev-parse -q --verify "refs/tags/$release_tag" >/dev/null; then
+            tag_sha="$(git rev-list -n 1 "$release_tag")"
+            if [[ "$tag_sha" != "$VALIDATED_COMMIT" ]]; then
+              echo "::error::Tag '$release_tag' points to $tag_sha instead of validated commit $VALIDATED_COMMIT. Refusing to move the tag."
+              exit 1
+            fi
+
+            echo "Tag '$release_tag' already points to the validated commit."
+            echo "release_tag_exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Tag '$release_tag' is absent; recovery may continue and will restore it after successful publication."
+            echo "release_tag_exists=false" >> "$GITHUB_OUTPUT"
           fi
 
-          echo "Tag '$release_tag' already points to the validated commit."
+      - name: Checkout validated release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ inputs.validated_commit }}
+          path: validated-source
+          fetch-depth: 0
+          persist-credentials: false
+          show-progress: false
 
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
-          global-json-file: global.json
+          global-json-file: validated-source/global.json
 
       - name: Validate SLNX equivalence
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          ./eng/validate-slnx-equivalence.ps1
+          ./eng/validate-slnx-equivalence.ps1 `
+            -SlnPath './validated-source/Dapper.FluentMap.sln' `
+            -SlnxPath './validated-source/Dapper.FluentMap.slnx'
 
       - name: Restore
-        run: dotnet restore ./Dapper.FluentMap.slnx
+        run: dotnet restore ./validated-source/Dapper.FluentMap.slnx
 
       - name: Build validated release source
         env:
           PACKAGE_VERSION: ${{ inputs.version }}
           VALIDATED_COMMIT: ${{ inputs.validated_commit }}
         run: >-
-          dotnet build ./Dapper.FluentMap.slnx
+          dotnet build ./validated-source/Dapper.FluentMap.slnx
           --configuration Release
           --no-restore
           -p:Version="$PACKAGE_VERSION"
@@ -147,14 +168,14 @@ jobs:
           -p:ContinuousIntegrationBuild=true
 
       - name: Run tests
-        run: dotnet test ./Dapper.FluentMap.slnx --configuration Release --no-build --no-restore
+        run: dotnet test ./validated-source/Dapper.FluentMap.slnx --configuration Release --no-build --no-restore
 
       - name: Pack release packages
         env:
           PACKAGE_VERSION: ${{ inputs.version }}
           VALIDATED_COMMIT: ${{ inputs.validated_commit }}
         run: >-
-          dotnet pack ./Dapper.FluentMap.slnx
+          dotnet pack ./validated-source/Dapper.FluentMap.slnx
           --configuration Release
           --no-build
           --no-restore
@@ -180,7 +201,8 @@ jobs:
             -Repository $env:REPOSITORY `
             -RepositoryUrl $env:REPOSITORY_URL `
             -Commit $env:COMMIT `
-            -Branch 'refs/heads/master'
+            -Branch 'refs/heads/master' `
+            -CatalogPath './validated-source/eng/package-catalog.json'
 
       - name: Consumer smoke test release packages
         shell: pwsh
@@ -190,18 +212,47 @@ jobs:
           $ErrorActionPreference = 'Stop'
           ./eng/consumer-smoke/run-consumer-smoke.ps1 `
             -PackageDirectory './artifacts/packages' `
-            -PackageVersion $env:PACKAGE_VERSION
+            -PackageVersion $env:PACKAGE_VERSION `
+            -CatalogPath './validated-source/eng/package-catalog.json'
 
       - name: Generate and verify checksums
-        shell: bash
+        shell: pwsh
         run: |
-          set -euo pipefail
-          cd ./artifacts
-          {
-            find packages -type f \( -name '*.nupkg' -o -name '*.snupkg' \)
-            find release-metadata -type f -name '*.json'
-          } | sort | xargs sha256sum > ./release-metadata/SHA256SUMS
-          sha256sum --check ./release-metadata/SHA256SUMS
+          $ErrorActionPreference = 'Stop'
+          Import-Module './eng/PackageCatalog.psm1' -Force
+          $catalogPath = './validated-source/eng/package-catalog.json'
+          $artifactRoot = (Resolve-Path './artifacts').Path
+          $packageFiles = @(
+            Get-ChildItem './artifacts/packages' -File |
+              Where-Object { $_.Extension -in @('.nupkg', '.snupkg') }
+          )
+          $expectedPackageFileCount = @(Get-FluentMapPackages -CatalogPath $catalogPath).Count + @(Get-FluentMapPackages -CatalogPath $catalogPath -WithSymbols).Count
+
+          if ($packageFiles.Count -ne $expectedPackageFileCount) {
+            throw "Expected $expectedPackageFileCount package artifacts for checksums, found $($packageFiles.Count)."
+          }
+
+          $files = @(
+            $packageFiles
+            Get-Item './artifacts/release-metadata/artifact-manifest.json'
+          ) | Sort-Object FullName
+
+          $lines = foreach ($file in $files) {
+            $relative = [System.IO.Path]::GetRelativePath($artifactRoot, $file.FullName).Replace('\\', '/')
+            $hash = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $relative"
+          }
+
+          $checksumPath = Join-Path $artifactRoot 'release-metadata/SHA256SUMS'
+          [System.IO.File]::WriteAllLines($checksumPath, $lines, [System.Text.UTF8Encoding]::new($false))
+
+          Push-Location $artifactRoot
+          try {
+            sha256sum --check ./release-metadata/SHA256SUMS
+          }
+          finally {
+            Pop-Location
+          }
 
       - name: Exchange GitHub OIDC token for temporary NuGet API key
         id: nuget-login
@@ -222,41 +273,60 @@ jobs:
             -Source 'https://api.nuget.org/v3/index.json' `
             -ApiKey $env:NUGET_API_KEY `
             -Registry NuGetOrg `
-            -WaitForNuGetOrgIndexing
+            -CatalogPath './validated-source/eng/package-catalog.json'
 
-      - name: Verify NuGet.org publication state
+      - name: Report recovery completion
+        run: echo "NuGet recovery completed for all package identities."
+
+  restore-release-tag:
+    name: Restore missing release tag
+    needs: recover-missing-nuget-packages
+    if: ${{ needs.recover-missing-nuget-packages.outputs.release-tag-exists == 'false' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: release
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout recovery tooling
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          show-progress: false
+
+      - name: Restore tag to validated commit
         shell: bash
         env:
           VERSION: ${{ inputs.version }}
+          VALIDATED_COMMIT: ${{ inputs.validated_commit }}
         run: |
           set -euo pipefail
 
-          version_lower="$(printf '%s' "$VERSION" | tr '[:upper:]' '[:lower:]')"
-          while IFS= read -r package_id; do
-            package_id_lower="$(printf '%s' "$package_id" | tr '[:upper:]' '[:lower:]')"
-            package_url="https://api.nuget.org/v3-flatcontainer/$package_id_lower/$version_lower/$package_id_lower.$version_lower.nupkg"
+          release_tag="v$VERSION"
+          if [[ "$release_tag" == "v3.0.0" ]]; then
+            echo "::error::Tag v3.0.0 is immutable and must not be recreated by recovery automation."
+            exit 1
+          fi
 
-            status="$(curl \
-              --silent \
-              --show-error \
-              --location \
-              --proto '=https' \
-              --proto-redir '=https' \
-              --retry 6 \
-              --retry-delay 5 \
-              --retry-all-errors \
-              --connect-timeout 10 \
-              --max-time 30 \
-              --output /dev/null \
-              --write-out '%{http_code}' \
-              "$package_url")"
+          git fetch origin master:refs/remotes/origin/master
+          git fetch --tags
 
-            if [[ "$status" != "200" ]]; then
-              echo "::error::$package_id $VERSION is not visible on NuGet.org after recovery (HTTP $status)."
+          if git rev-parse -q --verify "refs/tags/$release_tag" >/dev/null; then
+            tag_sha="$(git rev-list -n 1 "$release_tag")"
+            if [[ "$tag_sha" != "$VALIDATED_COMMIT" ]]; then
+              echo "::error::Tag '$release_tag' points to $tag_sha instead of validated commit $VALIDATED_COMMIT. Refusing to move the tag."
               exit 1
             fi
 
-            echo "$package_id $VERSION is visible on NuGet.org."
-          done < <(jq -r '.packages[].packageId' eng/package-catalog.json)
+            echo "Tag '$release_tag' already points to the validated commit."
+            exit 0
+          fi
 
-          echo "Recovery completed: all expected package IDs are visible on NuGet.org."
+          if ! git cat-file -e "$VALIDATED_COMMIT^{commit}" 2>/dev/null; then
+            git fetch origin "$VALIDATED_COMMIT"
+          fi
+
+          git tag "$release_tag" "$VALIDATED_COMMIT"
+          git push origin "refs/tags/$release_tag"
+          echo "Restored tag '$release_tag' to validated commit $VALIDATED_COMMIT."

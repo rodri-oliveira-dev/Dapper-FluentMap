@@ -19,7 +19,7 @@ param(
 
   [string]$GitHubToken,
 
-  [switch]$WaitForNuGetOrgIndexing
+  [string]$CatalogPath
 )
 
 Set-StrictMode -Version Latest
@@ -269,51 +269,12 @@ function Wait-GitHubPackageVisible {
   Fail "GitHub Packages did not expose $PackageId $Version after publication within the retry window."
 }
 
-function Wait-NuGetOrgPackageSetVisible {
-  param([array]$Packages)
-
-  $remainingPackages = @{}
-  foreach ($package in $Packages) {
-    $remainingPackages[[string]$package.packageId] = $package
-  }
-
-  for ($attempt = 1; $attempt -le 12; $attempt++) {
-    foreach ($packageId in @($remainingPackages.Keys)) {
-      $status = Get-HttpStatus -Uri (Get-NuGetFlatContainerUrl -PackageId $packageId -PackageVersion $Version)
-      switch ($status) {
-        '200' {
-          Write-Output "NuGet.org: verified $packageId $Version after publication."
-          $remainingPackages.Remove($packageId)
-        }
-        '404' {
-          Write-Output "NuGet.org: $packageId $Version is not visible yet after publication."
-        }
-        default {
-          Fail "Unexpected NuGet.org response HTTP $status for $packageId $Version while waiting for indexing. Failing closed."
-        }
-      }
-    }
-
-    if ($remainingPackages.Count -eq 0) {
-      Write-Output "NuGet.org: verified all package identities for $Version after publication."
-      return
-    }
-
-    if ($attempt -lt 12) {
-      Write-Output "NuGet.org: waiting for $($remainingPackages.Count) package identity or identities to become visible before retrying."
-      Start-Sleep -Seconds 10
-    }
-  }
-
-  Fail "NuGet.org did not expose $Version for package identity or identities within the retry window: $(@($remainingPackages.Keys) -join ', ')."
-}
-
 if ([string]::IsNullOrWhiteSpace($ApiKey)) {
   Fail "$Registry API key is empty."
 }
 
 $packageRoot = (Resolve-Path -LiteralPath $PackageDirectory).Path
-$packages = @(Get-FluentMapPackages)
+$packages = @(Get-FluentMapPackages -CatalogPath $CatalogPath)
 
 foreach ($package in $packages) {
   $packageId = [string]$package.packageId
@@ -353,10 +314,6 @@ foreach ($package in $packages) {
   else {
     Wait-GitHubPackageVisible -PackageId $packageId
   }
-}
-
-if ($Registry -eq 'NuGetOrg' -and $WaitForNuGetOrgIndexing) {
-  Wait-NuGetOrgPackageSetVisible -Packages $packages
 }
 
 Write-Output "$Registry publication completed for $($packages.Count) package identities."

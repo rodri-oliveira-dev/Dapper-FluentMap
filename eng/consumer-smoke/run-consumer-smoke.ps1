@@ -4,6 +4,7 @@ param(
   [string]$RemoteArtifactDirectory,
   [string]$PackageDirectory,
   [string]$PackageVersion,
+  [string]$CatalogPath,
   [switch]$SkipTrimPublish
 )
 
@@ -13,7 +14,7 @@ $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot '../PackageCatalog.psm1') -Force
 
 $packageVersion = if ([string]::IsNullOrWhiteSpace($PackageVersion)) { '3.0.1' } else { $PackageVersion }
-$catalogPackages = @(Get-FluentMapPackages)
+$catalogPackages = @(Get-FluentMapPackages -CatalogPath $CatalogPath)
 $expectedPackageIds = @($catalogPackages | ForEach-Object { [string]$_.packageId })
 
 function Fail {

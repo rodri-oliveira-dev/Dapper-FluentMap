@@ -14,7 +14,9 @@ param(
 
   [string]$Commit,
 
-  [string]$Branch
+  [string]$Branch,
+
+  [string]$CatalogPath
 )
 
 Set-StrictMode -Version Latest
@@ -29,8 +31,8 @@ function Fail {
   throw "Release artifact validation failed: $Message"
 }
 
-$catalogPackages = @(Get-FluentMapPackages)
-$symbolCatalogPackages = @(Get-FluentMapPackages -WithSymbols)
+$catalogPackages = @(Get-FluentMapPackages -CatalogPath $CatalogPath)
+$symbolCatalogPackages = @(Get-FluentMapPackages -CatalogPath $CatalogPath -WithSymbols)
 $expectedNupkgIds = @($catalogPackages | ForEach-Object { [string]$_.packageId })
 $expectedSnupkgIds = @($symbolCatalogPackages | ForEach-Object { [string]$_.packageId })
 $expectedDependencies = @{}
