@@ -6,7 +6,7 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     <IncludeBuildOutput>false</IncludeBuildOutput>
-    <PackageId>Dapper.FluentMap.Generators</PackageId>
+    <PackageId>FluentMap.Generators</PackageId>
     <PackageTags>dapper;roslyn;source-generator;mapping;code-generation;fluent-mapping;fluentmap</PackageTags>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <IncludeSymbols>false</IncludeSymbols>

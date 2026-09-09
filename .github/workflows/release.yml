@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Semantic version without the v prefix, for example 3.0.0-rc.1 or 3.0.0."
+        description: "Semantic version without the v prefix, for example 3.0.1 or 3.0.1-rc.1."
         required: true
         type: string
 
@@ -50,107 +50,106 @@ jobs:
 
       - name: Validate release version and availability
         id: version
-        shell: bash
+        shell: pwsh
         env:
           VERSION: ${{ inputs.version }}
         run: |
-          set -euo pipefail
+          $ErrorActionPreference = 'Stop'
+          Import-Module './eng/PackageCatalog.psm1' -Force
 
-          if [[ "$GITHUB_REF" != "refs/heads/master" ]]; then
-            echo "::error::Releases must be started from the master branch. Current ref: $GITHUB_REF"
+          if ($env:GITHUB_REF -ne 'refs/heads/master') {
+            Write-Error "Releases must be started from the master branch. Current ref: $env:GITHUB_REF"
             exit 1
-          fi
+          }
 
-          if [[ "$VERSION" == v* ]]; then
-            echo "::error::Enter the semantic version without the 'v' prefix (for example 3.0.0-rc.1)."
+          if ($env:VERSION.StartsWith('v', [System.StringComparison]::OrdinalIgnoreCase)) {
+            Write-Error "Enter the semantic version without the 'v' prefix (for example 3.0.1)."
             exit 1
-          fi
+          }
 
-          semver='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
-          if [[ ! "$VERSION" =~ $semver ]]; then
-            echo "::error::Invalid semantic version '$VERSION'. Expected a value such as 3.0.0-rc.1 or 3.0.0."
+          if ($env:VERSION -notmatch '^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$') {
+            Write-Error "Invalid semantic version '$env:VERSION'. Expected a value such as 3.0.1 or 3.0.1-rc.1."
             exit 1
-          fi
+          }
 
-          major="${VERSION%%.*}"
-          if (( major < 3 )); then
-            echo "::error::FluentMap releases from this workflow must use major version 3 or later."
+          $major = [int]($env:VERSION.Split('.')[0])
+          if ($major -lt 3) {
+            Write-Error 'FluentMap releases from this workflow must use major version 3 or later.'
             exit 1
-          fi
+          }
 
-          release_tag="v$VERSION"
-          is_prerelease=false
-          if [[ "$VERSION" == *-* ]]; then
-            is_prerelease=true
-          fi
-
-          echo "Checking whether release tag '$release_tag' already exists..."
-          git fetch --tags --force
-          if git rev-parse -q --verify "refs/tags/$release_tag" >/dev/null; then
-            tag_sha="$(git rev-list -n 1 "$release_tag")"
-            echo "::error::Release tag '$release_tag' already exists and points to $tag_sha. Choose a new version before building."
+          if ($env:VERSION -eq '3.0.0') {
+            Write-Error 'Version 3.0.0 is immutable and must not be recreated by this workflow. Use 3.0.1 or later for the next coherent release.'
             exit 1
-          fi
+          }
 
-          package_ids=(
-            'Dapper.FluentMap'
-            'Dapper.FluentMap.Dommel'
-            'Dapper.FluentMap.DependencyInjection'
-            'Dapper.FluentMap.Analyzers'
-            'Dapper.FluentMap.Generators'
-          )
-          version_lower="$(printf '%s' "$VERSION" | tr '[:upper:]' '[:lower:]')"
-          published_packages=()
+          $releaseTag = "v$env:VERSION"
+          $isPrerelease = if ($env:VERSION.Contains('-')) { 'true' } else { 'false' }
 
-          echo "Checking NuGet.org for version '$VERSION' before build..."
-          for package_id in "${package_ids[@]}"; do
-            package_id_lower="$(printf '%s' "$package_id" | tr '[:upper:]' '[:lower:]')"
-            package_url="https://api.nuget.org/v3-flatcontainer/$package_id_lower/$version_lower/$package_id_lower.$version_lower.nupkg"
-
-            if ! http_status="$(curl \
-              --silent \
-              --show-error \
-              --location \
-              --proto '=https' \
-              --proto-redir '=https' \
-              --retry 3 \
-              --retry-delay 2 \
-              --retry-all-errors \
-              --connect-timeout 10 \
-              --max-time 30 \
-              --output /dev/null \
-              --write-out '%{http_code}' \
-              "$package_url")"; then
-              echo "::error::Unable to verify NuGet.org availability for $package_id $VERSION. Failing closed before build."
+          Write-Host "Checking release tag '$releaseTag'..."
+          git fetch --tags
+          $tagExists = $false
+          & git rev-parse -q --verify "refs/tags/$releaseTag" *> $null
+          if ($LASTEXITCODE -eq 0) {
+            $tagExists = $true
+            $tagSha = (& git rev-list -n 1 $releaseTag).Trim()
+            if ($tagSha -ne $env:GITHUB_SHA) {
+              Write-Error "Release tag '$releaseTag' points to $tagSha instead of validated commit $env:GITHUB_SHA. Refusing to move the tag."
               exit 1
-            fi
+            }
 
-            case "$http_status" in
-              200)
-                echo "::error::$package_id $VERSION is already published on NuGet.org."
-                published_packages+=("$package_id")
-                ;;
-              404)
-                echo "$package_id $VERSION is available on NuGet.org."
-                ;;
-              *)
-                echo "::error::Unexpected NuGet.org response $http_status while checking $package_id $VERSION. Failing closed before build."
+            Write-Host "Release tag '$releaseTag' already points to the validated commit; accepting it."
+          }
+          else {
+            Write-Host "Release tag '$releaseTag' does not currently exist."
+          }
+
+          $versionLower = $env:VERSION.ToLowerInvariant()
+          foreach ($package in @(Get-FluentMapPackages)) {
+            $packageId = [string]$package.packageId
+            $packageIdLower = $packageId.ToLowerInvariant()
+            $packageUrl = "https://api.nuget.org/v3-flatcontainer/$packageIdLower/$versionLower/$packageIdLower.$versionLower.nupkg"
+            $httpStatus = (& curl `
+              --silent `
+              --show-error `
+              --location `
+              --proto '=https' `
+              --proto-redir '=https' `
+              --retry 3 `
+              --retry-delay 2 `
+              --retry-all-errors `
+              --connect-timeout 10 `
+              --max-time 30 `
+              --output /dev/null `
+              --write-out '%{http_code}' `
+              $packageUrl).Trim()
+
+            if ($LASTEXITCODE -ne 0) {
+              Write-Error "Unable to query NuGet.org for $packageId $env:VERSION. Failing closed before build."
+              exit 1
+            }
+
+            switch ($httpStatus) {
+              '200' {
+                Write-Host "NuGet.org already has $packageId $env:VERSION. Publication will validate the existing artifact before accepting it."
+              }
+              '404' {
+                Write-Host "NuGet.org does not currently have $packageId $env:VERSION. This does not prove the publisher is authorized to create the PackageId."
+              }
+              default {
+                Write-Error "Unexpected NuGet.org response HTTP $httpStatus while checking $packageId $env:VERSION. Failing closed before build."
                 exit 1
-                ;;
-            esac
-          done
+              }
+            }
+          }
 
-          if (( ${#published_packages[@]} > 0 )); then
-            echo "::error::Release version '$VERSION' is already published for: ${published_packages[*]}. Choose a new version."
-            exit 1
-          fi
-
-          echo "package_version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "release_tag=$release_tag" >> "$GITHUB_OUTPUT"
-          echo "is_prerelease=$is_prerelease" >> "$GITHUB_OUTPUT"
-          echo "Release version: $VERSION"
-          echo "Release tag: $release_tag"
-          echo "Preflight passed: tag is unused and the version is unpublished for all FluentMap NuGet packages."
+          "package_version=$env:VERSION" >> $env:GITHUB_OUTPUT
+          "release_tag=$releaseTag" >> $env:GITHUB_OUTPUT
+          "is_prerelease=$isPrerelease" >> $env:GITHUB_OUTPUT
+          "tag_exists=$tagExists" >> $env:GITHUB_OUTPUT
+          Write-Host "Release version: $env:VERSION"
+          Write-Host "Release tag: $releaseTag"
+          Write-Host 'Preflight passed: tag state is compatible and NuGet.org returned only expected package-version states.'
 
       - name: Show .NET info
         run: dotnet --info
@@ -221,19 +220,9 @@ jobs:
           PACKAGE_VERSION: ${{ steps.version.outputs.package_version }}
         run: |
           $ErrorActionPreference = 'Stop'
-
-          Get-ChildItem './eng/consumer-smoke' -Recurse -File |
-            Where-Object { $_.Extension -in @('.csproj', '.ps1') } |
-            ForEach-Object {
-              $content = Get-Content -LiteralPath $_.FullName -Raw
-              $updated = $content.Replace('3.0.0-rc.1', $env:PACKAGE_VERSION)
-              if ($updated -ne $content) {
-                [System.IO.File]::WriteAllText($_.FullName, $updated, [System.Text.UTF8Encoding]::new($false))
-              }
-            }
-
           ./eng/consumer-smoke/run-consumer-smoke.ps1 `
-            -PackageDirectory './artifacts/packages'
+            -PackageDirectory './artifacts/packages' `
+            -PackageVersion $env:PACKAGE_VERSION
 
       - name: Write dependency inventory
         shell: pwsh
@@ -247,14 +236,16 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          Import-Module './eng/PackageCatalog.psm1' -Force
           $artifactRoot = (Resolve-Path './artifacts').Path
           $packageFiles = @(
             Get-ChildItem './artifacts/packages' -File |
               Where-Object { $_.Extension -in @('.nupkg', '.snupkg') }
           )
+          $expectedPackageFileCount = @(Get-FluentMapPackages).Count + @(Get-FluentMapPackages -WithSymbols).Count
 
-          if ($packageFiles.Count -ne 8) {
-            throw "Expected 8 package artifacts for checksums, found $($packageFiles.Count)."
+          if ($packageFiles.Count -ne $expectedPackageFileCount) {
+            throw "Expected $expectedPackageFileCount package artifacts for checksums, found $($packageFiles.Count)."
           }
 
           $files = @(
@@ -286,6 +277,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    outputs:
+      tag-created: ${{ steps.release-tag.outputs.tag_created }}
 
     steps:
       - name: Checkout validated commit
@@ -294,6 +287,7 @@ jobs:
           fetch-depth: 0
 
       - name: Create or verify tag
+        id: release-tag
         shell: bash
         env:
           RELEASE_TAG: ${{ needs.build-and-pack.outputs.release-tag }}
@@ -301,7 +295,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          git fetch --tags --force
+          git fetch --tags
           if git rev-parse -q --verify "refs/tags/$RELEASE_TAG" >/dev/null; then
             tag_sha="$(git rev-list -n 1 "$RELEASE_TAG")"
             if [[ "$tag_sha" != "$VALIDATED_SHA" ]]; then
@@ -310,11 +304,13 @@ jobs:
             fi
 
             echo "Tag '$RELEASE_TAG' already exists on the validated commit."
+            echo "tag_created=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           git tag "$RELEASE_TAG" "$VALIDATED_SHA"
           git push origin "refs/tags/$RELEASE_TAG"
+          echo "tag_created=true" >> "$GITHUB_OUTPUT"
 
   publish-nuget:
     name: Publish to NuGet.org
@@ -328,6 +324,12 @@ jobs:
       id-token: write
 
     steps:
+      - name: Checkout release tooling
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          show-progress: false
+
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
@@ -359,24 +361,12 @@ jobs:
           PACKAGE_VERSION: ${{ needs.build-and-pack.outputs.package-version }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $packageIds = @(
-            'Dapper.FluentMap',
-            'Dapper.FluentMap.Dommel',
-            'Dapper.FluentMap.DependencyInjection',
-            'Dapper.FluentMap.Analyzers',
-            'Dapper.FluentMap.Generators'
-          )
-
-          foreach ($packageId in $packageIds) {
-            $package = "./artifacts/packages/$packageId.$env:PACKAGE_VERSION.nupkg"
-            dotnet nuget push $package `
-              --source 'https://api.nuget.org/v3/index.json' `
-              --api-key $env:NUGET_API_KEY
-
-            if ($LASTEXITCODE -ne 0) {
-              throw "NuGet.org publication failed for $packageId. The version may already exist; refusing to suppress an unverified duplicate."
-            }
-          }
+          ./eng/publish-package-set.ps1 `
+            -PackageDirectory './artifacts/packages' `
+            -Version $env:PACKAGE_VERSION `
+            -Source 'https://api.nuget.org/v3/index.json' `
+            -ApiKey $env:NUGET_API_KEY `
+            -Registry NuGetOrg
 
   publish-github-packages:
     name: Publish to GitHub Packages
@@ -390,6 +380,12 @@ jobs:
       packages: write
 
     steps:
+      - name: Checkout release tooling
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+          show-progress: false
+
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
@@ -414,26 +410,17 @@ jobs:
           GITHUB_PACKAGE_SOURCE: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
           GITHUB_PACKAGE_TOKEN: ${{ github.token }}
           PACKAGE_VERSION: ${{ needs.build-and-pack.outputs.package-version }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $packageIds = @(
-            'Dapper.FluentMap',
-            'Dapper.FluentMap.Dommel',
-            'Dapper.FluentMap.DependencyInjection',
-            'Dapper.FluentMap.Analyzers',
-            'Dapper.FluentMap.Generators'
-          )
-
-          foreach ($packageId in $packageIds) {
-            $package = "./artifacts/packages/$packageId.$env:PACKAGE_VERSION.nupkg"
-            dotnet nuget push $package `
-              --source $env:GITHUB_PACKAGE_SOURCE `
-              --api-key $env:GITHUB_PACKAGE_TOKEN
-
-            if ($LASTEXITCODE -ne 0) {
-              throw "GitHub Packages publication failed for $packageId. The version may already exist; refusing to suppress an unverified duplicate."
-            }
-          }
+          ./eng/publish-package-set.ps1 `
+            -PackageDirectory './artifacts/packages' `
+            -Version $env:PACKAGE_VERSION `
+            -Source $env:GITHUB_PACKAGE_SOURCE `
+            -ApiKey $env:GITHUB_PACKAGE_TOKEN `
+            -Registry GitHubPackages `
+            -RepositoryOwner $env:REPOSITORY_OWNER `
+            -GitHubToken $env:GITHUB_PACKAGE_TOKEN
 
   github-release:
     name: Create GitHub Release
@@ -510,8 +497,9 @@ jobs:
     if: >-
       ${{ always() &&
           needs.build-and-pack.result == 'success' &&
-          (needs.ensure-release-tag.result == 'failure' ||
-           needs.publish-nuget.result == 'failure' ||
+          needs.ensure-release-tag.result == 'success' &&
+          needs.ensure-release-tag.outputs.tag-created == 'true' &&
+          (needs.publish-nuget.result == 'failure' ||
            needs.publish-github-packages.result == 'failure' ||
            needs.github-release.result == 'failure') }}
     needs:
@@ -524,8 +512,6 @@ jobs:
     environment: release
     permissions:
       contents: write
-      packages: write
-      id-token: write
 
     steps:
       - name: Checkout rollback tooling
@@ -534,28 +520,18 @@ jobs:
           persist-credentials: false
           show-progress: false
 
-      - name: Exchange GitHub OIDC token for rollback NuGet API key
-        id: rollback-nuget-login
-        continue-on-error: true
-        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
-        with:
-          user: "${{ vars.NUGET_USER }}"
-
       - name: Compensate failed release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-          NUGET_API_KEY: ${{ steps.rollback-nuget-login.outputs.NUGET_API_KEY }}
           PACKAGE_VERSION: ${{ needs.build-and-pack.outputs.package-version }}
           RELEASE_TAG: ${{ needs.build-and-pack.outputs.release-tag }}
           REPOSITORY: ${{ github.repository }}
-          REPOSITORY_OWNER: ${{ github.repository_owner }}
         run: |
           $ErrorActionPreference = 'Stop'
           ./eng/rollback-release.ps1 `
             -Version $env:PACKAGE_VERSION `
             -ReleaseTag $env:RELEASE_TAG `
             -Repository $env:REPOSITORY `
-            -RepositoryOwner $env:REPOSITORY_OWNER `
             -GitHubToken $env:GH_TOKEN `
-            -NuGetApiKey $env:NUGET_API_KEY
+            -DeleteReleaseTag

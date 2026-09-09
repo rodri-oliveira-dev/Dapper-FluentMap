@@ -35,6 +35,14 @@ jobs:
           persist-credentials: false
           show-progress: false
 
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+
+      - name: Restore local .NET tools
+        run: dotnet tool restore
+
       - name: Install configuration validator
         run: python3 -m pip install --disable-pip-version-check check-jsonschema==0.38.0
 
@@ -43,6 +51,12 @@ jobs:
 
       - name: Validate Dependabot configuration
         run: check-jsonschema --builtin-schema vendor.dependabot .github/dependabot.yml
+
+      - name: Validate ADRs
+        run: |
+          dotnet tool run adr-guard check docs/adr
+          dotnet tool run adr-guard index docs/adr
+          git diff --exit-code -- docs/adr
 
   compatibility:
     name: Compatibility (${{ matrix.dapper-lane }}, Dapper ${{ matrix.dapper-version }})
@@ -177,17 +191,20 @@ jobs:
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
+          Import-Module './eng/PackageCatalog.psm1' -Force
           $packageDir = './artifacts/packages'
           $nupkgs = @(Get-ChildItem -Path $packageDir -Filter '*.nupkg' -File)
           $snupkgs = @(Get-ChildItem -Path $packageDir -Filter '*.snupkg' -File)
           $unexpected = @($nupkgs + $snupkgs | Where-Object { $_.Name -match '(Tests|Benchmarks|AotSmoke)' })
+          $expectedNupkgCount = @(Get-FluentMapPackages).Count
+          $expectedSnupkgCount = @(Get-FluentMapPackages -WithSymbols).Count
 
-          if ($nupkgs.Count -ne 5) {
-            throw "Expected 5 .nupkg files, found $($nupkgs.Count)."
+          if ($nupkgs.Count -ne $expectedNupkgCount) {
+            throw "Expected $expectedNupkgCount .nupkg files, found $($nupkgs.Count)."
           }
 
-          if ($snupkgs.Count -ne 3) {
-            throw "Expected 3 .snupkg files, found $($snupkgs.Count)."
+          if ($snupkgs.Count -ne $expectedSnupkgCount) {
+            throw "Expected $expectedSnupkgCount .snupkg files, found $($snupkgs.Count)."
           }
 
           if ($unexpected.Count -gt 0) {

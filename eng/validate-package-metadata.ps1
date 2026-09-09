@@ -7,35 +7,55 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+Import-Module (Join-Path $PSScriptRoot 'PackageCatalog.psm1') -Force
+
 $expectedRepositoryUrl = 'https://github.com/rodri-oliveira-dev/Dapper-FluentMap'
 $expectedReleaseNotesUrl = 'https://github.com/rodri-oliveira-dev/Dapper-FluentMap/releases'
 $expectedAuthors = @('Henk Mollema', 'Rodrigo de Oliveira')
-$expectedPackages = @{
-  'Dapper.FluentMap' = @{
-    Title = 'Dapper.FluentMap'
-    RequiredTags = @('dapper', 'fluent-mapping', 'mapping', 'micro-orm', 'database', 'sql', 'poco', 'fluentmap')
-  }
-  'Dapper.FluentMap.Dommel' = @{
-    Title = 'Dapper.FluentMap - Dommel Integration'
-    RequiredTags = @('dapper', 'dommel', 'fluent-mapping', 'mapping', 'crud', 'database', 'sql', 'fluentmap')
-  }
-  'Dapper.FluentMap.DependencyInjection' = @{
-    Title = 'Dapper.FluentMap - Dependency Injection'
-    RequiredTags = @('dapper', 'dependency-injection', 'di', 'fluent-mapping', 'mapping', 'database', 'fluentmap')
-  }
-  'Dapper.FluentMap.Analyzers' = @{
-    Title = 'Dapper.FluentMap Analyzers'
-    RequiredTags = @('dapper', 'roslyn', 'analyzers', 'mapping', 'diagnostics', 'fluent-mapping', 'fluentmap')
-  }
-  'Dapper.FluentMap.Generators' = @{
-    Title = 'Dapper.FluentMap Source Generators'
-    RequiredTags = @('dapper', 'roslyn', 'source-generator', 'mapping', 'code-generation', 'fluent-mapping', 'fluentmap')
-  }
-}
 
 function Fail {
   param([string]$Message)
   throw "NuGet package metadata validation failed: $Message"
+}
+
+$catalogPackages = @(Get-FluentMapPackages)
+$expectedPackages = @{}
+foreach ($package in $catalogPackages) {
+  $expectedPackages[[string]$package.packageId] = switch ([string]$package.project) {
+    'Dapper.FluentMap' {
+      @{
+        Title = 'Dapper.FluentMap'
+        RequiredTags = @('dapper', 'fluent-mapping', 'mapping', 'micro-orm', 'database', 'sql', 'poco', 'fluentmap')
+      }
+    }
+    'Dapper.FluentMap.Dommel' {
+      @{
+        Title = 'Dapper.FluentMap - Dommel Integration'
+        RequiredTags = @('dapper', 'dommel', 'fluent-mapping', 'mapping', 'crud', 'database', 'sql', 'fluentmap')
+      }
+    }
+    'Dapper.FluentMap.DependencyInjection' {
+      @{
+        Title = 'Dapper.FluentMap - Dependency Injection'
+        RequiredTags = @('dapper', 'dependency-injection', 'di', 'fluent-mapping', 'mapping', 'database', 'fluentmap')
+      }
+    }
+    'Dapper.FluentMap.Analyzers' {
+      @{
+        Title = 'Dapper.FluentMap Analyzers'
+        RequiredTags = @('dapper', 'roslyn', 'analyzers', 'mapping', 'diagnostics', 'fluent-mapping', 'fluentmap')
+      }
+    }
+    'Dapper.FluentMap.Generators' {
+      @{
+        Title = 'Dapper.FluentMap Source Generators'
+        RequiredTags = @('dapper', 'roslyn', 'source-generator', 'mapping', 'code-generation', 'fluent-mapping', 'fluentmap')
+      }
+    }
+    default {
+      Fail "Package catalog contains unexpected project identity '$($package.project)'."
+    }
+  }
 }
 
 function Get-ChildText {

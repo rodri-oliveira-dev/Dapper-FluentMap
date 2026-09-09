@@ -1,6 +1,12 @@
-# Dapper.FluentMap.DependencyInjection
+# FluentMap.DependencyInjection
 
 Dependency injection integration for Dapper.FluentMap.
+
+```bash
+dotnet add package FluentMap.DependencyInjection
+```
+
+The NuGet PackageId is `FluentMap.DependencyInjection`. The assembly and C# namespace remain `Dapper.FluentMap.DependencyInjection`.
 
 ```csharp
 using Microsoft.Extensions.DependencyInjection;

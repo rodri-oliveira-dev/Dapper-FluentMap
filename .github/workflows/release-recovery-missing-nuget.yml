@@ -1,12 +1,20 @@
-name: Recovery - Publish missing NuGet 3.0.0 packages
+name: Recovery - Publish missing NuGet packages
 
-run-name: "Recover missing NuGet 3.0.0 packages"
+run-name: "Recover missing NuGet packages for ${{ inputs.version }}"
 
 on:
   workflow_dispatch:
     inputs:
+      version:
+        description: "Semantic version without the v prefix, for example 3.0.1."
+        required: true
+        type: string
+      validated_commit:
+        description: "Commit SHA that produced the validated release artifacts."
+        required: true
+        type: string
       confirmation:
-        description: "Type PUBLISH-MISSING-3.0.0 to run the one-off recovery"
+        description: "Type PUBLISH-MISSING-NUGET to run the recovery."
         required: true
         type: string
 
@@ -14,7 +22,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: release-recovery-3.0.0
+  group: release-recovery-${{ inputs.version }}
   cancel-in-progress: false
 
 env:
@@ -22,25 +30,23 @@ env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
   DOTNET_NOLOGO: "true"
   CI: "true"
-  RECOVERY_VERSION: "3.0.0"
-  # This is the exact commit that produced the partially published 3.0.0 artifacts
-  # in release run 34234097570. Recovery packages must come from the same source.
-  RECOVERY_COMMIT: "758318cce5fc3644a93916978118e24fb7fadb59"
 
 jobs:
   recover-missing-nuget-packages:
     name: Publish only missing NuGet.org packages
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     environment: release
     permissions:
       contents: read
       id-token: write
 
     steps:
-      - name: Validate recovery confirmation
+      - name: Validate recovery request
         shell: bash
         env:
+          VERSION: ${{ inputs.version }}
+          VALIDATED_COMMIT: ${{ inputs.validated_commit }}
           CONFIRMATION: ${{ inputs.confirmation }}
         run: |
           set -euo pipefail
@@ -50,233 +56,183 @@ jobs:
             exit 1
           fi
 
-          if [[ "$CONFIRMATION" != "PUBLISH-MISSING-3.0.0" ]]; then
-            echo "::error::Recovery confirmation did not match PUBLISH-MISSING-3.0.0."
+          if [[ "$CONFIRMATION" != "PUBLISH-MISSING-NUGET" ]]; then
+            echo "::error::Recovery confirmation did not match PUBLISH-MISSING-NUGET."
             exit 1
           fi
 
-      - name: Checkout original 3.0.0 release commit
+          if [[ "$VERSION" == v* ]]; then
+            echo "::error::Enter the semantic version without the 'v' prefix."
+            exit 1
+          fi
+
+          semver='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
+          if [[ ! "$VERSION" =~ $semver ]]; then
+            echo "::error::Invalid semantic version '$VERSION'."
+            exit 1
+          fi
+
+          major="${VERSION%%.*}"
+          if (( major < 3 )); then
+            echo "::error::FluentMap recovery requires major version 3 or later."
+            exit 1
+          fi
+
+          if [[ "$VERSION" == "3.0.0" ]]; then
+            echo "::error::Version 3.0.0 is immutable and must not be recovered from a newer workflow."
+            exit 1
+          fi
+
+          if [[ ! "$VALIDATED_COMMIT" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            echo "::error::validated_commit must be a full 40-character commit SHA."
+            exit 1
+          fi
+
+      - name: Checkout validated release commit
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ env.RECOVERY_COMMIT }}
+          ref: ${{ inputs.validated_commit }}
           fetch-depth: 0
           persist-credentials: false
           show-progress: false
+
+      - name: Verify release tag
+        shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
+          VALIDATED_COMMIT: ${{ inputs.validated_commit }}
+        run: |
+          set -euo pipefail
+
+          release_tag="v$VERSION"
+          git fetch --tags
+          if ! git rev-parse -q --verify "refs/tags/$release_tag" >/dev/null; then
+            echo "::error::Expected recovery tag '$release_tag' does not exist. Run the normal release workflow for unreleased versions."
+            exit 1
+          fi
+
+          tag_sha="$(git rev-list -n 1 "$release_tag")"
+          if [[ "$tag_sha" != "$VALIDATED_COMMIT" ]]; then
+            echo "::error::Tag '$release_tag' points to $tag_sha instead of validated commit $VALIDATED_COMMIT. Refusing to move the tag."
+            exit 1
+          fi
+
+          echo "Tag '$release_tag' already points to the validated commit."
 
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
           global-json-file: global.json
 
-      - name: Detect packages still missing from NuGet.org
-        id: preflight
-        shell: bash
+      - name: Validate SLNX equivalence
+        shell: pwsh
         run: |
-          set -euo pipefail
-
-          nuget_status() {
-            local package_id="$1"
-            local package_id_lower
-            package_id_lower="$(printf '%s' "$package_id" | tr '[:upper:]' '[:lower:]')"
-            local version_lower
-            version_lower="$(printf '%s' "$RECOVERY_VERSION" | tr '[:upper:]' '[:lower:]')"
-            local package_url="https://api.nuget.org/v3-flatcontainer/$package_id_lower/$version_lower/$package_id_lower.$version_lower.nupkg"
-
-            curl \
-              --silent \
-              --show-error \
-              --location \
-              --proto '=https' \
-              --proto-redir '=https' \
-              --retry 3 \
-              --retry-delay 2 \
-              --retry-all-errors \
-              --connect-timeout 10 \
-              --max-time 30 \
-              --output /dev/null \
-              --write-out '%{http_code}' \
-              "$package_url"
-          }
-
-          # These two packages were successfully published by run 34234097570.
-          for package_id in 'Dapper.FluentMap' 'Dapper.FluentMap.Dommel'; do
-            status="$(nuget_status "$package_id")"
-            if [[ "$status" != "200" ]]; then
-              echo "::error::Expected $package_id $RECOVERY_VERSION to already exist on NuGet.org, but NuGet returned HTTP $status. Refusing recovery."
-              exit 1
-            fi
-            echo "$package_id $RECOVERY_VERSION already exists as expected."
-          done
-
-          targets=(
-            'Dapper.FluentMap.DependencyInjection'
-            'Dapper.FluentMap.Analyzers'
-            'Dapper.FluentMap.Generators'
-          )
-          missing=()
-
-          for package_id in "${targets[@]}"; do
-            status="$(nuget_status "$package_id")"
-            case "$status" in
-              200)
-                echo "$package_id $RECOVERY_VERSION already exists; it will be skipped."
-                ;;
-              404)
-                echo "$package_id $RECOVERY_VERSION is missing and will be published."
-                missing+=("$package_id")
-                ;;
-              *)
-                echo "::error::Unexpected NuGet.org response HTTP $status while checking $package_id $RECOVERY_VERSION. Failing closed."
-                exit 1
-                ;;
-            esac
-          done
-
-          if (( ${#missing[@]} == 0 )); then
-            echo "has_missing=false" >> "$GITHUB_OUTPUT"
-            echo "package_ids=" >> "$GITHUB_OUTPUT"
-            echo "All recovery package IDs already exist on NuGet.org; nothing to publish."
-            exit 0
-          fi
-
-          package_ids="$(IFS=';'; echo "${missing[*]}")"
-          echo "has_missing=true" >> "$GITHUB_OUTPUT"
-          echo "package_ids=$package_ids" >> "$GITHUB_OUTPUT"
-          echo "Missing packages: $package_ids"
+          $ErrorActionPreference = 'Stop'
+          ./eng/validate-slnx-equivalence.ps1
 
       - name: Restore
-        if: steps.preflight.outputs.has_missing == 'true'
-        run: dotnet restore ./Dapper.FluentMap.sln
+        run: dotnet restore ./Dapper.FluentMap.slnx
 
-      - name: Build original 3.0.0 release source
-        if: steps.preflight.outputs.has_missing == 'true'
+      - name: Build validated release source
+        env:
+          PACKAGE_VERSION: ${{ inputs.version }}
+          VALIDATED_COMMIT: ${{ inputs.validated_commit }}
         run: >-
-          dotnet build ./Dapper.FluentMap.sln
+          dotnet build ./Dapper.FluentMap.slnx
           --configuration Release
           --no-restore
-          -p:Version=${RECOVERY_VERSION}
-          -p:RepositoryCommit=${RECOVERY_COMMIT}
+          -p:Version="$PACKAGE_VERSION"
+          -p:RepositoryCommit="$VALIDATED_COMMIT"
           -p:RepositoryBranch=refs/heads/master
           -p:ContinuousIntegrationBuild=true
 
       - name: Run tests
-        if: steps.preflight.outputs.has_missing == 'true'
-        run: dotnet test ./Dapper.FluentMap.sln --configuration Release --no-build --no-restore
+        run: dotnet test ./Dapper.FluentMap.slnx --configuration Release --no-build --no-restore
 
-      - name: Pack recovery packages
-        if: steps.preflight.outputs.has_missing == 'true'
+      - name: Pack release packages
+        env:
+          PACKAGE_VERSION: ${{ inputs.version }}
+          VALIDATED_COMMIT: ${{ inputs.validated_commit }}
+        run: >-
+          dotnet pack ./Dapper.FluentMap.slnx
+          --configuration Release
+          --no-build
+          --no-restore
+          --output ./artifacts/packages
+          -p:Version="$PACKAGE_VERSION"
+          -p:RepositoryCommit="$VALIDATED_COMMIT"
+          -p:RepositoryBranch=refs/heads/master
+          -p:ContinuousIntegrationBuild=true
+
+      - name: Validate release artifacts and write manifest
         shell: pwsh
+        env:
+          PACKAGE_VERSION: ${{ inputs.version }}
+          REPOSITORY: ${{ github.repository }}
+          REPOSITORY_URL: https://github.com/${{ github.repository }}
+          COMMIT: ${{ inputs.validated_commit }}
         run: |
           $ErrorActionPreference = 'Stop'
-          New-Item -ItemType Directory -Force -Path './artifacts/packages' | Out-Null
+          ./eng/validate-release-artifacts.ps1 `
+            -PackageDirectory './artifacts/packages' `
+            -Version $env:PACKAGE_VERSION `
+            -ManifestPath './artifacts/release-metadata/artifact-manifest.json' `
+            -Repository $env:REPOSITORY `
+            -RepositoryUrl $env:REPOSITORY_URL `
+            -Commit $env:COMMIT `
+            -Branch 'refs/heads/master'
 
-          $projects = @(
-            './src/Dapper.FluentMap.DependencyInjection/Dapper.FluentMap.DependencyInjection.csproj',
-            './src/Dapper.FluentMap.Analyzers/Dapper.FluentMap.Analyzers.csproj',
-            './src/Dapper.FluentMap.Generators/Dapper.FluentMap.Generators.csproj'
-          )
+      - name: Consumer smoke test release packages
+        shell: pwsh
+        env:
+          PACKAGE_VERSION: ${{ inputs.version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./eng/consumer-smoke/run-consumer-smoke.ps1 `
+            -PackageDirectory './artifacts/packages' `
+            -PackageVersion $env:PACKAGE_VERSION
 
-          foreach ($project in $projects) {
-            dotnet pack $project `
-              --configuration Release `
-              --no-build `
-              --no-restore `
-              --output './artifacts/packages' `
-              -p:Version=$env:RECOVERY_VERSION `
-              -p:RepositoryCommit=$env:RECOVERY_COMMIT `
-              -p:RepositoryBranch='refs/heads/master' `
-              -p:ContinuousIntegrationBuild=true
-
-            if ($LASTEXITCODE -ne 0) {
-              throw "Packing failed for $project."
-            }
-          }
-
-          $expected = @(
-            'Dapper.FluentMap.DependencyInjection.3.0.0.nupkg',
-            'Dapper.FluentMap.Analyzers.3.0.0.nupkg',
-            'Dapper.FluentMap.Generators.3.0.0.nupkg'
-          )
-
-          foreach ($file in $expected) {
-            $path = Join-Path './artifacts/packages' $file
-            if (-not (Test-Path -LiteralPath $path)) {
-              throw "Expected recovery package '$file' was not produced."
-            }
-          }
+      - name: Generate and verify checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd ./artifacts
+          {
+            find packages -type f \( -name '*.nupkg' -o -name '*.snupkg' \)
+            find release-metadata -type f -name '*.json'
+          } | sort | xargs sha256sum > ./release-metadata/SHA256SUMS
+          sha256sum --check ./release-metadata/SHA256SUMS
 
       - name: Exchange GitHub OIDC token for temporary NuGet API key
-        if: steps.preflight.outputs.has_missing == 'true'
         id: nuget-login
         uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
         with:
           user: "${{ vars.NUGET_USER }}"
 
-      - name: Publish only packages that are still missing
-        if: steps.preflight.outputs.has_missing == 'true'
+      - name: Publish missing NuGet.org packages
         shell: pwsh
         env:
           NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
-          PACKAGE_IDS: ${{ steps.preflight.outputs.package_ids }}
+          PACKAGE_VERSION: ${{ inputs.version }}
         run: |
           $ErrorActionPreference = 'Stop'
-          $packageIds = $env:PACKAGE_IDS.Split(';', [System.StringSplitOptions]::RemoveEmptyEntries)
+          ./eng/publish-package-set.ps1 `
+            -PackageDirectory './artifacts/packages' `
+            -Version $env:PACKAGE_VERSION `
+            -Source 'https://api.nuget.org/v3/index.json' `
+            -ApiKey $env:NUGET_API_KEY `
+            -Registry NuGetOrg
 
-          foreach ($packageId in $packageIds) {
-            $idLower = $packageId.ToLowerInvariant()
-            $versionLower = $env:RECOVERY_VERSION.ToLowerInvariant()
-            $url = "https://api.nuget.org/v3-flatcontainer/$idLower/$versionLower/$idLower.$versionLower.nupkg"
-
-            $status = (& curl `
-              --silent `
-              --show-error `
-              --location `
-              --proto '=https' `
-              --proto-redir '=https' `
-              --retry 3 `
-              --retry-delay 2 `
-              --retry-all-errors `
-              --connect-timeout 10 `
-              --max-time 30 `
-              --output /dev/null `
-              --write-out '%{http_code}' `
-              $url).Trim()
-
-            if ($LASTEXITCODE -ne 0) {
-              throw "Unable to re-check NuGet.org before publishing $packageId $env:RECOVERY_VERSION."
-            }
-
-            if ($status -eq '200') {
-              Write-Host "$packageId $env:RECOVERY_VERSION appeared on NuGet.org after preflight; skipping it."
-              continue
-            }
-
-            if ($status -ne '404') {
-              throw "Unexpected NuGet.org response HTTP $status for $packageId $env:RECOVERY_VERSION."
-            }
-
-            $package = "./artifacts/packages/$packageId.$env:RECOVERY_VERSION.nupkg"
-            dotnet nuget push $package `
-              --source 'https://api.nuget.org/v3/index.json' `
-              --api-key $env:NUGET_API_KEY
-
-            if ($LASTEXITCODE -ne 0) {
-              throw "Recovery publication failed for $packageId. If NuGet reports a reserved package ID/prefix, the NuGet account still needs authorization for the reserved Dapper prefix before this recovery can succeed."
-            }
-          }
-
-      - name: Verify recovery result
-        if: steps.preflight.outputs.has_missing == 'true'
+      - name: Verify NuGet.org publication state
         shell: bash
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
 
-          for package_id in \
-            'Dapper.FluentMap.DependencyInjection' \
-            'Dapper.FluentMap.Analyzers' \
-            'Dapper.FluentMap.Generators'; do
+          version_lower="$(printf '%s' "$VERSION" | tr '[:upper:]' '[:lower:]')"
+          while IFS= read -r package_id; do
             package_id_lower="$(printf '%s' "$package_id" | tr '[:upper:]' '[:lower:]')"
-            version_lower="$(printf '%s' "$RECOVERY_VERSION" | tr '[:upper:]' '[:lower:]')"
             package_url="https://api.nuget.org/v3-flatcontainer/$package_id_lower/$version_lower/$package_id_lower.$version_lower.nupkg"
 
             status="$(curl \
@@ -295,11 +251,11 @@ jobs:
               "$package_url")"
 
             if [[ "$status" != "200" ]]; then
-              echo "::error::$package_id $RECOVERY_VERSION is not visible on NuGet.org after recovery (HTTP $status)."
+              echo "::error::$package_id $VERSION is not visible on NuGet.org after recovery (HTTP $status)."
               exit 1
             fi
 
-            echo "$package_id $RECOVERY_VERSION is available on NuGet.org."
-          done
+            echo "$package_id $VERSION is visible on NuGet.org."
+          done < <(jq -r '.packages[].packageId' eng/package-catalog.json)
 
-          echo "Recovery completed: all three previously missing 3.0.0 package IDs are now published on NuGet.org."
+          echo "Recovery completed: all expected package IDs are visible on NuGet.org."

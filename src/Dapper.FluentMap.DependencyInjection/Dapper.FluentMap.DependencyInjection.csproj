@@ -6,7 +6,7 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <LangVersion>8.0</LangVersion>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <PackageId>Dapper.FluentMap.DependencyInjection</PackageId>
+    <PackageId>FluentMap.DependencyInjection</PackageId>
     <PackageTags>dapper;dependency-injection;di;fluent-mapping;mapping;database;fluentmap</PackageTags>
     <EnablePackageValidation>true</EnablePackageValidation>
   </PropertyGroup>

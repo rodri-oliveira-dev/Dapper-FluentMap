@@ -1,6 +1,8 @@
 <Project>
-  <Target Name="BlockUnsafeFluentMapPackageVersions" BeforeTargets="Pack" Condition="'$(IsPackable)' != 'false'">
+  <Target Name="BlockUnsafeFluentMapPackageVersions" BeforeTargets="GenerateNuspec" Condition="'$(IsPackable)' != 'false'">
     <Error Condition="'$(PackageVersion)' == '2.0.0' or ('$(PackageVersion)' == '' and '$(Version)' == '2.0.0')"
            Text="Version 2.0.0 already exists for historical FluentMap package IDs and must not be produced by this repository." />
+    <Error Condition="'$(PackageVersion)' == '3.0.0' or ('$(PackageVersion)' == '' and '$(Version)' == '3.0.0')"
+           Text="Version 3.0.0 contains immutable historical FluentMap artifacts and must not be produced by newer repository commits." />
   </Target>
 </Project>

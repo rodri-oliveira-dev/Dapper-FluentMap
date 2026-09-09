@@ -20,40 +20,47 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+Import-Module (Join-Path $PSScriptRoot 'PackageCatalog.psm1') -Force
+
 $expectedRepositoryUrl = 'https://github.com/rodri-oliveira-dev/Dapper-FluentMap'
-$expectedNupkgIds = @(
-  'Dapper.FluentMap',
-  'Dapper.FluentMap.Dommel',
-  'Dapper.FluentMap.DependencyInjection',
-  'Dapper.FluentMap.Analyzers',
-  'Dapper.FluentMap.Generators'
-)
-$expectedSnupkgIds = @(
-  'Dapper.FluentMap',
-  'Dapper.FluentMap.Dommel',
-  'Dapper.FluentMap.DependencyInjection'
-)
-$expectedDependencies = @{
-  'Dapper.FluentMap' = @{
-    'Dapper' = '[2.1.79, 3.0.0)'
-    'Microsoft.Bcl.AsyncInterfaces' = '10.0.11'
-  }
-  'Dapper.FluentMap.Dommel' = @{
-    'Dapper.FluentMap' = $Version
-    'Dapper' = '[2.1.79, 3.0.0)'
-    'Dommel' = '[3.5.3, 4.0.0)'
-  }
-  'Dapper.FluentMap.DependencyInjection' = @{
-    'Dapper.FluentMap' = $Version
-    'Microsoft.Extensions.DependencyInjection.Abstractions' = '10.0.11'
-  }
-  'Dapper.FluentMap.Analyzers' = @{}
-  'Dapper.FluentMap.Generators' = @{}
-}
 
 function Fail {
   param([string]$Message)
   throw "Release artifact validation failed: $Message"
+}
+
+$catalogPackages = @(Get-FluentMapPackages)
+$symbolCatalogPackages = @(Get-FluentMapPackages -WithSymbols)
+$expectedNupkgIds = @($catalogPackages | ForEach-Object { [string]$_.packageId })
+$expectedSnupkgIds = @($symbolCatalogPackages | ForEach-Object { [string]$_.packageId })
+$expectedDependencies = @{}
+foreach ($package in $catalogPackages) {
+  $expectedDependencies[[string]$package.packageId] = switch ([string]$package.project) {
+    'Dapper.FluentMap' {
+      @{
+        'Dapper' = '[2.1.79, 3.0.0)'
+        'Microsoft.Bcl.AsyncInterfaces' = '10.0.11'
+      }
+    }
+    'Dapper.FluentMap.Dommel' {
+      @{
+        'Dapper.FluentMap' = $Version
+        'Dapper' = '[2.1.79, 3.0.0)'
+        'Dommel' = '[3.5.3, 4.0.0)'
+      }
+    }
+    'Dapper.FluentMap.DependencyInjection' {
+      @{
+        'Dapper.FluentMap' = $Version
+        'Microsoft.Extensions.DependencyInjection.Abstractions' = '10.0.11'
+      }
+    }
+    'Dapper.FluentMap.Analyzers' { @{} }
+    'Dapper.FluentMap.Generators' { @{} }
+    default {
+      Fail "Package catalog contains unexpected project identity '$($package.project)'."
+    }
+  }
 }
 
 function Get-GitOutput {
@@ -359,16 +366,16 @@ $nupkgs = @(Get-ChildItem -LiteralPath $packageRoot -Filter '*.nupkg' -File | So
 $snupkgs = @(Get-ChildItem -LiteralPath $packageRoot -Filter '*.snupkg' -File | Sort-Object Name)
 $allArtifacts = @($nupkgs + $snupkgs)
 
-if ($nupkgs.Count -ne 5) {
-  Fail "Expected 5 .nupkg files, found $($nupkgs.Count)."
+if ($nupkgs.Count -ne $expectedNupkgIds.Count) {
+  Fail "Expected $($expectedNupkgIds.Count) .nupkg files, found $($nupkgs.Count)."
 }
 
-if ($snupkgs.Count -ne 3) {
-  Fail "Expected 3 .snupkg files, found $($snupkgs.Count)."
+if ($snupkgs.Count -ne $expectedSnupkgIds.Count) {
+  Fail "Expected $($expectedSnupkgIds.Count) .snupkg files, found $($snupkgs.Count)."
 }
 
-$expectedNupkgNames = @($expectedNupkgIds | ForEach-Object { "$_.$Version.nupkg" })
-$expectedSnupkgNames = @($expectedSnupkgIds | ForEach-Object { "$_.$Version.snupkg" })
+$expectedNupkgNames = @($catalogPackages | ForEach-Object { Get-FluentMapPackageFileName -Package $_ -Version $Version })
+$expectedSnupkgNames = @($symbolCatalogPackages | ForEach-Object { Get-FluentMapPackageFileName -Package $_ -Version $Version -Kind symbols })
 Assert-SetEquals -Expected $expectedNupkgNames -Actual ([string[]]@($nupkgs.Name)) -Description '.nupkg file set'
 Assert-SetEquals -Expected $expectedSnupkgNames -Actual ([string[]]@($snupkgs.Name)) -Description '.snupkg file set'
 
@@ -398,19 +405,23 @@ foreach ($file in $nupkgs) {
 
 Assert-SetEquals -Expected $expectedNupkgIds -Actual ([string[]]$packageInfos.Keys) -Description '.nupkg package IDs'
 
-foreach ($id in @('Dapper.FluentMap', 'Dapper.FluentMap.Dommel', 'Dapper.FluentMap.DependencyInjection')) {
-  $expectedDll = "lib/netstandard2.0/$id.dll"
-  $expectedXml = "lib/netstandard2.0/$id.xml"
+foreach ($package in @($catalogPackages | Where-Object { $_.assetKind -eq 'library' })) {
+  $id = [string]$package.packageId
+  $assemblyName = [string]$package.project
+  $expectedDll = "lib/netstandard2.0/$assemblyName.dll"
+  $expectedXml = "lib/netstandard2.0/$assemblyName.xml"
   $info = $packageInfos[$id]
   if ($expectedDll -notin $info.Entries -or $expectedXml -notin $info.Entries) {
     Fail "$id must include $expectedDll and $expectedXml."
   }
 }
 
-foreach ($id in @('Dapper.FluentMap.Analyzers', 'Dapper.FluentMap.Generators')) {
+foreach ($package in @($catalogPackages | Where-Object { $_.assetKind -eq 'analyzer' })) {
+  $id = [string]$package.packageId
+  $assemblyName = [string]$package.project
   $info = $packageInfos[$id]
-  $expectedDll = "analyzers/dotnet/cs/$id.dll"
-  $expectedPdb = "analyzers/dotnet/cs/$id.pdb"
+  $expectedDll = "analyzers/dotnet/cs/$assemblyName.dll"
+  $expectedPdb = "analyzers/dotnet/cs/$assemblyName.pdb"
   if ($expectedDll -notin $info.Entries -or $expectedPdb -notin $info.Entries) {
     Fail "$id must use analyzer package layout under analyzers/dotnet/cs."
   }
@@ -427,7 +438,12 @@ foreach ($file in $snupkgs) {
   $info = Get-ZipPackageInfo -File $file
   Assert-CommonPackageMetadata -PackageInfo $info -ExpectedId $expectedId -RequireReadmeAndLicense $false
 
-  $expectedPdb = "lib/netstandard2.0/$expectedId.pdb"
+  $symbolPackage = $symbolCatalogPackages | Where-Object { $_.packageId -eq $expectedId } | Select-Object -First 1
+  if ($null -eq $symbolPackage) {
+    Fail "Unexpected symbol package ID '$expectedId'."
+  }
+
+  $expectedPdb = "lib/netstandard2.0/$($symbolPackage.project).pdb"
   if ($expectedPdb -notin $info.Entries) {
     Fail "$expectedId symbol package must include $expectedPdb."
   }
@@ -483,9 +499,10 @@ $manifestJson = $manifest | ConvertTo-Json -Depth 8
   $manifestJson + [Environment]::NewLine,
   [System.Text.UTF8Encoding]::new($false))
 
+$expectedArtifactCount = $expectedNupkgIds.Count + $expectedSnupkgIds.Count
 $validatedManifest = Get-Content -Raw -Path $manifestFullPath | ConvertFrom-Json
-if ($validatedManifest.version -ne $Version -or @($validatedManifest.packages).Count -ne 8) {
+if ($validatedManifest.version -ne $Version -or @($validatedManifest.packages).Count -ne $expectedArtifactCount) {
   Fail "Generated manifest '$manifestFullPath' did not round-trip with the expected version and package count."
 }
 
-Write-Host "Validated 5 .nupkg files, 3 .snupkg files and wrote manifest '$manifestFullPath' for $Version."
+Write-Host "Validated $($expectedNupkgIds.Count) .nupkg files, $($expectedSnupkgIds.Count) .snupkg files and wrote manifest '$manifestFullPath' for $Version."

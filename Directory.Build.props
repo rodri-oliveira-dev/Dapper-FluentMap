@@ -1,7 +1,7 @@
 <Project>
   <PropertyGroup>
-    <FluentMapPackageVersionPrefix Condition="'$(FluentMapPackageVersionPrefix)' == ''">3.0.0</FluentMapPackageVersionPrefix>
-    <FluentMapPackageVersionSuffix Condition="'$(Version)' == '' and '$(VersionSuffix)' == '' and '$(FluentMapPackageVersionPrefix)' == '3.0.0'">dev</FluentMapPackageVersionSuffix>
+    <FluentMapPackageVersionPrefix Condition="'$(FluentMapPackageVersionPrefix)' == ''">3.0.1</FluentMapPackageVersionPrefix>
+    <FluentMapPackageVersionSuffix Condition="'$(Version)' == '' and '$(VersionSuffix)' == '' and '$(FluentMapPackageVersionPrefix)' == '3.0.1'">dev</FluentMapPackageVersionSuffix>
     <VersionSuffix Condition="'$(FluentMapPackageVersionSuffix)' != '' and '$(VersionSuffix)' == ''">$(FluentMapPackageVersionSuffix)</VersionSuffix>
     <DapperMinimumSupportedVersion>2.1.79</DapperMinimumSupportedVersion>
     <DapperLatestStableVersion>2.1.79</DapperLatestStableVersion>

@@ -6,13 +6,22 @@
       "version": "11.3.0",
       "commands": [
         "dotnet-sonarscanner"
-      ]
+      ],
+      "rollForward": false
     },
     "dotnet-coverage": {
       "version": "18.11.0",
       "commands": [
         "dotnet-coverage"
-      ]
+      ],
+      "rollForward": false
+    },
+    "rodrioliveira.adrguard": {
+      "version": "0.1.8",
+      "commands": [
+        "adr-guard"
+      ],
+      "rollForward": false
     }
   }
 }

@@ -1,536 +1,204 @@
 # AGENTS.md
 
-## Objetivo
+## Purpose
 
-Este repositório mantém o **Dapper.FluentMap**, uma biblioteca .NET que fornece uma API fluente para mapear propriedades de POCOs para colunas de banco de dados usadas pelo Dapper, mantendo os modelos livres de atributos de persistência.
+This repository maintains **Dapper.FluentMap**, a public multi-package .NET library that provides fluent, strongly typed mapping between POCO properties and database columns used by Dapper, keeping persistence attributes out of domain models.
 
-O trabalho realizado por agentes deve ser pequeno, correto, reproduzível e compatível com o comportamento público existente. Responda em português, salvo pedido explícito em outro idioma.
+Agent work must be small, correct, reproducible, and compatible with existing public behavior. Respond in Portuguese unless the user explicitly asks otherwise.
 
-A prioridade inicial é a evolução segura do projeto principal `Dapper.FluentMap`. O módulo `Dapper.FluentMap.Dommel` só deve ser alterado quando a tarefa o mencionar explicitamente ou quando uma mudança no core exigir uma adaptação comprovada.
+## Non-Negotiable Rules
 
-## Princípios do projeto
+| Area | Rule |
+| --- | --- |
+| Branching | The default development and release branch is `master`. Never modify `master` directly; create or use a task branch. |
+| Scope | Prefer the smallest cohesive change. Do not mix functional change, modernization, dependency updates, refactoring, and release work unless the task explicitly spans them. |
+| Public library | Preserve source, binary, and behavioral compatibility unless a breaking change is explicitly requested, justified, tested, documented, and versioned. |
+| Publishing | Do not publish packages, create tags, create GitHub Releases, or run release/recovery workflows unless explicitly requested. |
+| Secrets | Never commit secrets, tokens, API keys, certificates, or credential material. |
+| Identity | Project name, project path, assembly name, C# namespace, and NuGet `PackageId` are independent identities. Never rename one merely because another changes; determine explicitly which identity the task intends to change. |
+| Targets | Public packages currently preserve `netstandard2.0`. Do not change targets, multi-targeting, SDK, nullable, AOT, analyzers, test framework, or the repository's dependency-versioning model as incidental work. |
+| Dapper | Use public Dapper contracts only. Do not copy Dapper internals or assume unit metadata tests prove end-to-end Dapper materialization. |
 
-- Trate o repositório como uma **biblioteca pública**, não como uma aplicação interna.
-- Preserve compatibilidade de código-fonte, binária e comportamental sempre que possível.
-- Não introduza breaking changes sem solicitação explícita, justificativa técnica, testes e estratégia de versionamento.
-- Prefira alterações pequenas, coesas, revisáveis e cobertas por testes.
-- Não transforme o FluentMap em ORM, query builder, gerador de SQL ou camada de CRUD.
-- Mantenha o diferencial principal: mapeamento fluente, fortemente tipado e sem atributos no modelo.
-- Não implemente recomendações apenas por serem boas práticas genéricas. Exija benefício observável, correção, redução de risco ou requisito claro.
-- Não misture modernização, refatoração estrutural, atualização de dependências e mudança funcional no mesmo trabalho sem necessidade explícita.
-- Não altere testes apenas para fazê-los passar.
-- Não publique pacotes, tags, releases ou versões sem solicitação explícita.
+## Repository Map
 
-## Fontes de verdade
+| Path | Role |
+| --- | --- |
+| `src/Dapper.FluentMap/` | Core package and default production scope. |
+| `src/Dapper.FluentMap.Dommel/` | Optional Dommel integration; change only when requested or demonstrably required by a core contract change. |
+| `src/Dapper.FluentMap.DependencyInjection/` | Optional DI integration. |
+| `src/Dapper.FluentMap.Analyzers/` | Roslyn analyzer package. |
+| `src/Dapper.FluentMap.Generators/` | Source generator package. |
+| `test/**` | Unit, integration, provider, analyzer/generator, DI, generated-registration, and AOT smoke tests. |
+| `benchmarks/**` | BenchmarkDotNet benchmarks; not part of ordinary validation unless the task concerns performance. |
+| `eng/**` | Validation, release, rollback, Sonar, package-catalog, and consumer-smoke helper scripts. |
+| `.github/workflows/**` | CI, release, release recovery, and Sonar automation. |
+| `.agents/skills/**` | Repository-local agent skills; load only those relevant to the current task. |
 
-Consulte apenas os arquivos relevantes para a tarefa atual, priorizando:
+Prefer `Dapper.FluentMap.slnx` for current SDK workflows; `Dapper.FluentMap.sln` remains a compatibility fallback.
+
+## Sources Of Truth
+
+Read only what the task needs, in this order:
 
 1. `AGENTS.md`
-2. `README.md`
-3. `Dapper.FluentMap.sln`
-4. `src/Dapper.FluentMap/Dapper.FluentMap.csproj`
-5. `src/Dapper.FluentMap/`
-6. `test/Dapper.FluentMap.Tests/Dapper.FluentMap.Tests.csproj`
-7. `test/Dapper.FluentMap.Tests/`
-8. `src/Dapper.FluentMap.Dommel/` e seus testes, somente quando o escopo incluir Dommel
-9. `NuGet.Config`
-10. `LICENSE`
-11. `.editorconfig`, `global.json`, `Directory.Build.props`, `Directory.Packages.props` e workflows, quando existirem e forem relevantes
-
-Não carregue indiscriminadamente todo o repositório. Localize primeiro o contrato, tipo, teste, issue ou comportamento diretamente relacionado à tarefa.
-
-## Estrutura do repositório
-
-- `src/Dapper.FluentMap/`: biblioteca principal e escopo padrão das mudanças.
-- `test/Dapper.FluentMap.Tests/`: testes da biblioteca principal.
-- `src/Dapper.FluentMap.Dommel/`: integração opcional com Dommel.
-- `test/Dapper.FluentMap.Dommel.Tests/`: testes da integração Dommel.
-- `Dapper.FluentMap.sln`: solution agregadora.
-
-Mudanças no core não devem incluir Dommel automaticamente. Quando uma alteração pública no core puder afetar Dommel, avalie o impacto, mas não amplie o escopo sem evidência ou pedido explícito.
-
-## Regras obrigatórias
-
-- Faça a menor mudança possível para resolver o problema.
-- Preserve a API pública existente, salvo quando a tarefa pedir explicitamente uma mudança de contrato.
-- Antes de alterar comportamento público, identifique usos, testes e compatibilidade esperada.
-- Para bugs, crie primeiro um teste de regressão que reproduza a falha quando isso for viável.
-- Para refatorações, use testes de caracterização quando o comportamento não estiver suficientemente protegido.
-- Não torne membros públicos apenas para facilitar testes.
-- Não silencie warnings, exceções ou testes sem justificativa técnica.
-- Não use `Skip`, remova asserts ou reduza verificações para obter uma suíte verde.
-- Não introduza `Task.Delay`, sleeps, dependência de horário, rede externa ou ordem entre testes.
-- Não adicione dependências sem necessidade clara.
-- Não adote Central Package Management, novo framework de testes, source generator, analyzer, NativeAOT ou nullable em uma tarefa não relacionada.
-- Não altere `PackageId`, versão, autores, licença, URLs do pacote ou metadados de publicação sem solicitação explícita.
-- Não faça publish para NuGet.
-- Não introduza segredos, tokens, chaves ou credenciais.
-- Não faça alterações diretamente na branch `master`.
-- Não abra pull request, publique branch, crie tag ou release sem solicitação explícita.
-
-## Escopo funcional do core
-
-O projeto principal deve permanecer focado em:
-
-- registro de mapas de entidades;
-- mapeamento entre propriedades e nomes de colunas;
-- convenções de nomes;
-- resolução de membros pelo Dapper;
-- composição previsível entre mapeamentos explícitos, convenções e comportamento padrão;
-- validação e diagnóstico de configuração;
-- compatibilidade com tipos, construtores e modelos suportados pelo contrato definido.
-
-Não adicionar ao core sem decisão explícita:
-
-- mapeamento de tabela;
-- chave primária, identidade ou geração de identificador;
-- CRUD;
-- geração de SQL;
-- tracking de entidades;
-- unit of work;
-- migrations;
-- abstração de conexão;
-- query builder;
-- recursos específicos de Dommel;
-- atributos de persistência como abordagem principal.
-
-Quando houver composição entre estratégias de resolução, preserve uma precedência explícita e testável. A direção preferencial é:
-
-1. mapeamento explícito;
-2. convenção configurada;
-3. comportamento padrão do Dapper.
-
-Não assuma que esse comportamento já existe em todos os caminhos atuais. Ao implementá-lo ou alterá-lo, proteja-o com testes.
-
-## Compatibilidade pública e SemVer
-
-Considere compatíveis ou incompatíveis, conforme o caso:
-
-- assinaturas públicas;
-- nomes de tipos e namespaces;
-- construtores públicos;
-- interfaces públicas;
-- comportamento de `FluentMapper.Initialize`;
-- comportamento de `EntityMap`, `PropertyMap`, convenções e type maps;
-- tipos de exceção observáveis;
-- mensagens de erro usadas apenas para diagnóstico, sem prometer texto exato salvo teste ou documentação explícita;
-- targets suportados;
-- dependências transitivas;
-- comportamento de resolução case-sensitive e case-insensitive.
-
-Antes de realizar breaking change:
-
-1. descreva o contrato atual;
-2. explique por que não é possível preservar compatibilidade;
-3. identifique impacto para consumidores;
-4. crie ou atualize testes;
-5. proponha versão major;
-6. atualize documentação;
-7. não implemente sem pedido explícito.
-
-Correções de bugs podem alterar comportamento incorreto, mas devem ter teste de regressão e explicação clara.
-
-## Frameworks e arquivos de projeto
-
-- O projeto principal deve preservar `netstandard2.0` enquanto não houver decisão explícita de compatibilidade diferente.
-- Projetos de teste podem usar runtimes modernos, como .NET 8 e .NET 10, sem obrigar a biblioteca publicada a abandonar `netstandard2.0`.
-- Multi-targeting deve existir apenas quando houver finalidade de compatibilidade e validação clara.
-- Não use `TargetFrameworks` quando houver somente um target.
-- Atualizações de SDK, Test SDK, xUnit, Dapper ou Dommel devem ser separadas de correções funcionais sempre que possível.
-- Não migre para xUnit v3 junto com a primeira migração de runtime, salvo pedido explícito.
-- Não introduza nullable e corrija centenas de warnings junto com uma tarefa não relacionada.
-- Não adote Central Package Management sem avaliar custo, benefício e impacto no repositório pequeno.
-- Respeite o formato e as convenções atuais dos arquivos `.csproj`, salvo modernização intencional.
-
-## Reflexão e expressões
-
-Código que interpreta expressões deve:
-
-- trabalhar diretamente com os membros representados pela expressão quando possível;
-- aceitar conversões legítimas produzidas por `Expression<Func<TEntity, object>>`;
-- validar se o membro final é uma propriedade suportada;
-- rejeitar expressões inválidas com exceção específica e mensagem útil;
-- não selecionar membros apenas por nome usando o primeiro resultado de reflection;
-- não confundir propriedades com métodos, campos ou membros homônimos;
-- preservar suporte a propriedades herdadas quando compatível;
-- ter testes para propriedades com nomes que colidem com membros de tipos como `string`, `DateTime` e `TimeSpan`.
-
-Mapeamento aninhado e Value Objects não devem ser tratados como simples correção de reflection. Antes de declarar suporte, valide materialização completa, criação de objetos intermediários, construtores, nulabilidade, cache e integração real com o Dapper.
-
-## Estado global, registro e cache
-
-O projeto possui configuração e integração global com o Dapper. Qualquer alteração nessa área deve considerar:
-
-- thread safety;
-- inicialização repetida;
-- isolamento entre testes;
-- invalidação de cache;
-- concorrência entre registros;
-- múltiplas entidades;
-- múltiplos processos de resolução;
-- efeitos de `SqlMapper.SetTypeMap`;
-- compatibilidade com consumidores que inicializam a biblioteca uma vez no startup.
-
-Regras:
-
-- Não introduza novo estado global mutável sem justificativa.
-- Prefira descritores imutáveis depois da configuração.
-- Use chaves de cache estruturadas; evite concatenação de strings sujeita a colisões.
-- Inclua no cache todas as opções que alteram o resultado, como tipo, nome de coluna e comparação.
-- Defina e teste quando o cache deve ser invalidado.
-- Não dependa de ordem de execução dos testes.
-- Quando necessário, forneça mecanismo interno ou público bem definido para reset controlado em testes, sem comprometer consumidores.
-- Ao refatorar configuração estática, preserve uma fachada compatível antes de remover contratos antigos.
-
-## Convenções e mapeamentos explícitos
-
-Ao alterar convenções:
+2. Relevant `.agents/skills/*/SKILL.md`
+3. User request, issue, PR, or diff
+4. `README.md`, `COMPATIBILITY.md`, `MIGRATION.md`, `CHANGELOG.md` when behavior or compatibility is involved
+5. `Dapper.FluentMap.slnx` / `Dapper.FluentMap.sln`
+6. Relevant `.csproj`, `Directory.Build.props`, `Directory.Build.targets`, `global.json`, `NuGet.Config`
+7. Relevant source and test files
+8. Relevant workflows and `eng` scripts when CI, packaging, or release is involved
 
-- preserve filtros, transformações, prefixos e configuração por entidade;
-- detecte ambiguidades de forma determinística;
-- não permita que uma convenção sobrescreva silenciosamente um mapeamento explícito;
-- não compartilhe estado mutável acidentalmente entre tipos;
-- teste mais de uma entidade usando a mesma convenção;
-- teste configuração case-sensitive e case-insensitive;
-- evite scanning amplo sem filtros quando uma alternativa explícita for viável.
+Do not load the whole repository by default. Search first with `rg` / `rg --files`, then open the narrow files that define the contract, implementation, tests, or automation being changed.
 
-Ao alterar mapeamentos explícitos:
+## Skill Routing
 
-- identifique propriedades por membro ou caminho completo, não apenas pelo nome terminal quando houver suporte a caminhos;
-- detecte duplicidades reais;
-- diferencie `Rank.Level` de `Seniority.Level` em qualquer modelo futuro de caminho;
-- não declare suporte a propriedades aninhadas antes de a materialização estar implementada de ponta a ponta.
+Read `AGENTS.md` first. Load only the skills relevant to the current task; do not load every skill by default. Multiple skills may be combined when the task genuinely spans multiple concerns. Repository-specific rules in this file take precedence over generic guidance in a skill. Skills must inspect the current repository rather than assuming their source-template baseline still applies.
 
-## Dapper
+| Task | Primary skill |
+| --- | --- |
+| Implement a well-defined issue | `dotnet-issue-implementation` |
+| Production/library/project/PackageId change | `dotnet-library-change` |
+| Behavior-preserving refactoring | `dotnet-refactoring-engineer` |
+| Pull request/diff review | `dotnet-pr-review` |
+| CI, packaging, NuGet, versioning, release or recovery semantics | `ci-release-governance` |
+| GitHub Actions YAML authoring/structural validation | `authoring-github-workflows` |
+| NuGet.org OIDC/trusted-publishing review or diagnosis | `nuget-trusted-publishing` |
+| Find caller-visible behaviors existing tests would miss | `test-gap-analysis` |
+| BenchmarkDotNet/performance comparison | `microbenchmarking` |
+| `Directory.Build.*` / MSBuild organization | `directory-build-organization` |
+| Diagnose unclear MSBuild failures from `.binlog` | `binlog-failure-analysis` |
 
-- Use apenas contratos públicos do Dapper.
-- Não copie implementação interna do Dapper sem justificativa e avaliação de licença.
-- Atualize Dapper em tarefa separada quando possível.
-- Ao atualizar Dapper, revise mudanças em `ITypeMap`, `IMemberMap`, `DefaultTypeMap`, constructor mapping, type handlers e comportamento de cache.
-- Teste o comportamento com uma consulta real quando a mudança depender da materialização do Dapper.
-- Não reimplemente `TypeHandler` sem necessidade; prefira integrar-se ao mecanismo do Dapper.
-- Não suponha que uma correção unitária de metadata garante materialização correta.
+Pair skills when concerns overlap. Examples:
 
-## Testes
+- release workflow change: `ci-release-governance` + `authoring-github-workflows`; add `nuget-trusted-publishing` when NuGet.org OIDC is involved;
+- performance-sensitive library change: `dotnet-library-change` + `microbenchmarking` when measurement is required;
+- implementation with uncertain test protection: implementation/refactoring skill + `test-gap-analysis`;
+- build-property refactor: `directory-build-organization` + `dotnet-library-change` when package/public compatibility can be affected;
+- opaque MSBuild failure: `binlog-failure-analysis`, then the relevant implementation/build skill once the cause is established.
 
-### Estratégia
+## FluentMap Behavior Rules
 
-Use a menor camada capaz de proteger o risco real:
+- Keep the core focused on mapping registration, property/column resolution, conventions, naming policies, Dapper member resolution, diagnostics, and predictable composition.
+- Do not turn FluentMap into an ORM, CRUD layer, SQL generator, query builder, connection abstraction, unit of work, migration tool, or entity tracker.
+- Default mapping precedence should remain explicit mapping, then configured convention, then Dapper default behavior. If a path does not currently prove that order, test it before changing it.
+- `Ignore()` and persistence metadata must preserve documented semantics across core and Dommel consumers.
+- Nested mappings and value objects require end-to-end materialization support. Do not claim support based only on expression parsing or reflection metadata.
 
-- teste unitário para expression parsing, metadata, duplicidade, convenções, cache e validação;
-- teste de integração simples com Dapper para materialização, construtores, type maps e consultas;
-- banco em memória ou efêmero quando suficiente;
-- nenhuma dependência de serviço externo para testes padrão.
+## Compatibility And SemVer
 
-### Regras
+Treat these as compatibility-sensitive: public signatures, type names, namespaces, constructors, interfaces, `FluentMapper.Initialize`, `EntityMap`, `PropertyMap`, conventions, type maps, observable exception types, target frameworks, dependency ranges, package metadata, and case-sensitive/case-insensitive resolution behavior.
 
-- Teste comportamento observável, não detalhes privados.
-- Use Arrange, Act e Assert de forma clara.
-- Dê nomes que descrevam cenário e resultado esperado.
-- Cubra sucesso, falha e ambiguidade relevantes.
-- Toda correção de bug deve ter teste de regressão.
-- Não aceite teste sem assert significativo.
-- Evite `NotNull` como única validação de objeto complexo.
-- Evite over-mocking do próprio mecanismo que está sendo testado.
-- Não replique a implementação no assert.
-- Não compartilhe estado mutável entre testes.
-- Restaure type maps e configuração global quando o teste os alterar.
-- Se a suíte desabilitar paralelismo por causa do estado global, não reabilite sem eliminar ou isolar a causa.
-- Não use cobertura como substituto de qualidade.
+Before a breaking change:
 
-## Empacotamento NuGet
+1. Describe the current contract and consumer impact.
+2. Explain why compatibility cannot be preserved.
+3. Add or update tests and documentation.
+4. Propose the required SemVer impact.
+5. Do not implement unless the user explicitly requested that direction.
 
-Quando uma tarefa alterar embalagem, metadata ou compatibilidade do pacote:
+Bug fixes may correct incorrect behavior, but they need regression tests and a clear explanation of changed observable behavior.
 
-1. execute build em `Release`;
-2. execute `dotnet pack`;
-3. inspecione o `.nupkg`;
-4. verifique assemblies, XML documentation, dependências e targets;
-5. confirme que arquivos de teste ou artefatos indevidos não foram incluídos;
-6. revise impacto de SemVer;
-7. não publique.
+## Dapper, State, And Cache
 
-Preserve licença e atribuição do projeto original. Não remova créditos históricos sem decisão explícita.
+This repository has global configuration paths through FluentMap, Dapper `SqlMapper.SetTypeMap`, and Dommel. Changes in that area must consider thread safety, repeated initialization, test isolation, cache invalidation, concurrent registration, multiple entities/profiles, and startup-style initialization used by consumers.
 
-## Documentação
+- Do not add mutable global state without a specific reason.
+- Prefer immutable descriptors after configuration is complete.
+- Use structured cache keys that include every option affecting resolution, such as type, column name, profile, comparison, and naming policy.
+- Define and test cache invalidation when behavior can change after registration.
+- Restore global type maps/configuration in tests and benchmarks that mutate them.
 
-Atualize documentação quando houver:
+## Expressions And Reflection
 
-- nova API pública;
-- alteração de inicialização;
-- nova convenção;
-- alteração de comportamento;
-- mudança de compatibilidade;
-- novo target suportado;
-- mudança de pacote ou dependência relevante;
-- depreciação;
-- breaking change.
+Expression parsing must work with the actual member represented by the expression, including legitimate conversions from `Expression<Func<TEntity, object>>`. Validate that the final member is a supported property, reject invalid expressions with useful diagnostics, preserve compatible inherited-property behavior, and avoid resolving by terminal name alone when homonyms or nested paths can collide.
 
-Regras:
+## Tests
 
-- `README.md` deve continuar sendo a porta de entrada.
-- Exemplos devem compilar ou refletir a API real.
-- Não documente recurso ainda não implementado.
-- Preserve documentação XML em APIs públicas.
-- Para decisões arquiteturais importantes, registre uma issue de design ou documento de decisão, sem criar burocracia para correções pequenas.
-- Issues arquivadas do projeto original são evidência de demanda ou defeito histórico, não requisitos automáticos.
+Use the smallest test layer that protects the risk:
 
-## Skills
+| Risk | Preferred validation |
+| --- | --- |
+| Expression parsing, metadata, duplicates, conventions, cache, validation | Unit tests. |
+| Dapper materialization, constructors, type maps, query helpers | Integration tests with an in-memory/ephemeral provider when possible. |
+| Provider-specific behavior | Provider compatibility tests; do not require external services for the default suite. |
+| Analyzer/generator behavior | Roslyn analyzer/generator tests. |
+| Packaging and consumer experience | Pack validation plus `eng/consumer-smoke/run-consumer-smoke.ps1` when relevant. |
+| Performance regression/optimization | Existing BenchmarkDotNet project with a controlled baseline; do not infer performance from unit-test duration. |
 
-Antes de executar tarefa especializada, verifique `.agents/skills/` e selecione somente as skills relacionadas ao pedido. Ter todas as skills disponíveis não significa carregar todas em toda tarefa.
+Do not weaken tests to get a green suite: no unjustified `Skip`, removed asserts, sleeps, time/network coupling, order dependence, or over-mocking of FluentMap itself.
 
-As regras deste `AGENTS.md` prevalecem quando uma skill genérica conflitar com o contexto do FluentMap.
+## Validation Commands
 
-### Governança e processo
+Start with the closest validation. For documentation-only or agent-governance changes, prefer file existence, content searches, diff review, and targeted lint checks; do not run expensive build/test suites unless needed.
 
-#### `repository-governance-sdd`
-
-Use para:
-
-- criar ou revisar skills;
-- alterar `AGENTS.md`;
-- estruturar prompts;
-- organizar documentação de processo;
-- decidir entre issue, documentação e decisão arquitetural.
-
-Não use para implementar código de produção ou testes.
-
-### Refatoração de código
-
-#### `dotnet-refactoring-engineer`
-
-Use para:
-
-- correções e refatorações em C#;
-- melhoria de legibilidade, coesão, testabilidade e performance;
-- redução de estado global;
-- revisão de design;
-- preservação de comportamento;
-- code review.
-
-Combine com as regras de compatibilidade pública deste arquivo.
-
-### MSBuild e projetos
-
-#### `msbuild-modernization`
-
-Use para:
-
-- modernizar `.csproj`;
-- atualizar `TargetFramework`;
-- configurar multi-targeting;
-- revisar propriedades de build;
-- modernizar SDK e estrutura MSBuild.
-
-#### `msbuild-antipatterns`
-
-Use para:
-
-- revisar duplicação e condições desnecessárias;
-- detectar propriedades redundantes;
-- evitar targets frágeis;
-- revisar uso incorreto de itens e referências.
-
-Use após ou durante mudanças em arquivos de projeto, sem ampliar escopo para modernização não solicitada.
-
-### Execução e diagnóstico de testes
-
-#### `run-tests`
-
-Use para:
-
-- descobrir e executar os testes;
-- aplicar filtros;
-- executar por projeto ou target;
-- diagnosticar falhas de descoberta e execução.
-
-Esta é a skill padrão para validação da suíte.
-
-### Qualidade dos testes
-
-Use estas skills somente depois de a suíte compilar e, quando aplicável, possuir uma baseline conhecida.
-
-#### `test-anti-patterns`
-
-Use para auditar:
-
-- ausência de asserts;
-- asserts fracos;
-- sleeps;
-- flakiness;
-- dependência de ordem;
-- over-mocking;
-- acoplamento a implementação;
-- cobertura artificial.
-
-#### `assertion-quality`
-
-Use para revisar força, precisão e relevância dos asserts.
-
-#### `test-gap-analysis`
-
-Use para identificar cenários importantes sem cobertura, especialmente contratos públicos, falhas, ambiguidades, concorrência e regressões históricas.
-
-#### `coverage-analysis`
-
-Use para analisar cobertura em conjunto com risco e comportamento. Não persiga percentual isolado.
-
-#### `detect-static-dependencies`
-
-Use ao investigar:
-
-- estado global;
-- membros estáticos;
-- caches estáticos;
-- isolamento entre testes;
-- dependência de ordem;
-- flakiness relacionada a `FluentMapper` e `SqlMapper`.
-
-### Migrações específicas
-
-Estas skills devem ser usadas em tarefas próprias e isoladas.
-
-#### `migrate-xunit-to-xunit-v3`
-
-Use apenas quando a tarefa pedir explicitamente migração para xUnit v3. Não combine por padrão com migração inicial de runtime ou atualização geral de pacotes.
-
-#### `migrate-nullable-references`
-
-Use apenas em trabalho dedicado para habilitar nullable, classificar warnings e corrigir contratos de nulabilidade. Preserve compatibilidade pública e evite mudanças indiscriminadas em assinaturas.
-
-#### `dotnet-aot-compat`
-
-Use para avaliação ou implementação dedicada de:
-
-- trimming;
-- NativeAOT;
-- reflection;
-- assembly scanning;
-- `Activator.CreateInstance`;
-- source generation;
-- anotações de preservação.
-
-Não declare compatibilidade AOT apenas porque o projeto compila. Exija validação real.
-
-## Roteamento recomendado de skills
-
-- Alterar `AGENTS.md`, skills ou processo:
-  - `repository-governance-sdd`
-- Refatorar ou corrigir código C#:
-  - `dotnet-refactoring-engineer`
-  - `run-tests`
-- Alterar `.csproj`, target ou SDK:
-  - `msbuild-modernization`
-  - `msbuild-antipatterns`
-  - `run-tests`
-- Corrigir bug relacionado a estado estático ou cache:
-  - `dotnet-refactoring-engineer`
-  - `detect-static-dependencies`
-  - `run-tests`
-- Auditar suíte já funcional:
-  - `test-anti-patterns`
-  - `assertion-quality`
-  - `test-gap-analysis`
-  - `coverage-analysis`, quando houver dados de cobertura
-- Migrar xUnit:
-  - `migrate-xunit-to-xunit-v3`
-  - `run-tests`
-- Habilitar nullable:
-  - `migrate-nullable-references`
-  - `run-tests`
-- Avaliar AOT/trimming:
-  - `dotnet-aot-compat`
-  - `run-tests`
-
-Não combine skills sem relação direta. Uma skill complementar não pode ampliar o escopo definido pelo pedido.
-
-## Processo de implementação
-
-1. Identifique o escopo: core, testes, Dommel, build, documentação ou empacotamento.
-2. Leia os arquivos diretamente relacionados.
-3. Selecione as skills necessárias.
-4. Descreva o comportamento atual e o risco.
-5. Localize testes existentes.
-6. Crie teste de regressão ou caracterização quando necessário.
-7. Faça a menor alteração coesa.
-8. Execute validação localizada.
-9. Execute build e testes mais amplos quando o impacto justificar.
-10. Execute pack quando houver impacto de pacote.
-11. Revise o diff para remover churn, renomeações ou formatação fora do escopo.
-12. Registre validações executadas, limitações e riscos restantes.
-13. Faça commit semântico apenas quando a alteração estiver coerente e validada.
-
-## Validação
-
-Comece pela validação mais próxima da mudança.
-
-### Biblioteca principal
+Core baseline:
 
 ```bash
-dotnet restore ./Dapper.FluentMap.sln
+dotnet restore ./Dapper.FluentMap.slnx
 dotnet build ./src/Dapper.FluentMap/Dapper.FluentMap.csproj --configuration Release --no-restore
 dotnet test ./test/Dapper.FluentMap.Tests/Dapper.FluentMap.Tests.csproj --configuration Release
 ```
 
-### Solution completa
-
-Use quando a alteração for transversal ou afetar contratos usados por Dommel:
+Full solution baseline:
 
 ```bash
-dotnet restore ./Dapper.FluentMap.sln
-dotnet build ./Dapper.FluentMap.sln --configuration Release --no-restore
-dotnet test ./Dapper.FluentMap.sln --configuration Release --no-build
+dotnet restore ./Dapper.FluentMap.slnx
+dotnet build ./Dapper.FluentMap.slnx --configuration Release --no-restore
+dotnet test ./Dapper.FluentMap.slnx --configuration Release --no-build
 ```
 
-### Pacote
-
-Use quando a alteração afetar o pacote principal:
+Workflow validation when `.github/workflows/**` changes:
 
 ```bash
-dotnet pack ./src/Dapper.FluentMap/Dapper.FluentMap.csproj \
-  --configuration Release \
-  --no-build \
-  --output ./artifacts/packages
+python -m check_jsonschema --builtin-schema vendor.github-workflows .github/workflows/*.yml
 ```
 
-Quando houver multi-targeting, valide cada target relevante. Quando a máquina não possuir o runtime necessário, não instale silenciosamente versões adicionais e não altere targets apenas para contornar o ambiente; registre a limitação ou use a matriz de CI quando disponível.
+Use `authoring-github-workflows` for additional `actionlint` validation when structural/expression risk warrants it.
 
-Se a baseline original estiver quebrada antes da mudança, registre:
+Packaging baseline when package output, metadata, compatibility, or release is affected:
 
-- comando executado;
-- falha observada;
-- se a falha é anterior à alteração;
-- o que foi ou não validado.
+```bash
+dotnet restore ./Dapper.FluentMap.slnx
+dotnet build ./Dapper.FluentMap.slnx --configuration Release --no-restore
+dotnet pack ./Dapper.FluentMap.slnx --configuration Release --no-build --output ./artifacts/packages
+./eng/validate-package-metadata.ps1 -PackageDirectory './artifacts/packages'
+./eng/validate-release-artifacts.ps1 -PackageDirectory './artifacts/packages' -Version <version> -ManifestPath './artifacts/release-metadata/artifact-manifest.json' -Repository <owner/repo> -RepositoryUrl <url> -Commit <sha> -Branch <ref>
+```
 
-## Git e commits
+Benchmark validation when performance is in scope:
 
-- A branch padrão é `master`; nunca aplique alterações diretamente nela.
-- Crie ou use branch de trabalho relacionada ao objetivo.
-- Use Conventional Commits:
-  - `fix:` para correção funcional;
-  - `feat:` para nova capacidade;
-  - `refactor:` para mudança estrutural sem mudança observável;
-  - `test:` para testes;
-  - `docs:` para documentação;
-  - `chore:` para manutenção;
-  - `ci:` para automação.
-- Não misture assuntos independentes no mesmo commit.
-- Revise o diff antes de commitar.
-- Não faça commit com falha de build ou teste sem registrar claramente o motivo.
-- Não faça push, abra pull request, crie tag ou release sem pedido explícito.
-- Não reescreva histórico compartilhado.
-- Não use `--force` sem autorização explícita.
+```bash
+dotnet build ./benchmarks/Dapper.FluentMap.Benchmarks/Dapper.FluentMap.Benchmarks.csproj --configuration Release
+dotnet run --project ./benchmarks/Dapper.FluentMap.Benchmarks/Dapper.FluentMap.Benchmarks.csproj --configuration Release --no-build -- --filter "*RelevantBenchmark*" --job Dry
+```
 
-## Formato da resposta final
+If the local SDK/runtime cannot run a required target, do not change project targets to work around the machine. Report the command, failure, and what remains unvalidated.
 
-Ao concluir uma tarefa, informe:
+## Packaging And Release
 
-1. objetivo atendido;
-2. arquivos alterados;
-3. comportamento preservado ou alterado;
-4. testes e comandos executados;
-5. resultado do build, testes e pack;
-6. riscos ou limitações restantes;
-7. commit criado, quando aplicável.
+The repository currently publishes multiple NuGet packages:
 
-Não declare sucesso quando uma validação necessária não tiver sido executada. Explique objetivamente o que ficou sem validar e por quê.
+- `Dapper.FluentMap`
+- `Dapper.FluentMap.Dommel`
+- `FluentMap.DependencyInjection`
+- `FluentMap.Analyzers`
+- `FluentMap.Generators`
+
+`eng/package-catalog.json` is the package identity catalog and separates project identity from NuGet `PackageId`. `Directory.Build.props` defines shared package metadata and `FluentMapPackageVersionPrefix` (currently `3.0.1`) with a local/dev suffix when no explicit version is supplied. The repository currently uses explicit `PackageReference` versions rather than Central Package Management. `Directory.Build.targets` blocks unsafe historical package versions. Release behavior lives in the actual workflows under `.github/workflows/`; inspect them before changing or documenting release behavior.
+
+NuGet.org publishing uses OIDC Trusted Publishing through `NuGet/login`, a protected `release` environment, and job-scoped `id-token: write`. Preserve this model; do not introduce a long-lived NuGet API key as a shortcut.
+
+Package or release changes require compatibility, provenance, artifact-set, rollback/recovery, and SemVer review. Do not alter PackageIds, versioning, authors, license, URLs, README/icon packaging, Source Link/provenance, or NuGet metadata without explicit scope.
+
+## Documentation
+
+Update docs when public API, initialization, behavior, compatibility, supported targets, package/dependency behavior, deprecations, or release flow changes. `README.md` is the entry point; examples must compile or accurately reflect the real API. Do not document unimplemented features.
+
+## Git
+
+Use Conventional Commits (`fix:`, `feat:`, `refactor:`, `test:`, `docs:`, `chore:`, `ci:`). Review the complete diff before committing. Do not push, open PRs, create tags, create releases, or publish packages unless the user explicitly requested it.
+
+## Final Report
+
+When finishing a task, report the objective, files changed, behavior preserved or changed, validations performed and results, build/test/pack status when applicable, remaining risks or limitations, and commit SHA when a commit was created.
