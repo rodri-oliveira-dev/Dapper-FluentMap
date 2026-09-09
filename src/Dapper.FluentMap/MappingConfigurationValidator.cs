@@ -304,23 +304,7 @@ namespace Dapper.FluentMap
 
             if (persistence.IgnoredByFluentMap)
             {
-                if (persistence.ParticipatesInMaterialization ||
-                    persistence.ParticipatesInInsert ||
-                    persistence.ParticipatesInUpdate ||
-                    persistence.IsKey ||
-                    persistence.IsIdentity ||
-                    persistence.IsGenerated ||
-                    persistence.IsComputed ||
-                    persistence.HasDatabaseDefaultOnInsert)
-                {
-                    throw InvalidPersistenceMetadata(
-                        entityType,
-                        memberPath,
-                        sourceKind,
-                        sourceType,
-                        "Ignored properties cannot participate in materialization, insert, update, key or generated persistence behavior.");
-                }
-
+                ValidateIgnoredPersistenceMetadata(entityType, memberPath, sourceKind, sourceType, persistence);
                 return;
             }
 
@@ -336,37 +320,12 @@ namespace Dapper.FluentMap
 
             if (persistence.IsComputed)
             {
-                if (!persistence.IsGenerated ||
-                    persistence.ParticipatesInInsert ||
-                    persistence.ParticipatesInUpdate ||
-                    persistence.HasDatabaseDefaultOnInsert ||
-                    persistence.IsKey ||
-                    persistence.IsIdentity)
-                {
-                    throw InvalidPersistenceMetadata(
-                        entityType,
-                        memberPath,
-                        sourceKind,
-                        sourceType,
-                        "Computed properties must be generated read-only values and cannot also be key, identity or database-default properties.");
-                }
+                ValidateComputedPersistenceMetadata(entityType, memberPath, sourceKind, sourceType, persistence);
             }
 
             if (persistence.IsIdentity)
             {
-                if (!persistence.IsGenerated ||
-                    !persistence.IsKey ||
-                    persistence.ParticipatesInInsert ||
-                    persistence.ParticipatesInUpdate ||
-                    persistence.HasDatabaseDefaultOnInsert)
-                {
-                    throw InvalidPersistenceMetadata(
-                        entityType,
-                        memberPath,
-                        sourceKind,
-                        sourceType,
-                        "Identity properties must be generated keys and cannot participate in insert, update or database-default-on-insert behavior.");
-                }
+                ValidateIdentityPersistenceMetadata(entityType, memberPath, sourceKind, sourceType, persistence);
             }
 
             if (persistence.IsKey && persistence.ParticipatesInUpdate)
@@ -381,18 +340,98 @@ namespace Dapper.FluentMap
 
             if (persistence.HasDatabaseDefaultOnInsert)
             {
-                if (!persistence.IsGenerated ||
-                    persistence.ParticipatesInInsert ||
-                    persistence.IsComputed ||
-                    persistence.IsIdentity)
-                {
-                    throw InvalidPersistenceMetadata(
-                        entityType,
-                        memberPath,
-                        sourceKind,
-                        sourceType,
-                        "Database-default-on-insert properties must be generated values omitted from insert and cannot also be computed or identity properties.");
-                }
+                ValidateDatabaseDefaultPersistenceMetadata(entityType, memberPath, sourceKind, sourceType, persistence);
+            }
+        }
+
+        private static void ValidateIgnoredPersistenceMetadata(
+            Type entityType,
+            MemberPath memberPath,
+            string sourceKind,
+            Type sourceType,
+            PropertyPersistenceMetadata persistence)
+        {
+            if (persistence.ParticipatesInMaterialization ||
+                persistence.ParticipatesInInsert ||
+                persistence.ParticipatesInUpdate ||
+                persistence.IsKey ||
+                persistence.IsIdentity ||
+                persistence.IsGenerated ||
+                persistence.IsComputed ||
+                persistence.HasDatabaseDefaultOnInsert)
+            {
+                throw InvalidPersistenceMetadata(
+                    entityType,
+                    memberPath,
+                    sourceKind,
+                    sourceType,
+                    "Ignored properties cannot participate in materialization, insert, update, key or generated persistence behavior.");
+            }
+        }
+
+        private static void ValidateComputedPersistenceMetadata(
+            Type entityType,
+            MemberPath memberPath,
+            string sourceKind,
+            Type sourceType,
+            PropertyPersistenceMetadata persistence)
+        {
+            if (!persistence.IsGenerated ||
+                persistence.ParticipatesInInsert ||
+                persistence.ParticipatesInUpdate ||
+                persistence.HasDatabaseDefaultOnInsert ||
+                persistence.IsKey ||
+                persistence.IsIdentity)
+            {
+                throw InvalidPersistenceMetadata(
+                    entityType,
+                    memberPath,
+                    sourceKind,
+                    sourceType,
+                    "Computed properties must be generated read-only values and cannot also be key, identity or database-default properties.");
+            }
+        }
+
+        private static void ValidateIdentityPersistenceMetadata(
+            Type entityType,
+            MemberPath memberPath,
+            string sourceKind,
+            Type sourceType,
+            PropertyPersistenceMetadata persistence)
+        {
+            if (!persistence.IsGenerated ||
+                !persistence.IsKey ||
+                persistence.ParticipatesInInsert ||
+                persistence.ParticipatesInUpdate ||
+                persistence.HasDatabaseDefaultOnInsert)
+            {
+                throw InvalidPersistenceMetadata(
+                    entityType,
+                    memberPath,
+                    sourceKind,
+                    sourceType,
+                    "Identity properties must be generated keys and cannot participate in insert, update or database-default-on-insert behavior.");
+            }
+        }
+
+        private static void ValidateDatabaseDefaultPersistenceMetadata(
+            Type entityType,
+            MemberPath memberPath,
+            string sourceKind,
+            Type sourceType,
+            PropertyPersistenceMetadata persistence)
+        {
+            if (!persistence.IsGenerated ||
+                persistence.ParticipatesInInsert ||
+                persistence.IsComputed ||
+                persistence.IsIdentity)
+            {
+                throw InvalidPersistenceMetadata(
+                    entityType,
+                    memberPath,
+                    sourceKind,
+                    sourceType,
+                    "Database-default-on-insert properties must be generated values omitted from insert and cannot also be computed or identity properties.");
             }
         }
 

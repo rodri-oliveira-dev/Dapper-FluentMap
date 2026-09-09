@@ -561,30 +561,7 @@ namespace Dapper.FluentMap
                 var fluentMap = GetProfilePropertyMap(type, profileType, column.ColumnName);
                 if (fluentMap != null)
                 {
-                    if (column.Ignored)
-                    {
-                        if (!fluentMap.Ignored)
-                        {
-                            return false;
-                        }
-
-                        continue;
-                    }
-
-                    if (fluentMap.Ignored)
-                    {
-                        return false;
-                    }
-
-                    if (!GeneratedReadConverterMatchesEffectiveMapping(
-                        PropertyMapConversion.GetConversion(fluentMap),
-                        column))
-                    {
-                        return false;
-                    }
-
-                    var memberPath = PropertyMapIdentity.GetMemberPath(fluentMap).ToString();
-                    if (!string.Equals(memberPath, column.MemberPath, StringComparison.Ordinal))
+                    if (!GeneratedMaterializerColumnMatchesFluentMap(fluentMap, column))
                     {
                         return false;
                     }
@@ -592,32 +569,67 @@ namespace Dapper.FluentMap
                     continue;
                 }
 
-                if (column.Ignored)
-                {
-                    return false;
-                }
-
-                var defaultMember = defaultTypeMap.GetMember(column.ColumnName);
-                var defaultMemberPath = defaultMember == null
-                    ? null
-                    : defaultMember.Property != null
-                        ? defaultMember.Property.Name
-                        : defaultMember.Field != null
-                            ? defaultMember.Field.Name
-                            : null;
-
-                if (!string.Equals(defaultMemberPath, column.MemberPath, StringComparison.Ordinal))
-                {
-                    return false;
-                }
-
-                if (column.ReadConverterType != null)
+                if (!GeneratedMaterializerColumnMatchesDefaultMap(defaultTypeMap, column))
                 {
                     return false;
                 }
             }
 
             return true;
+        }
+
+        private static bool GeneratedMaterializerColumnMatchesFluentMap(
+            IPropertyMap fluentMap,
+            GeneratedMaterializerColumn column)
+        {
+            if (column.Ignored)
+            {
+                return fluentMap.Ignored;
+            }
+
+            if (fluentMap.Ignored)
+            {
+                return false;
+            }
+
+            if (!GeneratedReadConverterMatchesEffectiveMapping(
+                PropertyMapConversion.GetConversion(fluentMap),
+                column))
+            {
+                return false;
+            }
+
+            var memberPath = PropertyMapIdentity.GetMemberPath(fluentMap).ToString();
+            return string.Equals(memberPath, column.MemberPath, StringComparison.Ordinal);
+        }
+
+        private static bool GeneratedMaterializerColumnMatchesDefaultMap(
+            DefaultTypeMap defaultTypeMap,
+            GeneratedMaterializerColumn column)
+        {
+            if (column.Ignored || column.ReadConverterType != null)
+            {
+                return false;
+            }
+
+            var defaultMemberPath = GetDefaultMemberPath(defaultTypeMap, column.ColumnName);
+            return string.Equals(defaultMemberPath, column.MemberPath, StringComparison.Ordinal);
+        }
+
+        private static string GetDefaultMemberPath(DefaultTypeMap defaultTypeMap, string columnName)
+        {
+            var defaultMember = defaultTypeMap.GetMember(columnName);
+            if (defaultMember == null)
+            {
+                return null;
+            }
+
+            if (defaultMember.Property != null)
+            {
+                return defaultMember.Property.Name;
+            }
+
+            return defaultMember.Field == null ? null : defaultMember.Field.Name;
         }
 
         private static bool GeneratedReadConverterMatchesEffectiveMapping(

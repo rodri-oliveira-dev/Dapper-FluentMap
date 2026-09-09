@@ -743,7 +743,7 @@ namespace Dapper.FluentMap.Materialization
             private object Materialize(IDataRecord record, object existing, bool forceNew)
             {
                 var current = _constructorPlan != null
-                    ? _constructorPlan.Create(record)
+                    ? _constructorPlan.Materialize(record)
                     : forceNew || existing == null
                         ? _parameterlessFactory()
                         : existing;
@@ -912,7 +912,7 @@ namespace Dapper.FluentMap.Materialization
                 return _bindings.Any(binding => binding.Child == child);
             }
 
-            internal object Create(IDataRecord record)
+            internal object Materialize(IDataRecord record)
             {
                 var args = new object[_bindings.Length];
                 for (var i = 0; i < _bindings.Length; i++)

@@ -48,40 +48,27 @@ namespace Dapper.FluentMap.Mapping
             bool computed,
             bool databaseDefaultOnInsert)
         {
-            if (ignored && (participatesInMaterialization || participatesInInsert || participatesInUpdate))
-            {
-                throw new ArgumentException("Ignored properties cannot participate in materialization, insert or update.");
-            }
-
-            if (ignored && (key || identity || generated || computed || databaseDefaultOnInsert))
-            {
-                throw new ArgumentException("Ignored properties cannot also be key, identity, generated, computed or database-default properties.");
-            }
-
-            if (computed && databaseDefaultOnInsert)
-            {
-                throw new ArgumentException("A property cannot be both computed and database-default-on-insert.");
-            }
-
-            if (computed && (participatesInInsert || participatesInUpdate))
-            {
-                throw new ArgumentException("Computed properties cannot participate in insert or update.");
-            }
-
-            if (computed && !generated)
-            {
-                throw new ArgumentException("Computed properties must be generated.");
-            }
-
-            if (identity && !generated)
-            {
-                throw new ArgumentException("Identity properties must be generated.");
-            }
-
-            if (identity && (participatesInInsert || participatesInUpdate))
-            {
-                throw new ArgumentException("Identity properties cannot participate in insert or update.");
-            }
+            EnsureIgnoredStateIsConsistent(
+                participatesInMaterialization,
+                participatesInInsert,
+                participatesInUpdate,
+                ignored,
+                key,
+                identity,
+                generated,
+                computed,
+                databaseDefaultOnInsert);
+            EnsureComputedStateIsConsistent(
+                participatesInInsert,
+                participatesInUpdate,
+                generated,
+                computed,
+                databaseDefaultOnInsert);
+            EnsureIdentityStateIsConsistent(
+                participatesInInsert,
+                participatesInUpdate,
+                identity,
+                generated);
 
             ParticipatesInMaterialization = participatesInMaterialization;
             ParticipatesInInsert = participatesInInsert;
@@ -92,6 +79,83 @@ namespace Dapper.FluentMap.Mapping
             IsGenerated = generated;
             IsComputed = computed;
             HasDatabaseDefaultOnInsert = databaseDefaultOnInsert;
+        }
+
+        private static void EnsureIgnoredStateIsConsistent(
+            bool participatesInMaterialization,
+            bool participatesInInsert,
+            bool participatesInUpdate,
+            bool ignored,
+            bool key,
+            bool identity,
+            bool generated,
+            bool computed,
+            bool databaseDefaultOnInsert)
+        {
+            if (!ignored)
+            {
+                return;
+            }
+
+            if (participatesInMaterialization || participatesInInsert || participatesInUpdate)
+            {
+                throw new ArgumentException("Ignored properties cannot participate in materialization, insert or update.");
+            }
+
+            if (key || identity || generated || computed || databaseDefaultOnInsert)
+            {
+                throw new ArgumentException("Ignored properties cannot also be key, identity, generated, computed or database-default properties.");
+            }
+        }
+
+        private static void EnsureComputedStateIsConsistent(
+            bool participatesInInsert,
+            bool participatesInUpdate,
+            bool generated,
+            bool computed,
+            bool databaseDefaultOnInsert)
+        {
+            if (!computed)
+            {
+                return;
+            }
+
+            if (databaseDefaultOnInsert)
+            {
+                throw new ArgumentException("A property cannot be both computed and database-default-on-insert.");
+            }
+
+            if (participatesInInsert || participatesInUpdate)
+            {
+                throw new ArgumentException("Computed properties cannot participate in insert or update.");
+            }
+
+            if (!generated)
+            {
+                throw new ArgumentException("Computed properties must be generated.");
+            }
+        }
+
+        private static void EnsureIdentityStateIsConsistent(
+            bool participatesInInsert,
+            bool participatesInUpdate,
+            bool identity,
+            bool generated)
+        {
+            if (!identity)
+            {
+                return;
+            }
+
+            if (!generated)
+            {
+                throw new ArgumentException("Identity properties must be generated.");
+            }
+
+            if (participatesInInsert || participatesInUpdate)
+            {
+                throw new ArgumentException("Identity properties cannot participate in insert or update.");
+            }
         }
 
         /// <summary>
