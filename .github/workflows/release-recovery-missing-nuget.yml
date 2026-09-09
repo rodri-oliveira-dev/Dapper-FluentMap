@@ -221,7 +221,8 @@ jobs:
             -Version $env:PACKAGE_VERSION `
             -Source 'https://api.nuget.org/v3/index.json' `
             -ApiKey $env:NUGET_API_KEY `
-            -Registry NuGetOrg
+            -Registry NuGetOrg `
+            -WaitForNuGetOrgIndexing
 
       - name: Verify NuGet.org publication state
         shell: bash
