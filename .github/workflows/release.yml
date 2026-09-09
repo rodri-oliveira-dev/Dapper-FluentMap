@@ -220,17 +220,6 @@ jobs:
           PACKAGE_VERSION: ${{ steps.version.outputs.package_version }}
         run: |
           $ErrorActionPreference = 'Stop'
-
-          Get-ChildItem './eng/consumer-smoke' -Recurse -File |
-            Where-Object { $_.Extension -in @('.csproj', '.ps1') } |
-            ForEach-Object {
-              $content = Get-Content -LiteralPath $_.FullName -Raw
-              $updated = $content.Replace('3.0.1', $env:PACKAGE_VERSION)
-              if ($updated -ne $content) {
-                [System.IO.File]::WriteAllText($_.FullName, $updated, [System.Text.UTF8Encoding]::new($false))
-              }
-            }
-
           ./eng/consumer-smoke/run-consumer-smoke.ps1 `
             -PackageDirectory './artifacts/packages' `
             -PackageVersion $env:PACKAGE_VERSION
@@ -288,6 +277,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    outputs:
+      tag-created: ${{ steps.release-tag.outputs.tag_created }}
 
     steps:
       - name: Checkout validated commit
@@ -296,6 +287,7 @@ jobs:
           fetch-depth: 0
 
       - name: Create or verify tag
+        id: release-tag
         shell: bash
         env:
           RELEASE_TAG: ${{ needs.build-and-pack.outputs.release-tag }}
@@ -312,11 +304,13 @@ jobs:
             fi
 
             echo "Tag '$RELEASE_TAG' already exists on the validated commit."
+            echo "tag_created=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           git tag "$RELEASE_TAG" "$VALIDATED_SHA"
           git push origin "refs/tags/$RELEASE_TAG"
+          echo "tag_created=true" >> "$GITHUB_OUTPUT"
 
   publish-nuget:
     name: Publish to NuGet.org
@@ -503,8 +497,9 @@ jobs:
     if: >-
       ${{ always() &&
           needs.build-and-pack.result == 'success' &&
-          (needs.ensure-release-tag.result == 'failure' ||
-           needs.publish-nuget.result == 'failure' ||
+          needs.ensure-release-tag.result == 'success' &&
+          needs.ensure-release-tag.outputs.tag-created == 'true' &&
+          (needs.publish-nuget.result == 'failure' ||
            needs.publish-github-packages.result == 'failure' ||
            needs.github-release.result == 'failure') }}
     needs:
@@ -517,8 +512,6 @@ jobs:
     environment: release
     permissions:
       contents: write
-      packages: write
-      id-token: write
 
     steps:
       - name: Checkout rollback tooling
@@ -527,28 +520,18 @@ jobs:
           persist-credentials: false
           show-progress: false
 
-      - name: Exchange GitHub OIDC token for rollback NuGet API key
-        id: rollback-nuget-login
-        continue-on-error: true
-        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
-        with:
-          user: "${{ vars.NUGET_USER }}"
-
       - name: Compensate failed release
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-          NUGET_API_KEY: ${{ steps.rollback-nuget-login.outputs.NUGET_API_KEY }}
           PACKAGE_VERSION: ${{ needs.build-and-pack.outputs.package-version }}
           RELEASE_TAG: ${{ needs.build-and-pack.outputs.release-tag }}
           REPOSITORY: ${{ github.repository }}
-          REPOSITORY_OWNER: ${{ github.repository_owner }}
         run: |
           $ErrorActionPreference = 'Stop'
           ./eng/rollback-release.ps1 `
             -Version $env:PACKAGE_VERSION `
             -ReleaseTag $env:RELEASE_TAG `
             -Repository $env:REPOSITORY `
-            -RepositoryOwner $env:REPOSITORY_OWNER `
             -GitHubToken $env:GH_TOKEN `
-            -NuGetApiKey $env:NUGET_API_KEY
+            -DeleteReleaseTag

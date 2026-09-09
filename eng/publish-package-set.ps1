@@ -24,6 +24,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 Import-Module (Join-Path $PSScriptRoot 'PackageCatalog.psm1') -Force
+Add-Type -AssemblyName System.IO.Compression.FileSystem
 
 function Fail {
   param([string]$Message)
@@ -66,6 +67,87 @@ function Get-HttpStatus {
   return $status
 }
 
+function Test-IsRepositorySignatureEntry {
+  param([string]$EntryName)
+
+  $normalized = $EntryName.Replace('\', '/')
+  return $normalized.Equals('[Content_Types].xml', [System.StringComparison]::OrdinalIgnoreCase) -or
+    $normalized.Equals('_rels/.rels', [System.StringComparison]::OrdinalIgnoreCase) -or
+    $normalized.Equals('.signature.p7s', [System.StringComparison]::OrdinalIgnoreCase) -or
+    $normalized.StartsWith('package/services/digital-signature/', [System.StringComparison]::OrdinalIgnoreCase)
+}
+
+function Get-NuGetPackageEntryHashes {
+  param([string]$PackagePath)
+
+  $entries = [ordered]@{}
+  $archive = [System.IO.Compression.ZipFile]::OpenRead($PackagePath)
+  try {
+    foreach ($entry in @($archive.Entries | Sort-Object -Property FullName)) {
+      if ([string]::IsNullOrEmpty($entry.Name) -or (Test-IsRepositorySignatureEntry -EntryName $entry.FullName)) {
+        continue
+      }
+
+      if ($entries.Contains($entry.FullName)) {
+        Fail "Package '$PackagePath' contains duplicate entry '$($entry.FullName)'."
+      }
+
+      $stream = $entry.Open()
+      $sha256 = [System.Security.Cryptography.SHA256]::Create()
+      try {
+        $entries[$entry.FullName] = [System.Convert]::ToHexString($sha256.ComputeHash($stream)).ToLowerInvariant()
+      }
+      finally {
+        $sha256.Dispose()
+        $stream.Dispose()
+      }
+    }
+  }
+  finally {
+    $archive.Dispose()
+  }
+
+  return $entries
+}
+
+function Assert-NuGetPackagesHaveSameContent {
+  param(
+    [string]$PackageId,
+    [string]$LocalPackagePath,
+    [string]$DownloadedPackagePath
+  )
+
+  $localEntries = Get-NuGetPackageEntryHashes -PackagePath $LocalPackagePath
+  $remoteEntries = Get-NuGetPackageEntryHashes -PackagePath $DownloadedPackagePath
+
+  $missingEntries = @($localEntries.Keys | Where-Object { -not $remoteEntries.Contains($_) })
+  $unexpectedEntries = @($remoteEntries.Keys | Where-Object { -not $localEntries.Contains($_) })
+  $changedEntries = @(
+    foreach ($entryName in $localEntries.Keys) {
+      if ($remoteEntries.Contains($entryName) -and $remoteEntries[$entryName] -ne $localEntries[$entryName]) {
+        $entryName
+      }
+    }
+  )
+
+  if ($missingEntries.Count -gt 0 -or $unexpectedEntries.Count -gt 0 -or $changedEntries.Count -gt 0) {
+    $details = @()
+    if ($missingEntries.Count -gt 0) {
+      $details += "missing entries: $($missingEntries -join ', ')"
+    }
+
+    if ($unexpectedEntries.Count -gt 0) {
+      $details += "unexpected entries: $($unexpectedEntries -join ', ')"
+    }
+
+    if ($changedEntries.Count -gt 0) {
+      $details += "changed entries: $($changedEntries -join ', ')"
+    }
+
+    Fail "NuGet.org already has $PackageId $Version, but the downloaded package content does not match the local artifact ($($details -join '; ')). Refusing to mask an artifact mismatch."
+  }
+}
+
 function Assert-NuGetOrgPackageMatches {
   param(
     [string]$PackageId,
@@ -95,13 +177,12 @@ function Assert-NuGetOrgPackageMatches {
       Fail "Unable to download existing NuGet.org package $PackageId $Version for artifact comparison."
     }
 
-    $localHash = (Get-FileHash -LiteralPath $LocalPackagePath -Algorithm SHA256).Hash.ToLowerInvariant()
-    $remoteHash = (Get-FileHash -LiteralPath $downloadPath -Algorithm SHA256).Hash.ToLowerInvariant()
-    if ($localHash -ne $remoteHash) {
-      Fail "NuGet.org already has $PackageId $Version, but its SHA-256 '$remoteHash' does not match local artifact '$localHash'. Refusing to mask an artifact mismatch."
-    }
+    Assert-NuGetPackagesHaveSameContent `
+      -PackageId $PackageId `
+      -LocalPackagePath $LocalPackagePath `
+      -DownloadedPackagePath $downloadPath
 
-    Write-Output "NuGet.org: validated existing $PackageId $Version against the local artifact hash; skipping push."
+    Write-Output "NuGet.org: validated existing $PackageId $Version against local artifact content while accounting for repository signatures; skipping push."
   }
   finally {
     if (Test-Path -LiteralPath $downloadPath) {

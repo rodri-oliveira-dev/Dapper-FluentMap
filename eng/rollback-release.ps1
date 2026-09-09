@@ -9,23 +9,16 @@ param(
     [string]$Repository,
 
     [Parameter(Mandatory = $true)]
-    [string]$RepositoryOwner,
-
-    [Parameter(Mandatory = $true)]
     [string]$GitHubToken,
 
-    [string]$NuGetApiKey
+    [switch]$DeleteReleaseTag
 )
 
 $ErrorActionPreference = 'Stop'
 
-Import-Module (Join-Path $PSScriptRoot 'PackageCatalog.psm1') -Force
-
 if ($Version -eq '3.0.0' -or $ReleaseTag -eq 'v3.0.0') {
     throw 'Version 3.0.0 and tag v3.0.0 are immutable historical artifacts and must not be modified by rollback automation.'
 }
-
-$packageIds = @(Get-FluentMapPackageIds)
 
 $failures = [System.Collections.Generic.List[string]]::new()
 
@@ -67,93 +60,8 @@ function Invoke-GitHubRequest {
 }
 
 Write-Host "Starting compensating rollback for $ReleaseTag ($Version)."
-Write-Host 'NuGet.org cannot permanently delete a published version; rollback unlists versions that were created before the release failed.'
-
-# NuGet.org compensation: unlist any target package version that exists.
-if ([string]::IsNullOrWhiteSpace($NuGetApiKey)) {
-    Add-RollbackFailure 'No temporary NuGet API key was available for rollback. Ensure the Trusted Publishing policy grants Unlist/relist scope.'
-}
-else {
-    foreach ($packageId in $packageIds) {
-        $escapedId = [System.Uri]::EscapeDataString($packageId)
-        $escapedVersion = [System.Uri]::EscapeDataString($Version)
-        $uri = "https://www.nuget.org/api/v2/package/$escapedId/$escapedVersion"
-
-        try {
-            $response = Invoke-WebRequest `
-                -Uri $uri `
-                -Method Delete `
-                -Headers @{ 'X-NuGet-ApiKey' = $NuGetApiKey } `
-                -SkipHttpErrorCheck
-
-            switch ([int]$response.StatusCode) {
-                204 { Write-Host "NuGet.org: unlisted $packageId $Version." }
-                404 { Write-Host "NuGet.org: $packageId $Version was not published; nothing to unlist." }
-                default {
-                    Add-RollbackFailure "NuGet.org rollback for $packageId $Version returned HTTP $([int]$response.StatusCode)."
-                }
-            }
-        }
-        catch {
-            Add-RollbackFailure "NuGet.org rollback failed for $packageId $Version`: $($_.Exception.Message)"
-        }
-    }
-}
-
-# GitHub Packages compensation: delete this version from each NuGet package.
-foreach ($packageId in $packageIds) {
-    $escapedPackageId = [System.Uri]::EscapeDataString($packageId)
-    $versionIds = [System.Collections.Generic.List[long]]::new()
-    $page = 1
-
-    while ($true) {
-        $listUri = "https://api.github.com/users/$RepositoryOwner/packages/nuget/$escapedPackageId/versions?per_page=100&page=$page"
-        $response = Invoke-GitHubRequest -Method GET -Uri $listUri
-        if ($null -eq $response) {
-            break
-        }
-
-        $status = [int]$response.StatusCode
-        if ($status -eq 404) {
-            Write-Host "GitHub Packages: $packageId does not exist; nothing to delete."
-            break
-        }
-
-        if ($status -ne 200) {
-            Add-RollbackFailure "GitHub Packages lookup for $packageId returned HTTP $status."
-            break
-        }
-
-        $versions = @($response.Content | ConvertFrom-Json)
-        foreach ($packageVersion in $versions) {
-            if ([string]$packageVersion.name -eq $Version) {
-                $versionIds.Add([long]$packageVersion.id)
-            }
-        }
-
-        if ($versions.Count -lt 100) {
-            break
-        }
-
-        $page++
-    }
-
-    foreach ($versionId in $versionIds) {
-        $deleteUri = "https://api.github.com/users/$RepositoryOwner/packages/nuget/$escapedPackageId/versions/$versionId"
-        $deleteResponse = Invoke-GitHubRequest -Method DELETE -Uri $deleteUri
-        if ($null -eq $deleteResponse) {
-            continue
-        }
-
-        $deleteStatus = [int]$deleteResponse.StatusCode
-        if ($deleteStatus -in @(204, 404)) {
-            Write-Host "GitHub Packages: deleted $packageId $Version (version id $versionId)."
-        }
-        else {
-            Add-RollbackFailure "GitHub Packages deletion for $packageId $Version returned HTTP $deleteStatus."
-        }
-    }
-}
+Write-Host 'Package registry artifacts are not deleted, unlisted, or overwritten by rollback.'
+Write-Host 'A partial registry publication is recovered by validating existing package identities and publishing only genuinely missing packages.'
 
 # Remove a partially-created GitHub Release, if any.
 $escapedTag = [System.Uri]::EscapeDataString($ReleaseTag)
@@ -175,16 +83,20 @@ if ($null -ne $releaseLookup) {
     }
 }
 
-# Remove the release tag last, after registry compensation has been attempted.
-$tagDelete = Invoke-GitHubRequest -Method DELETE -Uri "https://api.github.com/repos/$Repository/git/refs/tags/$escapedTag"
-if ($null -ne $tagDelete) {
-    $tagStatus = [int]$tagDelete.StatusCode
-    if ($tagStatus -in @(204, 404, 422)) {
-        Write-Host "Git tag: removed or already absent: $ReleaseTag."
+if ($DeleteReleaseTag) {
+    $tagDelete = Invoke-GitHubRequest -Method DELETE -Uri "https://api.github.com/repos/$Repository/git/refs/tags/$escapedTag"
+    if ($null -ne $tagDelete) {
+        $tagStatus = [int]$tagDelete.StatusCode
+        if ($tagStatus -in @(204, 404, 422)) {
+            Write-Host "Git tag: removed or already absent: $ReleaseTag."
+        }
+        else {
+            Add-RollbackFailure "Git tag deletion for $ReleaseTag returned HTTP $tagStatus."
+        }
     }
-    else {
-        Add-RollbackFailure "Git tag deletion for $ReleaseTag returned HTTP $tagStatus."
-    }
+}
+else {
+    Write-Host "Git tag: retained $ReleaseTag because it was not created by this workflow run."
 }
 
 if ($failures.Count -gt 0) {

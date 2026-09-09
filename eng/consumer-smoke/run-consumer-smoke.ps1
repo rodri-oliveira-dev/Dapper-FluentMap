@@ -309,6 +309,7 @@ function Invoke-DotNetForProject {
         $ConfigPath,
         '-p:RestoreNoCache=true',
         "-p:RestorePackagesPath=$PackagesDirectory",
+        "-p:FluentMapConsumerSmokePackageVersion=$packageVersion",
         '-p:DisableImplicitNuGetFallbackFolder=true'
       ) + $ExtraArguments
     }
@@ -317,6 +318,7 @@ function Invoke-DotNetForProject {
         'build',
         $ProjectPath,
         "-p:RestorePackagesPath=$PackagesDirectory",
+        "-p:FluentMapConsumerSmokePackageVersion=$packageVersion",
         '-p:DisableImplicitNuGetFallbackFolder=true'
       ) + $ExtraArguments
     }
@@ -326,6 +328,7 @@ function Invoke-DotNetForProject {
         '--project',
         $ProjectPath,
         "--property:RestorePackagesPath=$PackagesDirectory",
+        "--property:FluentMapConsumerSmokePackageVersion=$packageVersion",
         '--property:DisableImplicitNuGetFallbackFolder=true'
       ) + $ExtraArguments
     }
@@ -334,6 +337,7 @@ function Invoke-DotNetForProject {
         'publish',
         $ProjectPath,
         "-p:RestorePackagesPath=$PackagesDirectory",
+        "-p:FluentMapConsumerSmokePackageVersion=$packageVersion",
         '-p:DisableImplicitNuGetFallbackFolder=true'
       ) + $ExtraArguments
     }

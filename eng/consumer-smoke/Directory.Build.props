@@ -1,0 +1,5 @@
+<Project>
+  <PropertyGroup>
+    <FluentMapConsumerSmokePackageVersion Condition="'$(FluentMapConsumerSmokePackageVersion)' == ''">3.0.1</FluentMapConsumerSmokePackageVersion>
+  </PropertyGroup>
+</Project>
