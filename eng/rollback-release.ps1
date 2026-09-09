@@ -19,13 +19,13 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$packageIds = @(
-    'Dapper.FluentMap',
-    'Dapper.FluentMap.Dommel',
-    'Dapper.FluentMap.DependencyInjection',
-    'Dapper.FluentMap.Analyzers',
-    'Dapper.FluentMap.Generators'
-)
+Import-Module (Join-Path $PSScriptRoot 'PackageCatalog.psm1') -Force
+
+if ($Version -eq '3.0.0' -or $ReleaseTag -eq 'v3.0.0') {
+    throw 'Version 3.0.0 and tag v3.0.0 are immutable historical artifacts and must not be modified by rollback automation.'
+}
+
+$packageIds = @(Get-FluentMapPackageIds)
 
 $failures = [System.Collections.Generic.List[string]]::new()
 
