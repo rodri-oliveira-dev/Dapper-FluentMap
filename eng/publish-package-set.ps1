@@ -259,7 +259,10 @@ function Wait-NuGetOrgPackageVisible {
   )
 
   $url = Get-NuGetFlatContainerUrl -PackageId $PackageId -PackageVersion $Version
-  for ($attempt = 1; $attempt -le 12; $attempt++) {
+  $maxAttempts = 60
+  $delaySeconds = 10
+
+  for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
     $status = Get-HttpStatus -Uri $url
     if ($status -eq '200') {
       Assert-NuGetOrgPackageMatches -PackageId $PackageId -LocalPackagePath $PackagePath
@@ -270,10 +273,13 @@ function Wait-NuGetOrgPackageVisible {
       Fail "Unexpected NuGet.org response HTTP $status while waiting for $PackageId $Version."
     }
 
-    Start-Sleep -Seconds 10
+    if ($attempt -lt $maxAttempts) {
+      Write-Output "NuGet.org: waiting for $PackageId $Version to become visible ($attempt/$maxAttempts); retrying in $delaySeconds seconds."
+      Start-Sleep -Seconds $delaySeconds
+    }
   }
 
-  Fail "NuGet.org did not expose $PackageId $Version after publication within the retry window."
+  Fail "NuGet.org did not expose $PackageId $Version after publication within the 10-minute retry window."
 }
 
 function Wait-GitHubPackageVisible {
