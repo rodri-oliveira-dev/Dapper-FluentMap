@@ -49,6 +49,10 @@ jobs:
       - name: Validate GitHub workflows
         run: check-jsonschema --builtin-schema vendor.github-workflows .github/workflows/*.yml
 
+      - name: Validate release governance scripts
+        shell: pwsh
+        run: ./eng/test-release-governance.ps1
+
       - name: Validate Dependabot configuration
         run: check-jsonschema --builtin-schema vendor.dependabot .github/dependabot.yml
 

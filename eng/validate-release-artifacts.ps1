@@ -18,7 +18,9 @@ param(
 
   [string]$CatalogPath,
 
-  [string]$SourceRoot
+  [string]$SourceRoot,
+
+  [switch]$VerifyExistingManifest
 )
 
 Set-StrictMode -Version Latest
@@ -699,16 +701,33 @@ $manifest = [ordered]@{
 }
 
 $manifestFullPath = [System.IO.Path]::GetFullPath($ManifestPath)
-$manifestDirectory = Split-Path -Parent $manifestFullPath
-if (-not [string]::IsNullOrWhiteSpace($manifestDirectory)) {
-  New-Item -ItemType Directory -Force -Path $manifestDirectory | Out-Null
-}
 
 $manifestJson = $manifest | ConvertTo-Json -Depth 8
-[System.IO.File]::WriteAllText(
-  $manifestFullPath,
-  $manifestJson + [Environment]::NewLine,
-  [System.Text.UTF8Encoding]::new($false))
+
+if ($VerifyExistingManifest) {
+  if (-not (Test-Path -LiteralPath $manifestFullPath -PathType Leaf)) {
+    Fail "Expected existing manifest '$manifestFullPath' was not found."
+  }
+
+  $existingManifest = Get-Content -Raw -LiteralPath $manifestFullPath
+  $normalizedExistingManifest = ($existingManifest.TrimEnd() | ConvertFrom-Json | ConvertTo-Json -Depth 8).TrimEnd()
+  $normalizedExpectedManifest = $manifestJson.TrimEnd()
+
+  if ($normalizedExistingManifest -ne $normalizedExpectedManifest) {
+    Fail "Existing manifest '$manifestFullPath' does not match the validated release artifact set for $Version, repository '$Repository', commit '$Commit', and branch '$Branch'."
+  }
+}
+else {
+  $manifestDirectory = Split-Path -Parent $manifestFullPath
+  if (-not [string]::IsNullOrWhiteSpace($manifestDirectory)) {
+    New-Item -ItemType Directory -Force -Path $manifestDirectory | Out-Null
+  }
+
+  [System.IO.File]::WriteAllText(
+    $manifestFullPath,
+    $manifestJson + [Environment]::NewLine,
+    [System.Text.UTF8Encoding]::new($false))
+}
 
 $expectedArtifactCount = $expectedNupkgIds.Count + $expectedSnupkgIds.Count
 $validatedManifest = Get-Content -Raw -Path $manifestFullPath | ConvertFrom-Json
@@ -716,4 +735,9 @@ if ($validatedManifest.version -ne $Version -or @($validatedManifest.packages).C
   Fail "Generated manifest '$manifestFullPath' did not round-trip with the expected version and package count."
 }
 
-Write-Host "Validated $($expectedNupkgIds.Count) .nupkg files, $($expectedSnupkgIds.Count) .snupkg files and wrote manifest '$manifestFullPath' for $Version."
+if ($VerifyExistingManifest) {
+  Write-Host "Validated $($expectedNupkgIds.Count) .nupkg files, $($expectedSnupkgIds.Count) .snupkg files and verified existing manifest '$manifestFullPath' for $Version."
+}
+else {
+  Write-Host "Validated $($expectedNupkgIds.Count) .nupkg files, $($expectedSnupkgIds.Count) .snupkg files and wrote manifest '$manifestFullPath' for $Version."
+}
