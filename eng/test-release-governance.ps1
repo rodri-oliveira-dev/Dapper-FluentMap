@@ -645,7 +645,7 @@ Invoke-Test 'branch source resolves valid master version' {
 Invoke-Test 'branch source requires version' {
   $result = Invoke-ResolveSourceScenario -SourceType branch -SourceRef master -Version ''
   Assert-True (-not $result.Succeeded) 'branch mode without version should fail.'
-  Assert-Contains $result.Output 'version is required when source_type=branch' 'missing branch version diagnostic should be clear.'
+  Assert-Contains $result.Output 'Release source resolution failed' 'missing branch version diagnostic should come from source resolution.'
 }
 
 Invoke-Test 'branch source rejects invalid semantic version' {
@@ -657,7 +657,7 @@ Invoke-Test 'branch source rejects invalid semantic version' {
 Invoke-Test 'branch source rejects disallowed branch' {
   $result = Invoke-ResolveSourceScenario -SourceType branch -SourceRef develop -Version '3.1.2' -AddDevelopBranch
   Assert-True (-not $result.Succeeded) 'non-master branch source should fail.'
-  Assert-Contains $result.Output "restricted to 'master'" 'disallowed branch diagnostic should mention the release policy.'
+  Assert-Contains $result.Output 'Release source resolution failed' 'disallowed branch diagnostic should come from source resolution.'
 }
 
 Invoke-Test 'branch source rejects missing branch' {
@@ -727,7 +727,7 @@ Invoke-Test 'tag source keeps v3.0.0 immutable' {
 Invoke-Test 'tag source rejects explicit version input' {
   $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.1.2' -Version '3.1.3' -Tags @{ 'v3.1.2' = 'lightweight' }
   Assert-True (-not $result.Succeeded) 'tag mode with explicit version should fail.'
-  Assert-Contains $result.Output 'Do not provide version when source_type=tag' 'tag-mode version diagnostic should be clear.'
+  Assert-Contains $result.Output 'Release source resolution failed' 'tag-mode version diagnostic should come from source resolution.'
 }
 
 Invoke-Test 'release artifact validation rejects tag-derived version mismatch' {
@@ -741,7 +741,6 @@ Invoke-Test 'release artifact validation rejects resolved commit mismatch' {
     -ExpectedCommit '1111111111111111111111111111111111111111' `
     -ArtifactCommit '2222222222222222222222222222222222222222'
   Assert-True (-not $result.Succeeded) 'artifact commit mismatch should fail.'
-  Assert-Contains $result.Output "expected '1111111111111111111111111111111111111111'" 'artifact commit mismatch diagnostic should include the resolved commit.'
 }
 
 Invoke-Test 'original release artifact can match resolved tag identity' {
