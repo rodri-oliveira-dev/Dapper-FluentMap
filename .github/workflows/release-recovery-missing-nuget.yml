@@ -134,12 +134,15 @@ jobs:
         run: dotnet restore ./Dapper.FluentMap.slnx
 
       - name: Build validated release source
+        env:
+          PACKAGE_VERSION: ${{ inputs.version }}
+          VALIDATED_COMMIT: ${{ inputs.validated_commit }}
         run: >-
           dotnet build ./Dapper.FluentMap.slnx
           --configuration Release
           --no-restore
-          -p:Version=${{ inputs.version }}
-          -p:RepositoryCommit=${{ inputs.validated_commit }}
+          -p:Version="$PACKAGE_VERSION"
+          -p:RepositoryCommit="$VALIDATED_COMMIT"
           -p:RepositoryBranch=refs/heads/master
           -p:ContinuousIntegrationBuild=true
 
@@ -147,14 +150,17 @@ jobs:
         run: dotnet test ./Dapper.FluentMap.slnx --configuration Release --no-build --no-restore
 
       - name: Pack release packages
+        env:
+          PACKAGE_VERSION: ${{ inputs.version }}
+          VALIDATED_COMMIT: ${{ inputs.validated_commit }}
         run: >-
           dotnet pack ./Dapper.FluentMap.slnx
           --configuration Release
           --no-build
           --no-restore
           --output ./artifacts/packages
-          -p:Version=${{ inputs.version }}
-          -p:RepositoryCommit=${{ inputs.validated_commit }}
+          -p:Version="$PACKAGE_VERSION"
+          -p:RepositoryCommit="$VALIDATED_COMMIT"
           -p:RepositoryBranch=refs/heads/master
           -p:ContinuousIntegrationBuild=true
 

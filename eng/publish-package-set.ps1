@@ -101,7 +101,7 @@ function Assert-NuGetOrgPackageMatches {
       Fail "NuGet.org already has $PackageId $Version, but its SHA-256 '$remoteHash' does not match local artifact '$localHash'. Refusing to mask an artifact mismatch."
     }
 
-    Write-Host "NuGet.org: validated existing $PackageId $Version against the local artifact hash; skipping push."
+    Write-Output "NuGet.org: validated existing $PackageId $Version against the local artifact hash; skipping push."
   }
   finally {
     if (Test-Path -LiteralPath $downloadPath) {
@@ -158,13 +158,13 @@ function Invoke-DotNetNuGetPush {
     [string]$PackagePath
   )
 
-  Write-Host "> dotnet nuget push $PackagePath --source $Source --api-key ***"
+  Write-Output "> dotnet nuget push $PackagePath --source $Source --api-key ***"
   $output = & dotnet nuget push $PackagePath `
     --source $Source `
     --api-key $ApiKey 2>&1
   $exitCode = $LASTEXITCODE
 
-  $output | ForEach-Object { Write-Host $_ }
+  $output | ForEach-Object { Write-Output $_ }
 
   if ($exitCode -ne 0) {
     Fail "$Registry publication failed for $PackageId $Version from '$PackagePath' with exit code $exitCode. The original dotnet nuget push output is shown above."
@@ -200,7 +200,7 @@ function Wait-GitHubPackageVisible {
 
   for ($attempt = 1; $attempt -le 12; $attempt++) {
     if (Test-GitHubPackageVersionExists -PackageId $PackageId) {
-      Write-Host "GitHub Packages: verified $PackageId $Version after publication."
+      Write-Output "GitHub Packages: verified $PackageId $Version after publication."
       return
     }
 
@@ -233,7 +233,7 @@ foreach ($package in $packages) {
         continue
       }
       '404' {
-        Write-Host "NuGet.org: $packageId $Version is not currently published; publishing local artifact."
+        Write-Output "NuGet.org: $packageId $Version is not currently published; publishing local artifact."
       }
       default {
         Fail "Unexpected NuGet.org response HTTP $status for $packageId $Version. Failing closed."
@@ -241,11 +241,11 @@ foreach ($package in $packages) {
     }
   }
   elseif (Test-GitHubPackageVersionExists -PackageId $packageId) {
-    Write-Host "GitHub Packages: validated that $packageId $Version already exists; skipping push."
+    Write-Output "GitHub Packages: validated that $packageId $Version already exists; skipping push."
     continue
   }
   else {
-    Write-Host "GitHub Packages: $packageId $Version is not currently published; publishing local artifact."
+    Write-Output "GitHub Packages: $packageId $Version is not currently published; publishing local artifact."
   }
 
   Invoke-DotNetNuGetPush -PackageId $packageId -PackagePath $packagePath
@@ -257,4 +257,4 @@ foreach ($package in $packages) {
   }
 }
 
-Write-Host "$Registry publication completed for $($packages.Count) package identities."
+Write-Output "$Registry publication completed for $($packages.Count) package identities."
