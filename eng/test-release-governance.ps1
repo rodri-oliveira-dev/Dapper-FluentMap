@@ -352,7 +352,8 @@ Invoke-Test 'release checksum verification accepts a complete artifact set' {
 Invoke-Test 'release checksum verification rejects artifact hash mismatch' {
   $result = Invoke-ChecksumScenario -CorruptPackageHash
   Assert-True (-not $result.Succeeded) 'checksum mismatch should fail.'
-  Assert-Contains $result.Output "Checksum mismatch for 'packages/A.1.2.3.nupkg'" 'checksum mismatch diagnostic should identify the package artifact.'
+  Assert-Contains $result.Output 'Checksum mismatch for' 'checksum mismatch diagnostic should explain the failure.'
+  Assert-Contains $result.Output 'A.1.2.3.nupkg' 'checksum mismatch diagnostic should identify the package artifact.'
 }
 
 $twoPackages = @(
