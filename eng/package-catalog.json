@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "1.0",
+  "packages": [
+    {
+      "project": "Dapper.FluentMap",
+      "projectPath": "src/Dapper.FluentMap/Dapper.FluentMap.csproj",
+      "packageId": "Dapper.FluentMap",
+      "assetKind": "library",
+      "symbols": true
+    },
+    {
+      "project": "Dapper.FluentMap.Dommel",
+      "projectPath": "src/Dapper.FluentMap.Dommel/Dapper.FluentMap.Dommel.csproj",
+      "packageId": "Dapper.FluentMap.Dommel",
+      "assetKind": "library",
+      "symbols": true
+    },
+    {
+      "project": "Dapper.FluentMap.DependencyInjection",
+      "projectPath": "src/Dapper.FluentMap.DependencyInjection/Dapper.FluentMap.DependencyInjection.csproj",
+      "packageId": "FluentMap.DependencyInjection",
+      "assetKind": "library",
+      "symbols": true
+    },
+    {
+      "project": "Dapper.FluentMap.Analyzers",
+      "projectPath": "src/Dapper.FluentMap.Analyzers/Dapper.FluentMap.Analyzers.csproj",
+      "packageId": "FluentMap.Analyzers",
+      "assetKind": "analyzer",
+      "symbols": false
+    },
+    {
+      "project": "Dapper.FluentMap.Generators",
+      "projectPath": "src/Dapper.FluentMap.Generators/Dapper.FluentMap.Generators.csproj",
+      "packageId": "FluentMap.Generators",
+      "assetKind": "analyzer",
+      "symbols": false
+    }
+  ]
+}
