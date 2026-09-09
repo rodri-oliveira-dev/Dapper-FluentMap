@@ -252,36 +252,6 @@ function Invoke-DotNetNuGetPush {
   }
 }
 
-function Wait-NuGetOrgPackageVisible {
-  param(
-    [string]$PackageId,
-    [string]$PackagePath
-  )
-
-  $url = Get-NuGetFlatContainerUrl -PackageId $PackageId -PackageVersion $Version
-  $maxAttempts = 60
-  $delaySeconds = 10
-
-  for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
-    $status = Get-HttpStatus -Uri $url
-    if ($status -eq '200') {
-      Assert-NuGetOrgPackageMatches -PackageId $PackageId -LocalPackagePath $PackagePath
-      return
-    }
-
-    if ($status -ne '404') {
-      Fail "Unexpected NuGet.org response HTTP $status while waiting for $PackageId $Version."
-    }
-
-    if ($attempt -lt $maxAttempts) {
-      Write-Output "NuGet.org: waiting for $PackageId $Version to become visible ($attempt/$maxAttempts); retrying in $delaySeconds seconds."
-      Start-Sleep -Seconds $delaySeconds
-    }
-  }
-
-  Fail "NuGet.org did not expose $PackageId $Version after publication within the 10-minute retry window."
-}
-
 function Wait-GitHubPackageVisible {
   param([string]$PackageId)
 
@@ -337,7 +307,7 @@ foreach ($package in $packages) {
 
   Invoke-DotNetNuGetPush -PackageId $packageId -PackagePath $packagePath
   if ($Registry -eq 'NuGetOrg') {
-    Wait-NuGetOrgPackageVisible -PackageId $packageId -PackagePath $packagePath
+    Write-Output "NuGet.org: accepted $packageId $Version for publication; validation and indexing continue asynchronously and will not block the remaining package set."
   }
   else {
     Wait-GitHubPackageVisible -PackageId $packageId
