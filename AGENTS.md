@@ -16,7 +16,7 @@ Agent work must be small, correct, reproducible, and compatible with existing pu
 | Publishing | Do not publish packages, create tags, create GitHub Releases, or run release/recovery workflows unless explicitly requested. |
 | Secrets | Never commit secrets, tokens, API keys, certificates, or credential material. |
 | Identity | Project name, project path, assembly name, C# namespace, and NuGet `PackageId` are independent identities. Never rename one merely because another changes; determine explicitly which identity the task intends to change. |
-| Targets | Public packages currently preserve `netstandard2.0`. Do not change targets, multi-targeting, SDK, nullable, AOT, analyzers, test framework, or Central Package Management as incidental work. |
+| Targets | Public packages currently preserve `netstandard2.0`. Do not change targets, multi-targeting, SDK, nullable, AOT, analyzers, test framework, or the repository's dependency-versioning model as incidental work. |
 | Dapper | Use public Dapper contracts only. Do not copy Dapper internals or assume unit metadata tests prove end-to-end Dapper materialization. |
 
 ## Repository Map
@@ -29,9 +29,10 @@ Agent work must be small, correct, reproducible, and compatible with existing pu
 | `src/Dapper.FluentMap.Analyzers/` | Roslyn analyzer package. |
 | `src/Dapper.FluentMap.Generators/` | Source generator package. |
 | `test/**` | Unit, integration, provider, analyzer/generator, DI, generated-registration, and AOT smoke tests. |
-| `benchmarks/**` | Benchmarks; not part of ordinary validation unless the task concerns performance. |
-| `eng/**` | Validation, release, rollback, Sonar, and consumer-smoke helper scripts. |
+| `benchmarks/**` | BenchmarkDotNet benchmarks; not part of ordinary validation unless the task concerns performance. |
+| `eng/**` | Validation, release, rollback, Sonar, package-catalog, and consumer-smoke helper scripts. |
 | `.github/workflows/**` | CI, release, release recovery, and Sonar automation. |
+| `.agents/skills/**` | Repository-local agent skills; load only those relevant to the current task. |
 
 Prefer `Dapper.FluentMap.slnx` for current SDK workflows; `Dapper.FluentMap.sln` remains a compatibility fallback.
 
@@ -60,7 +61,21 @@ Read `AGENTS.md` first. Load only the skills relevant to the current task; do no
 | Production/library/project/PackageId change | `dotnet-library-change` |
 | Behavior-preserving refactoring | `dotnet-refactoring-engineer` |
 | Pull request/diff review | `dotnet-pr-review` |
-| CI, packaging, NuGet, versioning, release or recovery | `ci-release-governance` |
+| CI, packaging, NuGet, versioning, release or recovery semantics | `ci-release-governance` |
+| GitHub Actions YAML authoring/structural validation | `authoring-github-workflows` |
+| NuGet.org OIDC/trusted-publishing review or diagnosis | `nuget-trusted-publishing` |
+| Find caller-visible behaviors existing tests would miss | `test-gap-analysis` |
+| BenchmarkDotNet/performance comparison | `microbenchmarking` |
+| `Directory.Build.*` / MSBuild organization | `directory-build-organization` |
+| Diagnose unclear MSBuild failures from `.binlog` | `binlog-failure-analysis` |
+
+Pair skills when concerns overlap. Examples:
+
+- release workflow change: `ci-release-governance` + `authoring-github-workflows`; add `nuget-trusted-publishing` when NuGet.org OIDC is involved;
+- performance-sensitive library change: `dotnet-library-change` + `microbenchmarking` when measurement is required;
+- implementation with uncertain test protection: implementation/refactoring skill + `test-gap-analysis`;
+- build-property refactor: `directory-build-organization` + `dotnet-library-change` when package/public compatibility can be affected;
+- opaque MSBuild failure: `binlog-failure-analysis`, then the relevant implementation/build skill once the cause is established.
 
 ## FluentMap Behavior Rules
 
@@ -92,7 +107,7 @@ This repository has global configuration paths through FluentMap, Dapper `SqlMap
 - Prefer immutable descriptors after configuration is complete.
 - Use structured cache keys that include every option affecting resolution, such as type, column name, profile, comparison, and naming policy.
 - Define and test cache invalidation when behavior can change after registration.
-- Restore global type maps/configuration in tests that mutate them.
+- Restore global type maps/configuration in tests and benchmarks that mutate them.
 
 ## Expressions And Reflection
 
@@ -109,12 +124,13 @@ Use the smallest test layer that protects the risk:
 | Provider-specific behavior | Provider compatibility tests; do not require external services for the default suite. |
 | Analyzer/generator behavior | Roslyn analyzer/generator tests. |
 | Packaging and consumer experience | Pack validation plus `eng/consumer-smoke/run-consumer-smoke.ps1` when relevant. |
+| Performance regression/optimization | Existing BenchmarkDotNet project with a controlled baseline; do not infer performance from unit-test duration. |
 
 Do not weaken tests to get a green suite: no unjustified `Skip`, removed asserts, sleeps, time/network coupling, order dependence, or over-mocking of FluentMap itself.
 
 ## Validation Commands
 
-Start with the closest validation. For documentation-only or agent-governance changes, prefer file existence, content searches, diff review, and targeted lint/format checks if available; do not run expensive build/test suites unless needed.
+Start with the closest validation. For documentation-only or agent-governance changes, prefer file existence, content searches, diff review, and targeted lint checks; do not run expensive build/test suites unless needed.
 
 Core baseline:
 
@@ -132,6 +148,14 @@ dotnet build ./Dapper.FluentMap.slnx --configuration Release --no-restore
 dotnet test ./Dapper.FluentMap.slnx --configuration Release --no-build
 ```
 
+Workflow validation when `.github/workflows/**` changes:
+
+```bash
+python -m check_jsonschema --builtin-schema vendor.github-workflows .github/workflows/*.yml
+```
+
+Use `authoring-github-workflows` for additional `actionlint` validation when structural/expression risk warrants it.
+
 Packaging baseline when package output, metadata, compatibility, or release is affected:
 
 ```bash
@@ -140,6 +164,13 @@ dotnet build ./Dapper.FluentMap.slnx --configuration Release --no-restore
 dotnet pack ./Dapper.FluentMap.slnx --configuration Release --no-build --output ./artifacts/packages
 ./eng/validate-package-metadata.ps1 -PackageDirectory './artifacts/packages'
 ./eng/validate-release-artifacts.ps1 -PackageDirectory './artifacts/packages' -Version <version> -ManifestPath './artifacts/release-metadata/artifact-manifest.json' -Repository <owner/repo> -RepositoryUrl <url> -Commit <sha> -Branch <ref>
+```
+
+Benchmark validation when performance is in scope:
+
+```bash
+dotnet build ./benchmarks/Dapper.FluentMap.Benchmarks/Dapper.FluentMap.Benchmarks.csproj --configuration Release
+dotnet run --project ./benchmarks/Dapper.FluentMap.Benchmarks/Dapper.FluentMap.Benchmarks.csproj --configuration Release --no-build -- --filter "*RelevantBenchmark*" --job Dry
 ```
 
 If the local SDK/runtime cannot run a required target, do not change project targets to work around the machine. Report the command, failure, and what remains unvalidated.
@@ -154,7 +185,9 @@ The repository currently publishes multiple NuGet packages:
 - `FluentMap.Analyzers`
 - `FluentMap.Generators`
 
-`eng/package-catalog.json` is the package identity catalog and separates project identity from NuGet `PackageId`. `Directory.Build.props` defines shared package metadata and `FluentMapPackageVersionPrefix` (currently `3.0.1`) with a local/dev suffix when no explicit version is supplied. `Directory.Build.targets` blocks unsafe historical package versions. Release behavior lives in the actual workflows under `.github/workflows/`; inspect them before changing or documenting release behavior.
+`eng/package-catalog.json` is the package identity catalog and separates project identity from NuGet `PackageId`. `Directory.Build.props` defines shared package metadata and `FluentMapPackageVersionPrefix` (currently `3.0.1`) with a local/dev suffix when no explicit version is supplied. The repository currently uses explicit `PackageReference` versions rather than Central Package Management. `Directory.Build.targets` blocks unsafe historical package versions. Release behavior lives in the actual workflows under `.github/workflows/`; inspect them before changing or documenting release behavior.
+
+NuGet.org publishing uses OIDC Trusted Publishing through `NuGet/login`, a protected `release` environment, and job-scoped `id-token: write`. Preserve this model; do not introduce a long-lived NuGet API key as a shortcut.
 
 Package or release changes require compatibility, provenance, artifact-set, rollback/recovery, and SemVer review. Do not alter PackageIds, versioning, authors, license, URLs, README/icon packaging, Source Link/provenance, or NuGet metadata without explicit scope.
 

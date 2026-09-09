@@ -1,0 +1,39 @@
+# Third-Party Notices for Agent Skills
+
+Portions of the agent skills under `.agents/skills/` are adapted from the .NET team's `dotnet/skills` repository:
+
+- Source: https://github.com/dotnet/skills
+- Source revision used for this import: `c4a3f7ad4fd8fb50c02a42a6375c0aba4f92e9f7`
+- Imported/adapted skills in this change:
+  - `authoring-github-workflows`
+  - `nuget-trusted-publishing`
+  - `test-gap-analysis`
+  - `microbenchmarking`
+  - `directory-build-organization`
+  - `binlog-failure-analysis`
+
+The imported material is licensed under the MIT License:
+
+> The MIT License (MIT)
+>
+> Copyright (c) .NET Foundation and Contributors
+>
+> Permission is hereby granted, free of charge, to any person obtaining a copy
+> of this software and associated documentation files (the "Software"), to deal
+> in the Software without restriction, including without limitation the rights
+> to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+> copies of the Software, and to permit persons to whom the Software is
+> furnished to do so, subject to the following conditions:
+>
+> The above copyright notice and this permission notice shall be included in all
+> copies or substantial portions of the Software.
+>
+> THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+> IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+> FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+> AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+> LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+> OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+> SOFTWARE.
+
+The local copies are adapted to Dapper-FluentMap's `AGENTS.md`, public-library compatibility rules, existing explicit dependency-versioning model, multi-package release/recovery flow, SHA-pinned GitHub Actions, and deterministic validation policies.
