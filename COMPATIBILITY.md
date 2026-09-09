@@ -8,11 +8,13 @@ This document describes what is currently validated by this repository. It avoid
 | --- | --- | --- |
 | `Dapper.FluentMap` | `netstandard2.0` | Core package. |
 | `Dapper.FluentMap.Dommel` | `netstandard2.0` | Optional Dommel integration. |
-| `Dapper.FluentMap.DependencyInjection` | `netstandard2.0` | Optional DI integration. |
-| `Dapper.FluentMap.Analyzers` | `netstandard2.0` | Roslyn analyzer package. |
-| `Dapper.FluentMap.Generators` | `netstandard2.0` | Roslyn source generator package. |
+| `FluentMap.DependencyInjection` | `netstandard2.0` | Optional DI integration. |
+| `FluentMap.Analyzers` | `netstandard2.0` | Roslyn analyzer package. |
+| `FluentMap.Generators` | `netstandard2.0` | Roslyn source generator package. |
 
 Tests, provider compatibility tests, AOT smoke projects and benchmarks currently run on `net10.0`. That does not raise the minimum TFM for consumers.
+
+The `FluentMap.*` PackageIds are NuGet distribution identities. Assemblies and namespaces remain under `Dapper.FluentMap.*` for source and binary compatibility.
 
 ## Dapper
 

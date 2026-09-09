@@ -150,11 +150,11 @@ The repository currently publishes multiple NuGet packages:
 
 - `Dapper.FluentMap`
 - `Dapper.FluentMap.Dommel`
-- `Dapper.FluentMap.DependencyInjection`
-- `Dapper.FluentMap.Analyzers`
-- `Dapper.FluentMap.Generators`
+- `FluentMap.DependencyInjection`
+- `FluentMap.Analyzers`
+- `FluentMap.Generators`
 
-`Directory.Build.props` defines shared package metadata and `FluentMapPackageVersionPrefix` (currently `3.0.0`) with a local/dev suffix when no explicit version is supplied. `Directory.Build.targets` blocks unsafe historical package versions. Release behavior lives in the actual workflows under `.github/workflows/`; inspect them before changing or documenting release behavior.
+`eng/package-catalog.json` is the package identity catalog and separates project identity from NuGet `PackageId`. `Directory.Build.props` defines shared package metadata and `FluentMapPackageVersionPrefix` (currently `3.0.1`) with a local/dev suffix when no explicit version is supplied. `Directory.Build.targets` blocks unsafe historical package versions. Release behavior lives in the actual workflows under `.github/workflows/`; inspect them before changing or documenting release behavior.
 
 Package or release changes require compatibility, provenance, artifact-set, rollback/recovery, and SemVer review. Do not alter PackageIds, versioning, authors, license, URLs, README/icon packaging, Source Link/provenance, or NuGet metadata without explicit scope.
 

@@ -45,9 +45,11 @@ Install only the packages you use:
 | --- | --- |
 | `Dapper.FluentMap` | Core mapping and Dapper integration. |
 | `Dapper.FluentMap.Dommel` | Dommel table/key/generated-column integration. |
-| `Dapper.FluentMap.DependencyInjection` | DI registration of immutable configuration and runtime. |
-| `Dapper.FluentMap.Analyzers` | Compile-time diagnostics for mapping mistakes. |
-| `Dapper.FluentMap.Generators` | Generated registration and supported generated materializers. |
+| `FluentMap.DependencyInjection` | DI registration of immutable configuration and runtime. |
+| `FluentMap.Analyzers` | Compile-time diagnostics for mapping mistakes. |
+| `FluentMap.Generators` | Generated registration and supported generated materializers. |
+
+The three `FluentMap.*` PackageIds replace the unpublished `Dapper.FluentMap.DependencyInjection`, `Dapper.FluentMap.Analyzers` and `Dapper.FluentMap.Generators` distribution identities. This is not a namespace, assembly or API rename; keep existing `using Dapper.FluentMap.*` directives.
 
 ## Initialize
 
@@ -212,7 +214,7 @@ Write converter metadata exists, but Dapper/Dommel writes do not execute it yet.
 
 ## Generated Registration
 
-Install `Dapper.FluentMap.Generators` and call:
+Install `FluentMap.Generators` and call:
 
 ```csharp
 config.AddGeneratedMappings();
@@ -239,7 +241,7 @@ This isolates FluentMap-controlled materialization. It does not isolate normal `
 
 ## DI
 
-Install `Dapper.FluentMap.DependencyInjection` and register:
+Install `FluentMap.DependencyInjection` and register:
 
 ```csharp
 services.AddFluentMap(builder =>

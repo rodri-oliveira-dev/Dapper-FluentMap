@@ -8,11 +8,15 @@ The historical archived package history is not reconstructed here. This changelo
 
 ### Added
 
+- ADR Guard local tooling and ADR documentation for the NuGet PackageId architecture decision.
+- A package catalog under `eng/package-catalog.json` as the authoritative distribution package inventory.
 - Public adoption documentation for README, migration, compatibility and support policy.
 - Release candidate readiness checklist under `.sdd/etapa-12/`.
 
 ### Changed
 
+- The new Dependency Injection, analyzer and generator NuGet PackageIds are now `FluentMap.DependencyInjection`, `FluentMap.Analyzers` and `FluentMap.Generators`. Project names, assemblies, namespaces and public APIs remain `Dapper.FluentMap.*`.
+- Release and recovery automation now distinguish package-version existence from publisher authorization, validate existing NuGet.org artifacts before accepting them and publish only genuinely missing packages.
 - README is now a concise bilingual entrypoint and delegates detailed release/adoption policy to dedicated documents.
 
 ## [3.0.0-rc.1] - Unreleased
@@ -32,7 +36,7 @@ Release candidate status: ready for publication qualification. The date remains
 
 ### Changed
 
-- Release versioning is hardened so default local pack produces `3.0.0-dev`, not historical `2.0.0` or accidental stable `3.0.0`.
+- Release versioning is hardened so default local pack produces `3.0.1-dev`, not historical `2.0.0` or accidental stable `3.0.0`.
 - Release workflow uses an explicit validated package version for RC artifacts.
 - Public mapping configuration can now be isolated through immutable configuration/runtime APIs while the legacy global facade remains available.
 - Dommel integration honors the new persistence metadata for supported write scenarios.
@@ -60,8 +64,8 @@ Release candidate status: ready for publication qualification. The date remains
 - Pin all FluentMap packages to the exact same prerelease version: `3.0.0-rc.1`.
 - Keep existing global `FluentMapper.Initialize` usage when source compatibility is the priority.
 - Prefer `FluentMapConfigurationBuilder` and `FluentMapRuntime` for new isolated configurations or DI-based composition.
-- Add `Dapper.FluentMap.DependencyInjection` only when using `Microsoft.Extensions.DependencyInjection`.
-- Add `Dapper.FluentMap.Analyzers` and `Dapper.FluentMap.Generators` as analyzer/compiler packages; they should not be consumed as runtime libraries.
+- Add `FluentMap.DependencyInjection` only when using `Microsoft.Extensions.DependencyInjection`.
+- Add `FluentMap.Analyzers` and `FluentMap.Generators` as analyzer/compiler packages; they should not be consumed as runtime libraries.
 - For Dommel, keep using `Dapper.FluentMap.Dommel` and verify key/default/computed/read-only metadata against real write scenarios before promoting from RC.
 
 ### Known Limitations

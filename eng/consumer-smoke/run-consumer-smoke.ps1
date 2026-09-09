@@ -3,20 +3,18 @@ param(
   [string]$RepositoryRoot,
   [string]$RemoteArtifactDirectory,
   [string]$PackageDirectory,
+  [string]$PackageVersion,
   [switch]$SkipTrimPublish
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$packageVersion = '3.0.0-rc.1'
-$expectedPackageIds = @(
-  'Dapper.FluentMap',
-  'Dapper.FluentMap.Dommel',
-  'Dapper.FluentMap.DependencyInjection',
-  'Dapper.FluentMap.Analyzers',
-  'Dapper.FluentMap.Generators'
-)
+Import-Module (Join-Path $PSScriptRoot '../PackageCatalog.psm1') -Force
+
+$packageVersion = if ([string]::IsNullOrWhiteSpace($PackageVersion)) { '3.0.1' } else { $PackageVersion }
+$catalogPackages = @(Get-FluentMapPackages)
+$expectedPackageIds = @($catalogPackages | ForEach-Object { [string]$_.packageId })
 
 function Fail {
   param([string]$Message)
@@ -188,6 +186,7 @@ function Write-NuGetConfig {
     <packageSource key="rc-artifacts">
       <package pattern="Dapper.FluentMap" />
       <package pattern="Dapper.FluentMap.*" />
+      <package pattern="FluentMap.*" />
     </packageSource>
     <packageSource key="nuget.org">
       <package pattern="Dapper" />
@@ -246,7 +245,7 @@ function Assert-RestoredPackages {
   }
 
   $wrongFluentMapVersions = @($libraryNames | Where-Object {
-      $_ -match '^Dapper\.FluentMap(\..*)?/' -and $_ -notmatch "/$([regex]::Escape($packageVersion))$"
+      $_ -match '^(Dapper\.FluentMap(\..*)?|FluentMap\..*)/' -and $_ -notmatch "/$([regex]::Escape($packageVersion))$"
     })
   if ($wrongFluentMapVersions.Count -gt 0) {
     Fail "$ProjectPath restored unexpected FluentMap versions: $($wrongFluentMapVersions -join ', ')."
@@ -262,7 +261,7 @@ function Assert-RestoredPackages {
     Fail "$ProjectPath restored project libraries: $($projectLibraries.Name -join ', ')."
   }
 
-  foreach ($analyzerId in @('Dapper.FluentMap.Analyzers', 'Dapper.FluentMap.Generators')) {
+  foreach ($analyzerId in @($catalogPackages | Where-Object { $_.assetKind -eq 'analyzer' } | ForEach-Object { [string]$_.packageId })) {
     $targetLibraryNames = @(
       foreach ($target in $assets.targets.PSObject.Properties) {
         foreach ($library in $target.Value.PSObject.Properties) {
@@ -349,7 +348,7 @@ function Invoke-DotNetForProject {
 $repoRoot = Get-RepoRoot
 $artifactFiles = @{}
 if ([string]::IsNullOrWhiteSpace($PackageDirectory)) {
-  $releaseDirectory = Join-Path $repoRoot '.sdd/release-3.0.0-rc.1'
+  $releaseDirectory = Join-Path $repoRoot '.sdd/release-3.0.1'
   $manifestPath = Join-Path $releaseDirectory 'artifacts.json'
   if (-not (Test-Path -LiteralPath $manifestPath)) {
     Fail "Manifest not found at '$manifestPath'."
@@ -361,7 +360,7 @@ if ([string]::IsNullOrWhiteSpace($PackageDirectory)) {
   }
 
   $remoteRoot = if ([string]::IsNullOrWhiteSpace($RemoteArtifactDirectory)) {
-    Join-Path $repoRoot 'artifacts/release-3.0.0-rc.1/remote'
+    Join-Path $repoRoot 'artifacts/release-3.0.1/remote'
   }
   else {
     $RemoteArtifactDirectory
@@ -414,12 +413,12 @@ $projects = @(
   [pscustomobject]@{
     Name = 'GeneratorAnalyzerConsumer'
     Path = Join-Path $PSScriptRoot 'GeneratorAnalyzerConsumer/GeneratorAnalyzerConsumer.csproj'
-    Packages = @('Dapper.FluentMap', 'Dapper.FluentMap.Analyzers', 'Dapper.FluentMap.Generators')
+    Packages = @('Dapper.FluentMap', 'FluentMap.Analyzers', 'FluentMap.Generators')
   },
   [pscustomobject]@{
     Name = 'DIConsumer'
     Path = Join-Path $PSScriptRoot 'DIConsumer/DIConsumer.csproj'
-    Packages = @('Dapper.FluentMap', 'Dapper.FluentMap.DependencyInjection', 'Dapper.FluentMap.Generators')
+    Packages = @('Dapper.FluentMap', 'FluentMap.DependencyInjection', 'FluentMap.Generators')
   },
   [pscustomobject]@{
     Name = 'DommelConsumer'
@@ -474,7 +473,7 @@ Invoke-DotNetForProject `
   -LogPath (Join-Path $logsDirectory 'AnalyzerDiagnosticConsumer.restore.log') | Out-Null
 Assert-RestoredPackages `
   -ProjectPath $analyzerDiagnosticProject `
-  -ExpectedFluentMapPackages @('Dapper.FluentMap', 'Dapper.FluentMap.Analyzers') `
+  -ExpectedFluentMapPackages @('Dapper.FluentMap', 'FluentMap.Analyzers') `
   -PackagesDirectory $packagesDirectory
 
 $diagnosticResult = Invoke-DotNetForProject `
@@ -508,7 +507,7 @@ if (-not $SkipTrimPublish) {
       -ExtraArguments @('--runtime', $rid) | Out-Null
 
     $trimExpectedPackages = if ($trimProjectName -eq 'TrimGeneratedConsumer') {
-      @('Dapper.FluentMap', 'Dapper.FluentMap.Generators')
+      @('Dapper.FluentMap', 'FluentMap.Generators')
     }
     else {
       @('Dapper.FluentMap')

@@ -1,12 +1,14 @@
-# Dapper.FluentMap.Generators
+# FluentMap.Generators
 
 Build-time source generator for Dapper.FluentMap mapping registration and supported row materializers.
 
 The generator discovers eligible `IEntityMap<TEntity>` implementations declared in the current compilation and emits an `AddGeneratedMappings()` extension method that registers them through the existing `AddMap<TMap>()` / `AddProfile<TMap>()` APIs. For explicit maps with literal columns and supported deterministic construction, it also registers generated `IDataRecord -> entity` materializers for the matching ordered column shape, including flat properties, nested object paths and constructor-built Value Objects.
 
 ```bash
-dotnet add package Dapper.FluentMap.Generators
+dotnet add package FluentMap.Generators
 ```
+
+The NuGet PackageId is `FluentMap.Generators`. The source-generator assembly remains `Dapper.FluentMap.Generators.dll`.
 
 ```csharp
 using Dapper.FluentMap;

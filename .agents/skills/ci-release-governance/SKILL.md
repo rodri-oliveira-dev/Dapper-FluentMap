@@ -18,7 +18,7 @@ Inspect `.github/workflows/` and relevant `eng/**` scripts before assuming any a
 - `ci.yml` runs on pushes to `master`, pull requests, and manual dispatch.
 - `release.yml` is manual (`workflow_dispatch`) and rejects releases not started from `master`.
 - `release.yml` validates a SemVer input without `v`, rejects versions below major `3`, checks existing tags, checks NuGet availability for all published package IDs, builds/tests/packs, validates artifacts, runs consumer smoke tests, creates a tag, publishes to NuGet.org and GitHub Packages, creates/updates a GitHub Release, and runs rollback on partial failure.
-- `release-recovery-missing-nuget.yml` is a one-off recovery workflow for missing NuGet.org `3.0.0` packages from a fixed commit. Do not generalize it without explicit release-recovery scope.
+- `release-recovery-missing-nuget.yml` recovers future partial NuGet.org publication by rebuilding the validated commit, validating artifacts, accepting only an existing tag that points to that commit, and publishing only package versions that are genuinely missing.
 - `sonar-quality-issues.yml` syncs high-impact Sonar findings to GitHub issues when `SONAR_CI_ENABLED` and `SONAR_TOKEN` are configured.
 - Package validation scripts live under `eng/`: `validate-slnx-equivalence.ps1`, `validate-package-metadata.ps1`, `validate-release-artifacts.ps1`, `run-sonar-tests.ps1`, `rollback-release.ps1`, and consumer smoke scripts.
 
@@ -44,9 +44,9 @@ Inspect `.github/workflows/` and relevant `eng/**` scripts before assuming any a
 3. Preserve the real package set unless the task explicitly changes it:
    - `Dapper.FluentMap`
    - `Dapper.FluentMap.Dommel`
-   - `Dapper.FluentMap.DependencyInjection`
-   - `Dapper.FluentMap.Analyzers`
-   - `Dapper.FluentMap.Generators`
+   - `FluentMap.DependencyInjection`
+   - `FluentMap.Analyzers`
+   - `FluentMap.Generators`
 4. Preserve one effective release version source per flow. `Directory.Build.props` defines `FluentMapPackageVersionPrefix`; release passes the requested version through MSBuild `Version`.
 5. Preserve validation order: restore, audit when applicable, build, test, pack, validate artifacts, smoke test when relevant, then tag/publish/release.
 6. Preserve minimum required permissions; avoid broad write permissions.

@@ -25,7 +25,7 @@ Guide small, safe changes to this public multi-package .NET library while preser
 # Process
 
 1. Read root `AGENTS.md` and the files directly related to the requested change.
-2. Identify the affected package(s): `Dapper.FluentMap`, `Dapper.FluentMap.Dommel`, `Dapper.FluentMap.DependencyInjection`, `Dapper.FluentMap.Analyzers`, or `Dapper.FluentMap.Generators`.
+2. Identify the affected package(s): `Dapper.FluentMap`, `Dapper.FluentMap.Dommel`, `FluentMap.DependencyInjection`, `FluentMap.Analyzers`, or `FluentMap.Generators`.
 3. Determine whether the change affects public API, source/binary/behavior compatibility, target frameworks, dependency ranges, Dapper/Dommel integration, global state/cache, package output, or documentation.
 4. Preserve independent identities: project name, path, assembly name, namespace, and NuGet `PackageId` are not interchangeable.
 5. Implement the smallest coherent change using existing project patterns.
@@ -42,9 +42,9 @@ Guide small, safe changes to this public multi-package .NET library while preser
 - Package IDs currently include:
   - `Dapper.FluentMap`
   - `Dapper.FluentMap.Dommel`
-  - `Dapper.FluentMap.DependencyInjection`
-  - `Dapper.FluentMap.Analyzers`
-  - `Dapper.FluentMap.Generators`
+  - `FluentMap.DependencyInjection`
+  - `FluentMap.Analyzers`
+  - `FluentMap.Generators`
 - Dependency versions are declared where the current project files declare them; this repository does not currently use Central Package Management.
 - `Dapper.FluentMap.slnx` is preferred for current SDK validation; `Dapper.FluentMap.sln` remains a compatibility fallback.
 

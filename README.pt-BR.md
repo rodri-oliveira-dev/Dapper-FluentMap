@@ -69,17 +69,23 @@ Não use FluentMap como ORM, framework CRUD, query builder, unit of work ou abst
 
 Instale o pacote que corresponde ao recurso necessário:
 
-| Pacote | Finalidade |
+| Finalidade do pacote | NuGet PackageId |
 | --- | --- |
-| `Dapper.FluentMap` | API core de mapping e integração com Dapper. |
-| `Dapper.FluentMap.Dommel` | Integração opcional com Dommel para tabela, chave e colunas geradas. |
-| `Dapper.FluentMap.DependencyInjection` | Integração opcional com `Microsoft.Extensions.DependencyInjection`. |
-| `Dapper.FluentMap.Analyzers` | Analyzers Roslyn para erros de configuração prováveis em tempo de compilação. |
-| `Dapper.FluentMap.Generators` | Source generator para registro de maps e materializadores gerados. |
+| Core | `Dapper.FluentMap` |
+| Integração Dommel | `Dapper.FluentMap.Dommel` |
+| Dependency Injection | `FluentMap.DependencyInjection` |
+| Analyzers Roslyn | `FluentMap.Analyzers` |
+| Source generators | `FluentMap.Generators` |
 
 ```bash
 dotnet add package Dapper.FluentMap
+dotnet add package Dapper.FluentMap.Dommel
+dotnet add package FluentMap.DependencyInjection
+dotnet add package FluentMap.Analyzers
+dotnet add package FluentMap.Generators
 ```
+
+Os PackageIds `FluentMap.*` são apenas identidades de distribuição. Eles não renomeiam assemblies, namespaces C# ou APIs públicas existentes.
 
 Os pacotes públicos targetam `netstandard2.0`. Consulte [COMPATIBILITY.md](COMPATIBILITY.md) antes de adotar um release candidate.
 
@@ -268,10 +274,10 @@ Profiles são selecionados por query controlada pelo FluentMap. Eles não substi
 
 ## Materialização Gerada
 
-Instale `Dapper.FluentMap.Generators` para registro gerado de maps da compilação atual:
+Instale `FluentMap.Generators` para registro gerado de maps da compilação atual:
 
 ```bash
-dotnet add package Dapper.FluentMap.Generators
+dotnet add package FluentMap.Generators
 ```
 
 Depois chame a extensão gerada:
@@ -414,7 +420,11 @@ var customer = runtime.QueryMappedSingle<Customer>(
     "SELECT 7 AS customer_id, 'Ada' AS Name;");
 ```
 
-Instale `Dapper.FluentMap.DependencyInjection` para registro em DI:
+Instale `FluentMap.DependencyInjection` para registro em DI:
+
+```bash
+dotnet add package FluentMap.DependencyInjection
+```
 
 ```csharp
 using Microsoft.Extensions.DependencyInjection;
