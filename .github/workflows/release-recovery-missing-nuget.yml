@@ -466,6 +466,59 @@ jobs:
           git push origin "refs/tags/$RELEASE_TAG"
           echo "Git tag: restored $RELEASE_TAG to validated commit $VALIDATED_COMMIT."
 
+      - name: Write recovery attestation verification metadata
+        shell: pwsh
+        env:
+          SOURCE_TYPE: ${{ steps.source.outputs.source_type }}
+          RESOLVED_REF: ${{ steps.source.outputs.resolved_ref }}
+          RESOLVED_BRANCH: ${{ steps.source.outputs.resolved_branch }}
+          RESOLVED_TAG: ${{ steps.source.outputs.resolved_tag }}
+          PACKAGE_VERSION: ${{ steps.source.outputs.resolved_version }}
+          VALIDATED_COMMIT: ${{ steps.source.outputs.resolved_commit }}
+          RELEASE_TAG: ${{ steps.source.outputs.release_tag }}
+          ARTIFACT_SOURCE: ${{ steps.artifact-source.outputs.source }}
+          WORKFLOW_COMMIT: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path './artifacts/release-metadata' | Out-Null
+
+          $artifactRoot = (Resolve-Path './artifacts').Path
+          $subjectFiles = @(
+            Get-ChildItem './artifacts/packages' -File |
+              Where-Object { $_.Extension -in @('.nupkg', '.snupkg') }
+            Get-ChildItem './artifacts/release-metadata' -File |
+              Where-Object { $_.Name -ne 'recovery-attestation.json' }
+          ) | Sort-Object FullName
+
+          $subjects = foreach ($file in $subjectFiles) {
+            [ordered]@{
+              path = [System.IO.Path]::GetRelativePath($artifactRoot, $file.FullName).Replace('\', '/')
+              sha256 = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            }
+          }
+
+          $metadata = [ordered]@{
+            schemaVersion = '1.0'
+            purpose = 'release-recovery-attestation-verification'
+            sourceType = $env:SOURCE_TYPE
+            resolvedRef = $env:RESOLVED_REF
+            resolvedBranch = $env:RESOLVED_BRANCH
+            resolvedTag = $env:RESOLVED_TAG
+            releaseTag = $env:RELEASE_TAG
+            packageVersion = $env:PACKAGE_VERSION
+            validatedCommit = $env:VALIDATED_COMMIT
+            workflowCommit = $env:WORKFLOW_COMMIT
+            artifactSource = $env:ARTIFACT_SOURCE
+            runId = $env:RUN_ID
+            runAttempt = $env:RUN_ATTEMPT
+            subjects = @($subjects)
+          }
+
+          $metadata | ConvertTo-Json -Depth 8 |
+            Set-Content -LiteralPath './artifacts/release-metadata/recovery-attestation.json' -Encoding utf8NoBOM
+
       - name: Create or update GitHub Release
         shell: bash
         env:
@@ -491,6 +544,10 @@ jobs:
           expected_assets_file="$(mktemp)"
           actual_assets_file="$(mktemp)"
           printf '%s\n' "${assets[@]##*/}" | sort -u > "$expected_assets_file"
+          expected_prerelease=false
+          if [[ "$PACKAGE_VERSION" == *-* ]]; then
+            expected_prerelease=true
+          fi
 
           refresh_actual_assets() {
             gh release view "$RELEASE_TAG" \
@@ -511,6 +568,32 @@ jobs:
             done
           }
 
+          normalize_release_metadata() {
+            metadata_args=(--title "$RELEASE_TAG" --draft=false)
+            if [[ "$expected_prerelease" == "true" ]]; then
+              metadata_args+=(--prerelease=true)
+            else
+              metadata_args+=(--prerelease=false)
+            fi
+
+            gh release edit "$RELEASE_TAG" --repo "$GH_REPO" "${metadata_args[@]}"
+          }
+
+          verify_release_metadata() {
+            release_metadata="$(
+              gh release view "$RELEASE_TAG" \
+                --repo "$GH_REPO" \
+                --json tagName,name,isDraft,isPrerelease \
+                --jq '[.tagName, .name, (.isDraft | tostring), (.isPrerelease | tostring)] | @tsv'
+            )"
+
+            IFS=$'\t' read -r actual_tag actual_name actual_draft actual_prerelease <<< "$release_metadata"
+            if [[ "$actual_tag" != "$RELEASE_TAG" || "$actual_name" != "$RELEASE_TAG" || "$actual_draft" != "false" || "$actual_prerelease" != "$expected_prerelease" ]]; then
+              echo "::error::GitHub Release '$RELEASE_TAG' metadata does not match governed state. Expected title=$RELEASE_TAG draft=false prerelease=$expected_prerelease; got tag=$actual_tag title=$actual_name draft=$actual_draft prerelease=$actual_prerelease."
+              exit 1
+            fi
+          }
+
           verify_governed_release_assets() {
             refresh_actual_assets
             if ! diff -u "$expected_assets_file" "$actual_assets_file"; then
@@ -520,14 +603,16 @@ jobs:
           }
 
           release_args=(--verify-tag --generate-notes --title "$RELEASE_TAG")
-          if [[ "$PACKAGE_VERSION" == *-* ]]; then
+          if [[ "$expected_prerelease" == "true" ]]; then
             release_args+=(--prerelease)
           fi
 
           if gh release view "$RELEASE_TAG" --repo "$GH_REPO" >/dev/null 2>&1; then
             echo "GitHub Release '$RELEASE_TAG' already exists; refreshing governed release artifacts."
+            normalize_release_metadata
             delete_unexpected_release_assets
             gh release upload "$RELEASE_TAG" "${assets[@]}" --repo "$GH_REPO" --clobber
+            verify_release_metadata
             verify_governed_release_assets
             exit 0
           fi
@@ -536,6 +621,7 @@ jobs:
             "${assets[@]}" \
             --repo "$GH_REPO" \
             "${release_args[@]}"
+          verify_release_metadata
           verify_governed_release_assets
 
       - name: Attest recovered release artifacts
@@ -546,6 +632,7 @@ jobs:
             ./artifacts/packages/*.snupkg
             ./artifacts/release-metadata/artifact-manifest.json
             ./artifacts/release-metadata/dependencies.json
+            ./artifacts/release-metadata/recovery-attestation.json
             ./artifacts/release-metadata/SHA256SUMS
 
       - name: Final release reconciliation summary
@@ -554,6 +641,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ steps.source.outputs.release_tag }}
+          PACKAGE_VERSION: ${{ steps.source.outputs.resolved_version }}
           VALIDATED_COMMIT: ${{ steps.source.outputs.resolved_commit }}
           ARTIFACT_SOURCE: ${{ steps.artifact-source.outputs.source }}
         run: |
@@ -567,6 +655,15 @@ jobs:
           & gh release view $env:RELEASE_TAG --repo $env:GH_REPO *> $null
           if ($LASTEXITCODE -ne 0) {
             throw "Final reconciliation failed: GitHub Release $env:RELEASE_TAG is absent."
+          }
+
+          $releaseState = & gh release view $env:RELEASE_TAG --repo $env:GH_REPO --json tagName,name,isDraft,isPrerelease | ConvertFrom-Json
+          $expectedPrerelease = $env:PACKAGE_VERSION.Contains('-')
+          if ([string]$releaseState.tagName -ne $env:RELEASE_TAG -or
+              [string]$releaseState.name -ne $env:RELEASE_TAG -or
+              [bool]$releaseState.isDraft -or
+              [bool]$releaseState.isPrerelease -ne $expectedPrerelease) {
+            throw "Final reconciliation failed: GitHub Release $env:RELEASE_TAG metadata does not match governed state."
           }
 
           $expectedReleaseAssets = @(
@@ -600,6 +697,6 @@ jobs:
           Write-Host 'NuGet.org symbol packages: submitted via NuGet.org V3 tooling; NuGet.org exposes no public .snupkg content-comparison endpoint'
           Write-Host 'GitHub Packages: complete'
           Write-Host "Git tag: correct ($env:RELEASE_TAG)"
-          Write-Host 'GitHub Release assets: exact governed set'
-          Write-Host 'attestations: recreated for recovered release artifacts by this workflow'
+          Write-Host 'GitHub Release metadata and assets: exact governed state'
+          Write-Host "attestations: recreated for recovered release artifacts with validated commit metadata ($env:VALIDATED_COMMIT)"
           Write-Host 'Release recovery completed and governed release state reconciled.'

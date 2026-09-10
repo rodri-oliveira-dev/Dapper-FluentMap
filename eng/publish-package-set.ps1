@@ -57,6 +57,19 @@ function Get-NuGetFlatContainerUrl {
   return "https://api.nuget.org/v3-flatcontainer/$idLower/$versionLower/$idLower.$versionLower.nupkg"
 }
 
+function Get-NuGetPackageContentUrl {
+  param(
+    [string]$PackageBaseAddress,
+    [string]$PackageId,
+    [string]$PackageVersion
+  )
+
+  $baseAddress = $PackageBaseAddress.TrimEnd('/')
+  $idLower = $PackageId.ToLowerInvariant()
+  $versionLower = $PackageVersion.ToLowerInvariant()
+  return "$baseAddress/$idLower/$versionLower/$idLower.$versionLower.nupkg"
+}
+
 function Get-HttpStatus {
   param([string]$Uri)
 
@@ -80,6 +93,74 @@ function Get-HttpStatus {
   }
 
   return $status
+}
+
+function Invoke-CurlDownload {
+  param(
+    [string]$Uri,
+    [string]$OutputPath,
+    [switch]$Authenticated
+  )
+
+  $arguments = @(
+    '--fail-with-body'
+    '--silent'
+    '--show-error'
+    '--location'
+    '--proto'
+    '=https'
+    '--proto-redir'
+    '=https'
+    '--retry'
+    '3'
+    '--retry-delay'
+    '2'
+    '--retry-all-errors'
+    '--connect-timeout'
+    '10'
+    '--max-time'
+    '60'
+    '--output'
+    $OutputPath
+  )
+
+  if ($Authenticated) {
+    if ([string]::IsNullOrWhiteSpace($GitHubToken)) {
+      Fail 'GitHubToken is required to download existing GitHub Packages artifacts for content comparison.'
+    }
+
+    $arguments += @('--header', "Authorization: Bearer $GitHubToken")
+  }
+
+  $arguments += $Uri
+  & $curlCommand @arguments
+}
+
+function Get-AuthenticatedNuGetPackageBaseAddress {
+  if ([string]::IsNullOrWhiteSpace($Source)) {
+    Fail 'Package source is required to resolve the authenticated NuGet package content endpoint.'
+  }
+
+  $serviceIndexPath = Join-Path ([System.IO.Path]::GetTempPath()) "$([System.Guid]::NewGuid()).json"
+  try {
+    Invoke-CurlDownload -Uri $Source -OutputPath $serviceIndexPath -Authenticated
+    if ($LASTEXITCODE -ne 0) {
+      Fail "Unable to download NuGet service index '$Source'."
+    }
+
+    $serviceIndex = Get-Content -LiteralPath $serviceIndexPath -Raw | ConvertFrom-Json
+    $resource = @($serviceIndex.resources | Where-Object { [string]$_.'@type' -eq 'PackageBaseAddress/3.0.0' } | Select-Object -First 1)
+    if ($resource.Count -ne 1 -or [string]::IsNullOrWhiteSpace([string]$resource[0].'@id')) {
+      Fail "NuGet service index '$Source' does not expose a PackageBaseAddress/3.0.0 resource for content comparison."
+    }
+
+    return [string]$resource[0].'@id'
+  }
+  finally {
+    if (Test-Path -LiteralPath $serviceIndexPath) {
+      Remove-Item -LiteralPath $serviceIndexPath -Force
+    }
+  }
 }
 
 function Test-IsRepositorySignatureEntry {
@@ -129,7 +210,8 @@ function Assert-NuGetPackagesHaveSameContent {
   param(
     [string]$PackageId,
     [string]$LocalPackagePath,
-    [string]$DownloadedPackagePath
+    [string]$DownloadedPackagePath,
+    [string]$RegistryLabel = $Registry
   )
 
   $localEntries = Get-NuGetPackageEntryHashes -PackagePath $LocalPackagePath
@@ -159,7 +241,40 @@ function Assert-NuGetPackagesHaveSameContent {
       $details += "changed entries: $($changedEntries -join ', ')"
     }
 
-    Fail "NuGet.org already has $PackageId $Version, but the downloaded package content does not match the local artifact ($($details -join '; ')). Refusing to mask an artifact mismatch."
+    Fail "$RegistryLabel already has $PackageId $Version, but the downloaded package content does not match the local artifact ($($details -join '; ')). Refusing to mask an artifact mismatch."
+  }
+}
+
+function Assert-RemotePackageMatches {
+  param(
+    [string]$PackageId,
+    [string]$LocalPackagePath,
+    [string]$PackageUrl,
+    [string]$RegistryLabel,
+    [switch]$Authenticated
+  )
+
+  $downloadPath = Join-Path ([System.IO.Path]::GetTempPath()) "$([System.Guid]::NewGuid()).nupkg"
+
+  try {
+    Invoke-CurlDownload -Uri $PackageUrl -OutputPath $downloadPath -Authenticated:$Authenticated
+
+    if ($LASTEXITCODE -ne 0) {
+      Fail "Unable to download existing $RegistryLabel package $PackageId $Version for artifact comparison."
+    }
+
+    Assert-NuGetPackagesHaveSameContent `
+      -PackageId $PackageId `
+      -LocalPackagePath $LocalPackagePath `
+      -DownloadedPackagePath $downloadPath `
+      -RegistryLabel $RegistryLabel
+
+    Write-Output "$RegistryLabel`: validated existing $PackageId $Version against local artifact content while accounting for repository signatures; skipping push."
+  }
+  finally {
+    if (Test-Path -LiteralPath $downloadPath) {
+      Remove-Item -LiteralPath $downloadPath -Force
+    }
   }
 }
 
@@ -170,40 +285,18 @@ function Assert-NuGetOrgPackageMatches {
   )
 
   $url = Get-NuGetFlatContainerUrl -PackageId $PackageId -PackageVersion $Version
-  $downloadPath = Join-Path ([System.IO.Path]::GetTempPath()) "$([System.Guid]::NewGuid()).nupkg"
+  Assert-RemotePackageMatches -PackageId $PackageId -LocalPackagePath $LocalPackagePath -PackageUrl $url -RegistryLabel 'NuGet.org'
+}
 
-  try {
-    & $curlCommand `
-      --fail-with-body `
-      --silent `
-      --show-error `
-      --location `
-      --proto '=https' `
-      --proto-redir '=https' `
-      --retry 3 `
-      --retry-delay 2 `
-      --retry-all-errors `
-      --connect-timeout 10 `
-      --max-time 60 `
-      --output $downloadPath `
-      $url
+function Assert-GitHubPackageMatches {
+  param(
+    [string]$PackageId,
+    [string]$LocalPackagePath,
+    [string]$PackageBaseAddress
+  )
 
-    if ($LASTEXITCODE -ne 0) {
-      Fail "Unable to download existing NuGet.org package $PackageId $Version for artifact comparison."
-    }
-
-    Assert-NuGetPackagesHaveSameContent `
-      -PackageId $PackageId `
-      -LocalPackagePath $LocalPackagePath `
-      -DownloadedPackagePath $downloadPath
-
-    Write-Output "NuGet.org: validated existing $PackageId $Version against local artifact content while accounting for repository signatures; skipping push."
-  }
-  finally {
-    if (Test-Path -LiteralPath $downloadPath) {
-      Remove-Item -LiteralPath $downloadPath -Force
-    }
-  }
+  $url = Get-NuGetPackageContentUrl -PackageBaseAddress $PackageBaseAddress -PackageId $PackageId -PackageVersion $Version
+  Assert-RemotePackageMatches -PackageId $PackageId -LocalPackagePath $LocalPackagePath -PackageUrl $url -RegistryLabel 'GitHub Packages' -Authenticated
 }
 
 function Test-GitHubPackageVersionExists {
@@ -413,6 +506,8 @@ if ($Registry -eq 'NuGetOrg') {
   return
 }
 
+$githubPackageBaseAddress = Get-AuthenticatedNuGetPackageBaseAddress
+
 foreach ($package in $packages) {
   $packageId = [string]$package.packageId
   $packageName = Get-FluentMapPackageFileName -Package $package -Version $Version
@@ -422,7 +517,7 @@ foreach ($package in $packages) {
   }
 
   if (Test-GitHubPackageVersionExists -PackageId $packageId) {
-    Write-Output "GitHub Packages: validated that $packageId $Version already exists; skipping push."
+    Assert-GitHubPackageMatches -PackageId $packageId -LocalPackagePath $packagePath -PackageBaseAddress $githubPackageBaseAddress
     continue
   }
   else {

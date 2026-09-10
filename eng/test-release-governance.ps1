@@ -91,7 +91,9 @@ function Invoke-PublishScenario {
     [array]$Packages,
     [hashtable]$StatusSequences,
     [string[]]$DifferentRemotePackages = @(),
-    [int]$MaxAttempts = 3
+    [int]$MaxAttempts = 3,
+    [ValidateSet('NuGetOrg', 'GitHubPackages')]
+    [string]$Registry = 'NuGetOrg'
   )
 
   $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) "fluentmap-release-test-$([System.Guid]::NewGuid())"
@@ -99,6 +101,7 @@ function Invoke-PublishScenario {
   $oldMockRemoteDir = $env:MOCK_REMOTE_DIR
   $oldMockPushLog = $env:MOCK_PUSH_LOG
   $oldMockEventLog = $env:MOCK_EVENT_LOG
+  $oldMockPackageVersion = $env:MOCK_PACKAGE_VERSION
   $oldCurlCommand = $env:FLUENTMAP_CURL_COMMAND
   $oldDotnetCommand = $env:FLUENTMAP_DOTNET_COMMAND
   $oldCurlAlias = Get-Alias curl -ErrorAction SilentlyContinue
@@ -145,6 +148,7 @@ function Invoke-PublishScenario {
     $env:MOCK_REMOTE_DIR = $remoteDir
     $env:MOCK_PUSH_LOG = $pushLog
     $env:MOCK_EVENT_LOG = $eventLog
+    $env:MOCK_PACKAGE_VERSION = $version
     $env:FLUENTMAP_CURL_COMMAND = 'mock-curl'
     $env:FLUENTMAP_DOTNET_COMMAND = 'mock-dotnet'
     Remove-Item alias:\curl -ErrorAction SilentlyContinue
@@ -152,14 +156,19 @@ function Invoke-PublishScenario {
     function global:mock-curl {
       $Arguments = $args
       $url = @($Arguments | Where-Object { $_ -match '^https?://' } | Select-Object -Last 1)
-      if ($url.Count -ne 1 -or $url[0] -notmatch '/v3-flatcontainer/([^/]+)/([^/]+)/') {
-        Write-Error "mock curl could not determine NuGet package id from arguments: $($Arguments -join ' ')"
+      if ($url.Count -ne 1) {
+        Write-Error "mock curl could not determine URL from arguments: $($Arguments -join ' ')"
         return
       }
 
-      $packageId = $Matches[1].ToLowerInvariant()
-      $statusPath = Join-Path $env:MOCK_STATUS_DIR "$packageId.status"
       if ($Arguments -contains '--write-out') {
+        if ($url[0] -notmatch '/v3-flatcontainer/([^/]+)/([^/]+)/') {
+          Write-Error "mock curl could not determine NuGet package id from status URL: $($Arguments -join ' ')"
+          return
+        }
+
+        $packageId = $Matches[1].ToLowerInvariant()
+        $statusPath = Join-Path $env:MOCK_STATUS_DIR "$packageId.status"
         if (Test-Path -LiteralPath $statusPath) {
           $statuses = @(Get-Content -LiteralPath $statusPath)
         }
@@ -186,6 +195,29 @@ function Invoke-PublishScenario {
       }
 
       $outputPath = $Arguments[$outputIndex + 1]
+      if ($url[0] -match '/index\.json$') {
+        $serviceIndex = @{
+          version = '3.0.0'
+          resources = @(
+            @{
+              '@id' = 'https://nuget.pkg.github.com/test-owner/download'
+              '@type' = 'PackageBaseAddress/3.0.0'
+            }
+          )
+        } | ConvertTo-Json -Depth 5
+        Set-Content -LiteralPath $outputPath -Value $serviceIndex -Encoding UTF8
+        Add-Content -LiteralPath $env:MOCK_EVENT_LOG -Value 'curl-index'
+        $global:LASTEXITCODE = 0
+        return
+      }
+
+      if ($url[0] -notmatch '/(?:v3-flatcontainer|download)/([^/]+)/([^/]+)/') {
+        Write-Error "mock curl could not determine NuGet package id from download URL: $($Arguments -join ' ')"
+        $global:LASTEXITCODE = 2
+        return
+      }
+
+      $packageId = $Matches[1].ToLowerInvariant()
       $remotePath = Join-Path $env:MOCK_REMOTE_DIR "$packageId.nupkg"
       if (-not (Test-Path -LiteralPath $remotePath -PathType Leaf)) {
         Write-Error "mock remote package does not exist: $remotePath"
@@ -196,6 +228,61 @@ function Invoke-PublishScenario {
       Copy-Item -LiteralPath $remotePath -Destination $outputPath -Force
       Add-Content -LiteralPath $env:MOCK_EVENT_LOG -Value "curl-download:$packageId"
       $global:LASTEXITCODE = 0
+    }
+
+    function global:Invoke-WebRequest {
+      param(
+        [string]$Uri,
+        [string]$Method,
+        [hashtable]$Headers,
+        [switch]$SkipHttpErrorCheck
+      )
+
+      if ($Uri -notmatch '/packages/nuget/([^/]+)/versions') {
+        throw "mock Invoke-WebRequest only supports GitHub package version lookup: $Uri"
+      }
+
+      $packageId = [System.Uri]::UnescapeDataString($Matches[1]).ToLowerInvariant()
+      $statusPath = Join-Path $env:MOCK_STATUS_DIR "$packageId.status"
+      if (Test-Path -LiteralPath $statusPath) {
+        $statuses = @(Get-Content -LiteralPath $statusPath)
+      }
+      else {
+        $statuses = @('200')
+      }
+
+      $status = $statuses[0]
+      if ($statuses.Count -gt 1) {
+        [System.IO.File]::WriteAllLines($statusPath, [string[]]$statuses[1..($statuses.Count - 1)])
+      }
+
+      Add-Content -LiteralPath $env:MOCK_EVENT_LOG -Value "github-api:$packageId`:$status"
+      switch ($status) {
+        '200' {
+          return [pscustomobject]@{
+            StatusCode = 200
+            Content = (@(@{ name = $env:MOCK_PACKAGE_VERSION }) | ConvertTo-Json -Depth 3)
+          }
+        }
+        '404' {
+          return [pscustomobject]@{
+            StatusCode = 404
+            Content = ''
+          }
+        }
+        'empty' {
+          return [pscustomobject]@{
+            StatusCode = 200
+            Content = '[]'
+          }
+        }
+        default {
+          return [pscustomobject]@{
+            StatusCode = [int]$status
+            Content = ''
+          }
+        }
+      }
     }
 
     function global:mock-dotnet {
@@ -214,18 +301,27 @@ function Invoke-PublishScenario {
     }
 
     $script = Join-Path $repoRoot 'eng/publish-package-set.ps1'
+    $source = if ($Registry -eq 'GitHubPackages') { 'https://nuget.pkg.github.com/test-owner/index.json' } else { 'https://api.nuget.org/v3/index.json' }
+    $publishArguments = @{
+      PackageDirectory = $packageDir
+      Version = $version
+      Source = $source
+      ApiKey = 'test-key'
+      Registry = $Registry
+      CatalogPath = $catalogPath
+      NuGetConvergenceMaxAttempts = $MaxAttempts
+      NuGetConvergenceDelaySeconds = 0
+    }
+
+    if ($Registry -eq 'GitHubPackages') {
+      $publishArguments.RepositoryOwner = 'test-owner'
+      $publishArguments.GitHubToken = 'test-token'
+    }
+
     $exitCode = 0
     $output = @(
       try {
-        & $script `
-          -PackageDirectory $packageDir `
-          -Version $version `
-          -Source 'https://api.nuget.org/v3/index.json' `
-          -ApiKey 'test-key' `
-          -Registry NuGetOrg `
-          -CatalogPath $catalogPath `
-          -NuGetConvergenceMaxAttempts $MaxAttempts `
-          -NuGetConvergenceDelaySeconds 0 2>&1
+        & $script @publishArguments 2>&1
       }
       catch {
         $exitCode = 1
@@ -245,10 +341,12 @@ function Invoke-PublishScenario {
     $env:MOCK_REMOTE_DIR = $oldMockRemoteDir
     $env:MOCK_PUSH_LOG = $oldMockPushLog
     $env:MOCK_EVENT_LOG = $oldMockEventLog
+    $env:MOCK_PACKAGE_VERSION = $oldMockPackageVersion
     $env:FLUENTMAP_CURL_COMMAND = $oldCurlCommand
     $env:FLUENTMAP_DOTNET_COMMAND = $oldDotnetCommand
     Remove-Item function:\mock-curl -ErrorAction SilentlyContinue
     Remove-Item function:\mock-dotnet -ErrorAction SilentlyContinue
+    Remove-Item function:\Invoke-WebRequest -ErrorAction SilentlyContinue
     if ($null -ne $oldCurlAlias) {
       Set-Alias -Name curl -Value $oldCurlAlias.Definition
     }
@@ -621,7 +719,12 @@ Invoke-Test 'recovery workflow reconciles governed release state' {
       'Restore or verify release tag',
       'Create or update GitHub Release',
       'gh release delete-asset',
-      'GitHub Release assets: exact governed set',
+      'gh release edit',
+      '--draft=false',
+      '--prerelease=false',
+      'recovery-attestation.json',
+      'validatedCommit',
+      'GitHub Release metadata and assets: exact governed state',
       'Attest recovered release artifacts',
       'Release recovery completed and governed release state reconciled.'
     )) {
@@ -630,6 +733,7 @@ Invoke-Test 'recovery workflow reconciles governed release state' {
 
   Assert-Contains $recoveryWorkflow 'Refusing to move the tag' 'recovery must fail closed when the release tag points to the wrong commit.'
   Assert-Contains $recoveryWorkflow 'asset set does not match governed artifacts' 'recovery must fail closed when GitHub Release assets differ from governed artifacts.'
+  Assert-Contains $recoveryWorkflow 'metadata does not match governed state' 'recovery must fail closed when GitHub Release metadata differs from governed state.'
   Assert-Contains $recoveryWorkflow 'source=rebuild' 'recovery must expose deterministic rebuild fallback when original artifacts are unavailable.'
   Assert-Contains $recoveryWorkflow 'headSha' 'recovery must validate that original artifacts came from the requested commit.'
   Assert-True ($recoveryWorkflow.IndexOf('validated_commit:', [System.StringComparison]::Ordinal) -lt 0) 'validated_commit must not remain an operator-facing workflow input.'
@@ -881,6 +985,29 @@ Invoke-Test 'symbol-enabled package is not considered recovered solely by primar
   Assert-True $result.Succeeded "publish script failed: $($result.Output)"
   Assert-True (@($result.PushLog | Where-Object { $_ -like 'A.9.9.9-test.1.snupkg|*--skip-duplicate*' }).Count -eq 1) 'Visible primary package must still trigger independent symbol package recovery.'
   Assert-Contains $result.Output 'does not expose a public content-comparison endpoint for .snupkg artifacts' 'symbol limitation should be logged.'
+}
+
+Invoke-Test 'GitHub Packages recovery validates and skips identical existing packages' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -Registry GitHubPackages -StatusSequences @{
+    A = @('200')
+    B = @('404', '200')
+  }
+
+  Assert-True $result.Succeeded "GitHub Packages recovery failed: $($result.Output)"
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'A.9.9.9-test.1.nupkg|*' }).Count -eq 0) 'Existing identical GitHub Packages artifact should not be pushed.'
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'B.9.9.9-test.1.nupkg|*' }).Count -eq 1) 'Missing GitHub Packages artifact should be pushed.'
+  Assert-Contains $result.Output 'GitHub Packages: validated existing A 9.9.9-test.1 against local artifact content' 'existing GitHub Packages artifact should be content-compared.'
+}
+
+Invoke-Test 'GitHub Packages recovery fails closed on existing artifact mismatch' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -Registry GitHubPackages -StatusSequences @{
+    A = @('200')
+    B = @('404', '200')
+  } -DifferentRemotePackages @('A')
+
+  Assert-True (-not $result.Succeeded) 'GitHub Packages artifact mismatch should fail.'
+  Assert-Contains $result.Output 'does not match the local artifact' 'GitHub Packages mismatch diagnostic should be precise.'
+  Assert-True (@($result.PushLog).Count -eq 0) 'GitHub Packages recovery should not publish missing packages after an existing package mismatch.'
 }
 
 if ($failures.Count -gt 0) {
