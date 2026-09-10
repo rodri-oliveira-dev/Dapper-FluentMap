@@ -13,6 +13,8 @@ on:
 permissions:
   contents: read
 
+# Shared with the recovery workflow so governed release/package state cannot be
+# mutated concurrently. Runs wait for each other; they never cancel in progress.
 concurrency:
   group: release
   cancel-in-progress: false

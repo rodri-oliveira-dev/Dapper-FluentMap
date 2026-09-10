@@ -17,7 +17,13 @@ param(
 
   [string]$RepositoryOwner,
 
-  [string]$GitHubToken
+  [string]$GitHubToken,
+
+  [string]$CatalogPath,
+
+  [int]$NuGetConvergenceMaxAttempts = 60,
+
+  [int]$NuGetConvergenceDelaySeconds = 10
 )
 
 Set-StrictMode -Version Latest
@@ -26,9 +32,18 @@ $ErrorActionPreference = 'Stop'
 Import-Module (Join-Path $PSScriptRoot 'PackageCatalog.psm1') -Force
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
+$curlCommand = if ([string]::IsNullOrWhiteSpace($env:FLUENTMAP_CURL_COMMAND)) { 'curl' } else { $env:FLUENTMAP_CURL_COMMAND }
+$dotnetCommand = if ([string]::IsNullOrWhiteSpace($env:FLUENTMAP_DOTNET_COMMAND)) { 'dotnet' } else { $env:FLUENTMAP_DOTNET_COMMAND }
+
 function Fail {
   param([string]$Message)
   throw "Package publication failed: $Message"
+}
+
+function Convert-BytesToLowerHex {
+  param([byte[]]$Bytes)
+
+  return ([System.BitConverter]::ToString($Bytes) -replace '-', '').ToLowerInvariant()
 }
 
 function Get-NuGetFlatContainerUrl {
@@ -42,10 +57,23 @@ function Get-NuGetFlatContainerUrl {
   return "https://api.nuget.org/v3-flatcontainer/$idLower/$versionLower/$idLower.$versionLower.nupkg"
 }
 
+function Get-NuGetPackageContentUrl {
+  param(
+    [string]$PackageBaseAddress,
+    [string]$PackageId,
+    [string]$PackageVersion
+  )
+
+  $baseAddress = $PackageBaseAddress.TrimEnd('/')
+  $idLower = $PackageId.ToLowerInvariant()
+  $versionLower = $PackageVersion.ToLowerInvariant()
+  return "$baseAddress/$idLower/$versionLower/$idLower.$versionLower.nupkg"
+}
+
 function Get-HttpStatus {
   param([string]$Uri)
 
-  $status = (& curl `
+  $status = (& $curlCommand `
     --silent `
     --show-error `
     --location `
@@ -65,6 +93,74 @@ function Get-HttpStatus {
   }
 
   return $status
+}
+
+function Invoke-CurlDownload {
+  param(
+    [string]$Uri,
+    [string]$OutputPath,
+    [switch]$Authenticated
+  )
+
+  $arguments = @(
+    '--fail-with-body'
+    '--silent'
+    '--show-error'
+    '--location'
+    '--proto'
+    '=https'
+    '--proto-redir'
+    '=https'
+    '--retry'
+    '3'
+    '--retry-delay'
+    '2'
+    '--retry-all-errors'
+    '--connect-timeout'
+    '10'
+    '--max-time'
+    '60'
+    '--output'
+    $OutputPath
+  )
+
+  if ($Authenticated) {
+    if ([string]::IsNullOrWhiteSpace($GitHubToken)) {
+      Fail 'GitHubToken is required to download existing GitHub Packages artifacts for content comparison.'
+    }
+
+    $arguments += @('--header', "Authorization: Bearer $GitHubToken")
+  }
+
+  $arguments += $Uri
+  & $curlCommand @arguments
+}
+
+function Get-AuthenticatedNuGetPackageBaseAddress {
+  if ([string]::IsNullOrWhiteSpace($Source)) {
+    Fail 'Package source is required to resolve the authenticated NuGet package content endpoint.'
+  }
+
+  $serviceIndexPath = Join-Path ([System.IO.Path]::GetTempPath()) "$([System.Guid]::NewGuid()).json"
+  try {
+    Invoke-CurlDownload -Uri $Source -OutputPath $serviceIndexPath -Authenticated
+    if ($LASTEXITCODE -ne 0) {
+      Fail "Unable to download NuGet service index '$Source'."
+    }
+
+    $serviceIndex = Get-Content -LiteralPath $serviceIndexPath -Raw | ConvertFrom-Json
+    $resource = @($serviceIndex.resources | Where-Object { [string]$_.'@type' -eq 'PackageBaseAddress/3.0.0' } | Select-Object -First 1)
+    if ($resource.Count -ne 1 -or [string]::IsNullOrWhiteSpace([string]$resource[0].'@id')) {
+      Fail "NuGet service index '$Source' does not expose a PackageBaseAddress/3.0.0 resource for content comparison."
+    }
+
+    return [string]$resource[0].'@id'
+  }
+  finally {
+    if (Test-Path -LiteralPath $serviceIndexPath) {
+      Remove-Item -LiteralPath $serviceIndexPath -Force
+    }
+  }
 }
 
 function Test-IsRepositorySignatureEntry {
@@ -95,7 +191,7 @@ function Get-NuGetPackageEntryHashes {
       $stream = $entry.Open()
       $sha256 = [System.Security.Cryptography.SHA256]::Create()
       try {
-        $entries[$entry.FullName] = [System.Convert]::ToHexString($sha256.ComputeHash($stream)).ToLowerInvariant()
+        $entries[$entry.FullName] = Convert-BytesToLowerHex -Bytes $sha256.ComputeHash($stream)
       }
       finally {
         $sha256.Dispose()
@@ -114,7 +210,8 @@ function Assert-NuGetPackagesHaveSameContent {
   param(
     [string]$PackageId,
     [string]$LocalPackagePath,
-    [string]$DownloadedPackagePath
+    [string]$DownloadedPackagePath,
+    [string]$RegistryLabel = $Registry
   )
 
   $localEntries = Get-NuGetPackageEntryHashes -PackagePath $LocalPackagePath
@@ -144,7 +241,40 @@ function Assert-NuGetPackagesHaveSameContent {
       $details += "changed entries: $($changedEntries -join ', ')"
     }
 
-    Fail "NuGet.org already has $PackageId $Version, but the downloaded package content does not match the local artifact ($($details -join '; ')). Refusing to mask an artifact mismatch."
+    Fail "$RegistryLabel already has $PackageId $Version, but the downloaded package content does not match the local artifact ($($details -join '; ')). Refusing to mask an artifact mismatch."
+  }
+}
+
+function Assert-RemotePackageMatches {
+  param(
+    [string]$PackageId,
+    [string]$LocalPackagePath,
+    [string]$PackageUrl,
+    [string]$RegistryLabel,
+    [switch]$Authenticated
+  )
+
+  $downloadPath = Join-Path ([System.IO.Path]::GetTempPath()) "$([System.Guid]::NewGuid()).nupkg"
+
+  try {
+    Invoke-CurlDownload -Uri $PackageUrl -OutputPath $downloadPath -Authenticated:$Authenticated
+
+    if ($LASTEXITCODE -ne 0) {
+      Fail "Unable to download existing $RegistryLabel package $PackageId $Version for artifact comparison."
+    }
+
+    Assert-NuGetPackagesHaveSameContent `
+      -PackageId $PackageId `
+      -LocalPackagePath $LocalPackagePath `
+      -DownloadedPackagePath $downloadPath `
+      -RegistryLabel $RegistryLabel
+
+    Write-Output "$RegistryLabel`: validated existing $PackageId $Version against local artifact content while accounting for repository signatures; skipping push."
+  }
+  finally {
+    if (Test-Path -LiteralPath $downloadPath) {
+      Remove-Item -LiteralPath $downloadPath -Force
+    }
   }
 }
 
@@ -155,40 +285,18 @@ function Assert-NuGetOrgPackageMatches {
   )
 
   $url = Get-NuGetFlatContainerUrl -PackageId $PackageId -PackageVersion $Version
-  $downloadPath = Join-Path ([System.IO.Path]::GetTempPath()) "$([System.Guid]::NewGuid()).nupkg"
+  Assert-RemotePackageMatches -PackageId $PackageId -LocalPackagePath $LocalPackagePath -PackageUrl $url -RegistryLabel 'NuGet.org'
+}
 
-  try {
-    & curl `
-      --fail-with-body `
-      --silent `
-      --show-error `
-      --location `
-      --proto '=https' `
-      --proto-redir '=https' `
-      --retry 3 `
-      --retry-delay 2 `
-      --retry-all-errors `
-      --connect-timeout 10 `
-      --max-time 60 `
-      --output $downloadPath `
-      $url
+function Assert-GitHubPackageMatches {
+  param(
+    [string]$PackageId,
+    [string]$LocalPackagePath,
+    [string]$PackageBaseAddress
+  )
 
-    if ($LASTEXITCODE -ne 0) {
-      Fail "Unable to download existing NuGet.org package $PackageId $Version for artifact comparison."
-    }
-
-    Assert-NuGetPackagesHaveSameContent `
-      -PackageId $PackageId `
-      -LocalPackagePath $LocalPackagePath `
-      -DownloadedPackagePath $downloadPath
-
-    Write-Output "NuGet.org: validated existing $PackageId $Version against local artifact content while accounting for repository signatures; skipping push."
-  }
-  finally {
-    if (Test-Path -LiteralPath $downloadPath) {
-      Remove-Item -LiteralPath $downloadPath -Force
-    }
-  }
+  $url = Get-NuGetPackageContentUrl -PackageBaseAddress $PackageBaseAddress -PackageId $PackageId -PackageVersion $Version
+  Assert-RemotePackageMatches -PackageId $PackageId -LocalPackagePath $LocalPackagePath -PackageUrl $url -RegistryLabel 'GitHub Packages' -Authenticated
 }
 
 function Test-GitHubPackageVersionExists {
@@ -236,13 +344,22 @@ function Test-GitHubPackageVersionExists {
 function Invoke-DotNetNuGetPush {
   param(
     [string]$PackageId,
-    [string]$PackagePath
+    [string]$PackagePath,
+    [string[]]$AdditionalArguments = @()
   )
 
-  Write-Output "> dotnet nuget push $PackagePath --source $Source --api-key ***"
-  $output = & dotnet nuget push $PackagePath `
-    --source $Source `
-    --api-key $ApiKey 2>&1
+  $maskedArguments = if ($AdditionalArguments.Count -gt 0) { " $($AdditionalArguments -join ' ')" } else { '' }
+  Write-Output "> dotnet nuget push $PackagePath --source $Source --api-key ***$maskedArguments"
+  $arguments = @(
+    'nuget'
+    'push'
+    $PackagePath
+    '--source'
+    $Source
+    '--api-key'
+    $ApiKey
+  ) + $AdditionalArguments
+  $output = & $dotnetCommand @arguments 2>&1
   $exitCode = $LASTEXITCODE
 
   $output | ForEach-Object { Write-Output $_ }
@@ -252,34 +369,60 @@ function Invoke-DotNetNuGetPush {
   }
 }
 
-function Wait-NuGetOrgPackageVisible {
+function Wait-NuGetOrgPackageSetConverged {
   param(
-    [string]$PackageId,
-    [string]$PackagePath
+    [array]$ExpectedPackages,
+    [hashtable]$PackagePaths
   )
 
-  $url = Get-NuGetFlatContainerUrl -PackageId $PackageId -PackageVersion $Version
-  $maxAttempts = 60
-  $delaySeconds = 10
+  $validated = @{}
 
-  for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
-    $status = Get-HttpStatus -Uri $url
-    if ($status -eq '200') {
-      Assert-NuGetOrgPackageMatches -PackageId $PackageId -LocalPackagePath $PackagePath
+  for ($attempt = 1; $attempt -le $NuGetConvergenceMaxAttempts; $attempt++) {
+    $missing = @()
+
+    foreach ($package in $ExpectedPackages) {
+      $packageId = [string]$package.packageId
+      if ($validated.ContainsKey($packageId)) {
+        continue
+      }
+
+      $status = Get-HttpStatus -Uri (Get-NuGetFlatContainerUrl -PackageId $packageId -PackageVersion $Version)
+      switch ($status) {
+        '200' {
+          Assert-NuGetOrgPackageMatches -PackageId $packageId -LocalPackagePath $PackagePaths[$packageId]
+          $validated[$packageId] = $true
+        }
+        '404' {
+          $missing += $packageId
+        }
+        default {
+          Fail "Unexpected NuGet.org response HTTP $status while verifying convergence for $packageId $Version."
+        }
+      }
+    }
+
+    if ($validated.Count -eq $ExpectedPackages.Count) {
+      Write-Output "NuGet.org: all $($ExpectedPackages.Count) primary package identities converged and match the expected artifacts."
       return
     }
 
-    if ($status -ne '404') {
-      Fail "Unexpected NuGet.org response HTTP $status while waiting for $PackageId $Version."
-    }
-
-    if ($attempt -lt $maxAttempts) {
-      Write-Output "NuGet.org: waiting for $PackageId $Version to become visible ($attempt/$maxAttempts); retrying in $delaySeconds seconds."
-      Start-Sleep -Seconds $delaySeconds
+    $missingList = $missing -join ', '
+    if ($attempt -lt $NuGetConvergenceMaxAttempts) {
+      Write-Output "NuGet.org: indexing still pending for $missingList ($attempt/$NuGetConvergenceMaxAttempts); retrying in $NuGetConvergenceDelaySeconds seconds."
+      Start-Sleep -Seconds $NuGetConvergenceDelaySeconds
     }
   }
 
-  Fail "NuGet.org did not expose $PackageId $Version after publication within the 10-minute retry window."
+  $notConverged = @(
+    foreach ($package in $ExpectedPackages) {
+      $packageId = [string]$package.packageId
+      if (-not $validated.ContainsKey($packageId)) {
+        $packageId
+      }
+    }
+  )
+
+  Fail "NuGet.org primary package convergence timed out for $Version. Still missing from the Flat Container: $($notConverged -join ', ')."
 }
 
 function Wait-GitHubPackageVisible {
@@ -302,7 +445,68 @@ if ([string]::IsNullOrWhiteSpace($ApiKey)) {
 }
 
 $packageRoot = (Resolve-Path -LiteralPath $PackageDirectory).Path
-$packages = @(Get-FluentMapPackages)
+$packages = @(Get-FluentMapPackages -CatalogPath $CatalogPath)
+$symbolPackages = @(Get-FluentMapPackages -CatalogPath $CatalogPath -WithSymbols)
+
+if ($Registry -eq 'NuGetOrg') {
+  $packagePaths = @{}
+  $missingPackages = @()
+  $existingPackageCount = 0
+
+  foreach ($package in $packages) {
+    $packageId = [string]$package.packageId
+    $packageName = Get-FluentMapPackageFileName -Package $package -Version $Version
+    $packagePath = Join-Path $packageRoot $packageName
+    if (-not (Test-Path -LiteralPath $packagePath -PathType Leaf)) {
+      Fail "Expected package artifact '$packageName' was not found in '$packageRoot'."
+    }
+
+    $packagePaths[$packageId] = $packagePath
+    $status = Get-HttpStatus -Uri (Get-NuGetFlatContainerUrl -PackageId $packageId -PackageVersion $Version)
+    switch ($status) {
+      '200' {
+        Assert-NuGetOrgPackageMatches -PackageId $packageId -LocalPackagePath $packagePath
+        $existingPackageCount++
+      }
+      '404' {
+        Write-Output "NuGet.org: $packageId $Version is not currently published; local artifact will be submitted after existing package content preflight completes."
+        $missingPackages += $package
+      }
+      default {
+        Fail "Unexpected NuGet.org response HTTP $status for $packageId $Version. Failing closed."
+      }
+    }
+  }
+
+  Write-Output "NuGet.org: preflight validated $existingPackageCount existing primary package identity or identities before publishing $($missingPackages.Count) missing identity or identities."
+
+  foreach ($package in $missingPackages) {
+    $packageId = [string]$package.packageId
+    $packagePath = $packagePaths[$packageId]
+    Write-Output "NuGet.org: submitting missing primary package $packageId $Version without waiting for indexing."
+    Invoke-DotNetNuGetPush -PackageId $packageId -PackagePath $packagePath -AdditionalArguments @('--no-symbols')
+    Write-Output "NuGet.org: accepted primary package $packageId $Version; validation and indexing continue asynchronously."
+  }
+
+  Wait-NuGetOrgPackageSetConverged -ExpectedPackages $packages -PackagePaths $packagePaths
+
+  foreach ($package in $symbolPackages) {
+    $packageId = [string]$package.packageId
+    $symbolName = Get-FluentMapPackageFileName -Package $package -Version $Version -Kind symbols
+    $symbolPath = Join-Path $packageRoot $symbolName
+    if (-not (Test-Path -LiteralPath $symbolPath -PathType Leaf)) {
+      Fail "Expected symbol package artifact '$symbolName' was not found in '$packageRoot'."
+    }
+
+    Write-Output "NuGet.org: submitting symbol package $symbolName. NuGet.org does not expose a public content-comparison endpoint for .snupkg artifacts; duplicate symbol submissions are accepted only through NuGet tooling semantics."
+    Invoke-DotNetNuGetPush -PackageId "$packageId symbols" -PackagePath $symbolPath -AdditionalArguments @('--skip-duplicate')
+  }
+
+  Write-Output "NuGet.org publication completed for $($packages.Count) primary package identities and $($symbolPackages.Count) symbol package identities. Primary packages were converged and content-validated; symbol packages were submitted through NuGet.org V3 tooling."
+  return
+}
+
+$githubPackageBaseAddress = Get-AuthenticatedNuGetPackageBaseAddress
 
 foreach ($package in $packages) {
   $packageId = [string]$package.packageId
@@ -312,23 +516,8 @@ foreach ($package in $packages) {
     Fail "Expected package artifact '$packageName' was not found in '$packageRoot'."
   }
 
-  if ($Registry -eq 'NuGetOrg') {
-    $status = Get-HttpStatus -Uri (Get-NuGetFlatContainerUrl -PackageId $packageId -PackageVersion $Version)
-    switch ($status) {
-      '200' {
-        Assert-NuGetOrgPackageMatches -PackageId $packageId -LocalPackagePath $packagePath
-        continue
-      }
-      '404' {
-        Write-Output "NuGet.org: $packageId $Version is not currently published; publishing local artifact."
-      }
-      default {
-        Fail "Unexpected NuGet.org response HTTP $status for $packageId $Version. Failing closed."
-      }
-    }
-  }
-  elseif (Test-GitHubPackageVersionExists -PackageId $packageId) {
-    Write-Output "GitHub Packages: validated that $packageId $Version already exists; skipping push."
+  if (Test-GitHubPackageVersionExists -PackageId $packageId) {
+    Assert-GitHubPackageMatches -PackageId $packageId -LocalPackagePath $packagePath -PackageBaseAddress $githubPackageBaseAddress
     continue
   }
   else {
@@ -336,12 +525,7 @@ foreach ($package in $packages) {
   }
 
   Invoke-DotNetNuGetPush -PackageId $packageId -PackagePath $packagePath
-  if ($Registry -eq 'NuGetOrg') {
-    Wait-NuGetOrgPackageVisible -PackageId $packageId -PackagePath $packagePath
-  }
-  else {
-    Wait-GitHubPackageVisible -PackageId $packageId
-  }
+  Wait-GitHubPackageVisible -PackageId $packageId
 }
 
 Write-Output "$Registry publication completed for $($packages.Count) package identities."

@@ -1,17 +1,28 @@
-name: Recovery - Publish missing NuGet packages
+name: Recovery - Reconcile release state
 
-run-name: "Recover missing NuGet packages for ${{ inputs.version }}"
+run-name: "Recover release from ${{ inputs.source_type }} ${{ inputs.source_ref }}"
 
 on:
   workflow_dispatch:
     inputs:
-      version:
-        description: "Semantic version without the v prefix, for example 3.0.1."
+      source_type:
+        description: "Release source type."
+        required: true
+        type: choice
+        options:
+          - branch
+          - tag
+      source_ref:
+        description: "Branch or tag name."
         required: true
         type: string
-      validated_commit:
-        description: "Commit SHA that produced the validated release artifacts."
-        required: true
+      version:
+        description: "Required for branch mode; leave empty for tag mode."
+        required: false
+        type: string
+      original_release_run_id:
+        description: "Optional release workflow run_id to download the original release-package artifact."
+        required: false
         type: string
       confirmation:
         description: "Type PUBLISH-MISSING-NUGET to run the recovery."
@@ -21,8 +32,10 @@ on:
 permissions:
   contents: read
 
+# Shared with the normal release workflow so governed release/package state cannot
+# be mutated concurrently. Recovery waits; it never cancels an in-flight release.
 concurrency:
-  group: release-recovery-${{ inputs.version }}
+  group: release
   cancel-in-progress: false
 
 env:
@@ -32,145 +45,288 @@ env:
   CI: "true"
 
 jobs:
-  recover-missing-nuget-packages:
-    name: Publish only missing NuGet.org packages
+  reconcile-release-state:
+    name: Reconcile governed release state
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     environment: release
     permissions:
-      contents: read
+      actions: read
+      contents: write
+      packages: write
       id-token: write
+      attestations: write
+      artifact-metadata: write
 
     steps:
+      - name: Checkout recovery tooling
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          show-progress: false
+
+      - name: Resolve release source
+        id: source
+        shell: pwsh
+        env:
+          SOURCE_TYPE: ${{ inputs.source_type }}
+          SOURCE_REF: ${{ inputs.source_ref }}
+          VERSION: ${{ inputs.version }}
+          CURRENT_WORKFLOW_REF: ${{ github.ref }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./eng/resolve-release-source.ps1 `
+            -SourceType $env:SOURCE_TYPE `
+            -SourceRef $env:SOURCE_REF `
+            -Version $env:VERSION `
+            -CurrentWorkflowRef $env:CURRENT_WORKFLOW_REF `
+            -GitHubOutputPath $env:GITHUB_OUTPUT
+
       - name: Validate recovery request
         shell: bash
         env:
-          VERSION: ${{ inputs.version }}
-          VALIDATED_COMMIT: ${{ inputs.validated_commit }}
+          ORIGINAL_RELEASE_RUN_ID: ${{ inputs.original_release_run_id }}
           CONFIRMATION: ${{ inputs.confirmation }}
         run: |
           set -euo pipefail
-
-          if [[ "$GITHUB_REF" != "refs/heads/master" ]]; then
-            echo "::error::The recovery workflow must be started from master. Current ref: $GITHUB_REF"
-            exit 1
-          fi
 
           if [[ "$CONFIRMATION" != "PUBLISH-MISSING-NUGET" ]]; then
             echo "::error::Recovery confirmation did not match PUBLISH-MISSING-NUGET."
             exit 1
           fi
 
-          if [[ "$VERSION" == v* ]]; then
-            echo "::error::Enter the semantic version without the 'v' prefix."
+          if [[ -n "$ORIGINAL_RELEASE_RUN_ID" && ! "$ORIGINAL_RELEASE_RUN_ID" =~ ^[0-9]+$ ]]; then
+            echo "::error::original_release_run_id must be a numeric GitHub Actions run id when provided."
             exit 1
           fi
 
-          semver='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
-          if [[ ! "$VERSION" =~ $semver ]]; then
-            echo "::error::Invalid semantic version '$VERSION'."
+      - name: Verify release tag state
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ steps.source.outputs.release_tag }}
+          VALIDATED_COMMIT: ${{ steps.source.outputs.resolved_commit }}
+        run: |
+          set -euo pipefail
+
+          git fetch origin master:refs/remotes/origin/master
+          git fetch --tags
+
+          if ! git merge-base --is-ancestor "$VALIDATED_COMMIT" origin/master; then
+            echo "::error::Resolved commit $VALIDATED_COMMIT is not reachable from origin/master."
             exit 1
           fi
 
-          major="${VERSION%%.*}"
-          if (( major < 3 )); then
-            echo "::error::FluentMap recovery requires major version 3 or later."
-            exit 1
+          if git rev-parse -q --verify "refs/tags/$RELEASE_TAG" >/dev/null; then
+            tag_sha="$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
+            if [[ "$tag_sha" != "$VALIDATED_COMMIT" ]]; then
+              echo "::error::Tag '$RELEASE_TAG' points to $tag_sha instead of validated commit $VALIDATED_COMMIT. Refusing to move the tag."
+              exit 1
+            fi
+
+            echo "Tag '$RELEASE_TAG' already points to the validated commit."
+          else
+            echo "Tag '$RELEASE_TAG' is absent; recovery may continue and will restore it only after package registries are reconciled."
           fi
 
-          if [[ "$VERSION" == "3.0.0" ]]; then
-            echo "::error::Version 3.0.0 is immutable and must not be recovered from a newer workflow."
-            exit 1
-          fi
-
-          if [[ ! "$VALIDATED_COMMIT" =~ ^[0-9a-fA-F]{40}$ ]]; then
-            echo "::error::validated_commit must be a full 40-character commit SHA."
-            exit 1
-          fi
-
-      - name: Checkout validated release commit
+      - name: Checkout validated release source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ inputs.validated_commit }}
+          ref: ${{ steps.source.outputs.resolved_commit }}
+          path: validated-source
           fetch-depth: 0
           persist-credentials: false
           show-progress: false
 
-      - name: Verify release tag
-        shell: bash
+      - name: Verify partial release evidence
+        shell: pwsh
         env:
-          VERSION: ${{ inputs.version }}
-          VALIDATED_COMMIT: ${{ inputs.validated_commit }}
+          PACKAGE_VERSION: ${{ steps.source.outputs.resolved_version }}
         run: |
-          set -euo pipefail
+          $ErrorActionPreference = 'Stop'
+          Import-Module './eng/PackageCatalog.psm1' -Force
 
-          release_tag="v$VERSION"
-          git fetch --tags
-          if ! git rev-parse -q --verify "refs/tags/$release_tag" >/dev/null; then
-            echo "::error::Expected recovery tag '$release_tag' does not exist. Run the normal release workflow for unreleased versions."
-            exit 1
-          fi
+          $releaseTag = "v$env:PACKAGE_VERSION"
+          $tagExists = $false
+          & git rev-parse -q --verify "refs/tags/$releaseTag" *> $null
+          if ($LASTEXITCODE -eq 0) {
+            $tagExists = $true
+          }
 
-          tag_sha="$(git rev-list -n 1 "$release_tag")"
-          if [[ "$tag_sha" != "$VALIDATED_COMMIT" ]]; then
-            echo "::error::Tag '$release_tag' points to $tag_sha instead of validated commit $VALIDATED_COMMIT. Refusing to move the tag."
-            exit 1
-          fi
+          $versionLower = $env:PACKAGE_VERSION.ToLowerInvariant()
+          $existingPackages = 0
+          $missingPackages = 0
+          foreach ($package in @(Get-FluentMapPackages -CatalogPath './validated-source/eng/package-catalog.json')) {
+            $packageId = [string]$package.packageId
+            $packageIdLower = $packageId.ToLowerInvariant()
+            $packageUrl = "https://api.nuget.org/v3-flatcontainer/$packageIdLower/$versionLower/$packageIdLower.$versionLower.nupkg"
+            $httpStatus = (& curl `
+              --silent `
+              --show-error `
+              --location `
+              --proto '=https' `
+              --proto-redir '=https' `
+              --retry 3 `
+              --retry-delay 2 `
+              --retry-all-errors `
+              --connect-timeout 10 `
+              --max-time 30 `
+              --output /dev/null `
+              --write-out '%{http_code}' `
+              $packageUrl).Trim()
 
-          echo "Tag '$release_tag' already points to the validated commit."
+            if ($LASTEXITCODE -ne 0) {
+              throw "Unable to query NuGet.org for $packageId $env:PACKAGE_VERSION. Failing closed before recovery."
+            }
 
-      - name: Setup .NET
+            switch ($httpStatus) {
+              '200' {
+                $existingPackages++
+                Write-Host "NuGet.org already has $packageId $env:PACKAGE_VERSION; recovery will validate artifact content before skipping it."
+              }
+              '404' {
+                $missingPackages++
+                Write-Host "NuGet.org does not currently have $packageId $env:PACKAGE_VERSION."
+              }
+              default {
+                throw "Unexpected NuGet.org response HTTP $httpStatus while checking $packageId $env:PACKAGE_VERSION. Failing closed before recovery."
+              }
+            }
+          }
+
+          if (-not $tagExists -and $existingPackages -eq 0) {
+            throw "Release tag $releaseTag is absent and NuGet.org has no governed package for this version. Use the normal release workflow for unreleased versions."
+          }
+
+          Write-Host "Recovery preflight accepted: NuGet.org has $existingPackages existing primary package identity or identities and $missingPackages missing primary package identity or identities for $env:PACKAGE_VERSION."
+
+      - name: Obtain original release artifacts when requested
+        id: artifact-source
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          PACKAGE_VERSION: ${{ steps.source.outputs.resolved_version }}
+          VALIDATED_COMMIT: ${{ steps.source.outputs.resolved_commit }}
+          RELEASE_HISTORY_REF: ${{ steps.source.outputs.release_history_ref }}
+          ORIGINAL_RELEASE_RUN_ID: ${{ inputs.original_release_run_id }}
+          REPOSITORY: ${{ github.repository }}
+          REPOSITORY_URL: https://github.com/${{ github.repository }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path './artifacts' | Out-Null
+
+          if ([string]::IsNullOrWhiteSpace($env:ORIGINAL_RELEASE_RUN_ID)) {
+            Write-Host 'No original_release_run_id was provided; recovery will use the deterministic rebuild fallback from the resolved commit.'
+            "source=rebuild" >> $env:GITHUB_OUTPUT
+            return
+          }
+
+          Write-Host "Attempting to download release-package artifact from release workflow run $env:ORIGINAL_RELEASE_RUN_ID."
+          $runJson = & gh run view $env:ORIGINAL_RELEASE_RUN_ID --repo $env:GH_REPO --json databaseId,headSha,headBranch,event,workflowName,conclusion 2>&1
+          if ($LASTEXITCODE -ne 0) {
+            Write-Warning "Unable to inspect run $env:ORIGINAL_RELEASE_RUN_ID; artifact may have expired or be unavailable. Falling back to deterministic rebuild. gh output: $runJson"
+            "source=rebuild" >> $env:GITHUB_OUTPUT
+            return
+          }
+
+          $run = $runJson | ConvertFrom-Json
+          if ([string]$run.workflowName -ne 'Release') {
+            throw "Run $env:ORIGINAL_RELEASE_RUN_ID belongs to workflow '$($run.workflowName)', expected 'Release'."
+          }
+
+          if ([string]$run.headSha -ne $env:VALIDATED_COMMIT) {
+            throw "Run $env:ORIGINAL_RELEASE_RUN_ID headSha '$($run.headSha)' does not match resolved commit '$env:VALIDATED_COMMIT'."
+          }
+
+          & gh run download $env:ORIGINAL_RELEASE_RUN_ID --repo $env:GH_REPO --name release-package --dir './artifacts'
+          if ($LASTEXITCODE -ne 0) {
+            Write-Warning "Original release-package artifact could not be downloaded, likely because retention expired. Falling back to deterministic rebuild from the resolved commit."
+            Remove-Item -LiteralPath './artifacts' -Recurse -Force
+            New-Item -ItemType Directory -Force -Path './artifacts' | Out-Null
+            "source=rebuild" >> $env:GITHUB_OUTPUT
+            return
+          }
+
+          ./eng/verify-release-checksums.ps1 -ArtifactRoot './artifacts'
+          ./eng/validate-release-artifacts.ps1 `
+            -PackageDirectory './artifacts/packages' `
+            -Version $env:PACKAGE_VERSION `
+            -ManifestPath './artifacts/release-metadata/artifact-manifest.json' `
+            -Repository $env:REPOSITORY `
+            -RepositoryUrl $env:REPOSITORY_URL `
+            -Commit $env:VALIDATED_COMMIT `
+            -Branch $env:RELEASE_HISTORY_REF `
+            -CatalogPath './validated-source/eng/package-catalog.json' `
+            -SourceRoot './validated-source' `
+            -VerifyExistingManifest
+
+          Write-Host "Recovery will reuse the exact original release-package artifact bytes from run $env:ORIGINAL_RELEASE_RUN_ID."
+          "source=original" >> $env:GITHUB_OUTPUT
+
+      - name: Setup .NET for rebuild fallback
+        if: ${{ steps.artifact-source.outputs.source == 'rebuild' }}
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
-          global-json-file: global.json
+          global-json-file: validated-source/global.json
 
-      - name: Validate SLNX equivalence
+      - name: Validate SLNX equivalence for rebuild fallback
+        if: ${{ steps.artifact-source.outputs.source == 'rebuild' }}
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          ./eng/validate-slnx-equivalence.ps1
+          ./eng/validate-slnx-equivalence.ps1 `
+            -SlnPath './validated-source/Dapper.FluentMap.sln' `
+            -SlnxPath './validated-source/Dapper.FluentMap.slnx'
 
-      - name: Restore
-        run: dotnet restore ./Dapper.FluentMap.slnx
+      - name: Restore rebuild fallback source
+        if: ${{ steps.artifact-source.outputs.source == 'rebuild' }}
+        run: dotnet restore ./validated-source/Dapper.FluentMap.slnx
 
-      - name: Build validated release source
+      - name: Build rebuild fallback source
+        if: ${{ steps.artifact-source.outputs.source == 'rebuild' }}
         env:
-          PACKAGE_VERSION: ${{ inputs.version }}
-          VALIDATED_COMMIT: ${{ inputs.validated_commit }}
+          PACKAGE_VERSION: ${{ steps.source.outputs.resolved_version }}
+          VALIDATED_COMMIT: ${{ steps.source.outputs.resolved_commit }}
+          RELEASE_HISTORY_REF: ${{ steps.source.outputs.release_history_ref }}
         run: >-
-          dotnet build ./Dapper.FluentMap.slnx
+          dotnet build ./validated-source/Dapper.FluentMap.slnx
           --configuration Release
           --no-restore
           -p:Version="$PACKAGE_VERSION"
           -p:RepositoryCommit="$VALIDATED_COMMIT"
-          -p:RepositoryBranch=refs/heads/master
+          -p:RepositoryBranch="$RELEASE_HISTORY_REF"
           -p:ContinuousIntegrationBuild=true
 
-      - name: Run tests
-        run: dotnet test ./Dapper.FluentMap.slnx --configuration Release --no-build --no-restore
+      - name: Test rebuild fallback source
+        if: ${{ steps.artifact-source.outputs.source == 'rebuild' }}
+        run: dotnet test ./validated-source/Dapper.FluentMap.slnx --configuration Release --no-build --no-restore
 
-      - name: Pack release packages
+      - name: Pack rebuild fallback source
+        if: ${{ steps.artifact-source.outputs.source == 'rebuild' }}
         env:
-          PACKAGE_VERSION: ${{ inputs.version }}
-          VALIDATED_COMMIT: ${{ inputs.validated_commit }}
+          PACKAGE_VERSION: ${{ steps.source.outputs.resolved_version }}
+          VALIDATED_COMMIT: ${{ steps.source.outputs.resolved_commit }}
+          RELEASE_HISTORY_REF: ${{ steps.source.outputs.release_history_ref }}
         run: >-
-          dotnet pack ./Dapper.FluentMap.slnx
+          dotnet pack ./validated-source/Dapper.FluentMap.slnx
           --configuration Release
           --no-build
           --no-restore
           --output ./artifacts/packages
           -p:Version="$PACKAGE_VERSION"
           -p:RepositoryCommit="$VALIDATED_COMMIT"
-          -p:RepositoryBranch=refs/heads/master
+          -p:RepositoryBranch="$RELEASE_HISTORY_REF"
           -p:ContinuousIntegrationBuild=true
 
-      - name: Validate release artifacts and write manifest
+      - name: Validate rebuild fallback artifacts and write manifest
+        if: ${{ steps.artifact-source.outputs.source == 'rebuild' }}
         shell: pwsh
         env:
-          PACKAGE_VERSION: ${{ inputs.version }}
+          PACKAGE_VERSION: ${{ steps.source.outputs.resolved_version }}
           REPOSITORY: ${{ github.repository }}
           REPOSITORY_URL: https://github.com/${{ github.repository }}
-          COMMIT: ${{ inputs.validated_commit }}
+          COMMIT: ${{ steps.source.outputs.resolved_commit }}
+          RELEASE_HISTORY_REF: ${{ steps.source.outputs.release_history_ref }}
         run: |
           $ErrorActionPreference = 'Stop'
           ./eng/validate-release-artifacts.ps1 `
@@ -180,28 +336,64 @@ jobs:
             -Repository $env:REPOSITORY `
             -RepositoryUrl $env:REPOSITORY_URL `
             -Commit $env:COMMIT `
-            -Branch 'refs/heads/master'
+            -Branch $env:RELEASE_HISTORY_REF `
+            -CatalogPath './validated-source/eng/package-catalog.json' `
+            -SourceRoot './validated-source'
 
-      - name: Consumer smoke test release packages
+      - name: Consumer smoke test rebuild fallback artifacts
+        if: ${{ steps.artifact-source.outputs.source == 'rebuild' }}
         shell: pwsh
         env:
-          PACKAGE_VERSION: ${{ inputs.version }}
+          PACKAGE_VERSION: ${{ steps.source.outputs.resolved_version }}
         run: |
           $ErrorActionPreference = 'Stop'
           ./eng/consumer-smoke/run-consumer-smoke.ps1 `
             -PackageDirectory './artifacts/packages' `
-            -PackageVersion $env:PACKAGE_VERSION
+            -PackageVersion $env:PACKAGE_VERSION `
+            -CatalogPath './validated-source/eng/package-catalog.json'
 
-      - name: Generate and verify checksums
-        shell: bash
+      - name: Write rebuild fallback dependency inventory
+        if: ${{ steps.artifact-source.outputs.source == 'rebuild' }}
+        shell: pwsh
         run: |
-          set -euo pipefail
-          cd ./artifacts
-          {
-            find packages -type f \( -name '*.nupkg' -o -name '*.snupkg' \)
-            find release-metadata -type f -name '*.json'
-          } | sort | xargs sha256sum > ./release-metadata/SHA256SUMS
-          sha256sum --check ./release-metadata/SHA256SUMS
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path './artifacts/release-metadata' | Out-Null
+          dotnet list ./validated-source/Dapper.FluentMap.slnx package --include-transitive --format json |
+            Set-Content -Encoding utf8NoBOM -Path './artifacts/release-metadata/dependencies.json'
+
+      - name: Generate and verify rebuild fallback checksums
+        if: ${{ steps.artifact-source.outputs.source == 'rebuild' }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Import-Module './eng/PackageCatalog.psm1' -Force
+          $catalogPath = './validated-source/eng/package-catalog.json'
+          $artifactRoot = (Resolve-Path './artifacts').Path
+          $packageFiles = @(
+            Get-ChildItem './artifacts/packages' -File |
+              Where-Object { $_.Extension -in @('.nupkg', '.snupkg') }
+          )
+          $expectedPackageFileCount = @(Get-FluentMapPackages -CatalogPath $catalogPath).Count + @(Get-FluentMapPackages -CatalogPath $catalogPath -WithSymbols).Count
+
+          if ($packageFiles.Count -ne $expectedPackageFileCount) {
+            throw "Expected $expectedPackageFileCount package artifacts for checksums, found $($packageFiles.Count)."
+          }
+
+          $files = @(
+            $packageFiles
+            Get-Item './artifacts/release-metadata/artifact-manifest.json'
+            Get-Item './artifacts/release-metadata/dependencies.json'
+          ) | Sort-Object FullName
+
+          $lines = foreach ($file in $files) {
+            $relative = [System.IO.Path]::GetRelativePath($artifactRoot, $file.FullName).Replace('\', '/')
+            $hash = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $relative"
+          }
+
+          $checksumPath = Join-Path $artifactRoot 'release-metadata/SHA256SUMS'
+          [System.IO.File]::WriteAllLines($checksumPath, $lines, [System.Text.UTF8Encoding]::new($false))
+          ./eng/verify-release-checksums.ps1 -ArtifactRoot './artifacts'
 
       - name: Exchange GitHub OIDC token for temporary NuGet API key
         id: nuget-login
@@ -209,11 +401,11 @@ jobs:
         with:
           user: "${{ vars.NUGET_USER }}"
 
-      - name: Publish missing NuGet.org packages
+      - name: Recover and verify NuGet.org packages
         shell: pwsh
         env:
           NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
-          PACKAGE_VERSION: ${{ inputs.version }}
+          PACKAGE_VERSION: ${{ steps.source.outputs.resolved_version }}
         run: |
           $ErrorActionPreference = 'Stop'
           ./eng/publish-package-set.ps1 `
@@ -221,41 +413,290 @@ jobs:
             -Version $env:PACKAGE_VERSION `
             -Source 'https://api.nuget.org/v3/index.json' `
             -ApiKey $env:NUGET_API_KEY `
-            -Registry NuGetOrg
+            -Registry NuGetOrg `
+            -CatalogPath './validated-source/eng/package-catalog.json'
 
-      - name: Verify NuGet.org publication state
+      - name: Recover and verify GitHub Packages
+        shell: pwsh
+        env:
+          GITHUB_PACKAGE_SOURCE: https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json
+          GITHUB_PACKAGE_TOKEN: ${{ github.token }}
+          PACKAGE_VERSION: ${{ steps.source.outputs.resolved_version }}
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./eng/publish-package-set.ps1 `
+            -PackageDirectory './artifacts/packages' `
+            -Version $env:PACKAGE_VERSION `
+            -Source $env:GITHUB_PACKAGE_SOURCE `
+            -ApiKey $env:GITHUB_PACKAGE_TOKEN `
+            -Registry GitHubPackages `
+            -RepositoryOwner $env:REPOSITORY_OWNER `
+            -GitHubToken $env:GITHUB_PACKAGE_TOKEN `
+            -CatalogPath './validated-source/eng/package-catalog.json'
+
+      - name: Restore or verify release tag
         shell: bash
         env:
-          VERSION: ${{ inputs.version }}
+          RELEASE_TAG: ${{ steps.source.outputs.release_tag }}
+          VALIDATED_COMMIT: ${{ steps.source.outputs.resolved_commit }}
         run: |
           set -euo pipefail
 
-          version_lower="$(printf '%s' "$VERSION" | tr '[:upper:]' '[:lower:]')"
-          while IFS= read -r package_id; do
-            package_id_lower="$(printf '%s' "$package_id" | tr '[:upper:]' '[:lower:]')"
-            package_url="https://api.nuget.org/v3-flatcontainer/$package_id_lower/$version_lower/$package_id_lower.$version_lower.nupkg"
+          if [[ "$RELEASE_TAG" == "v3.0.0" ]]; then
+            echo "::error::Tag v3.0.0 is immutable and must not be recreated by recovery automation."
+            exit 1
+          fi
 
-            status="$(curl \
-              --silent \
-              --show-error \
-              --location \
-              --proto '=https' \
-              --proto-redir '=https' \
-              --retry 6 \
-              --retry-delay 5 \
-              --retry-all-errors \
-              --connect-timeout 10 \
-              --max-time 30 \
-              --output /dev/null \
-              --write-out '%{http_code}' \
-              "$package_url")"
+          git fetch origin master:refs/remotes/origin/master
+          git fetch --tags
 
-            if [[ "$status" != "200" ]]; then
-              echo "::error::$package_id $VERSION is not visible on NuGet.org after recovery (HTTP $status)."
+          if git rev-parse -q --verify "refs/tags/$RELEASE_TAG" >/dev/null; then
+            tag_sha="$(git rev-parse "refs/tags/$RELEASE_TAG^{commit}")"
+            if [[ "$tag_sha" != "$VALIDATED_COMMIT" ]]; then
+              echo "::error::Tag '$RELEASE_TAG' points to $tag_sha instead of validated commit $VALIDATED_COMMIT. Refusing to move the tag."
               exit 1
             fi
 
-            echo "$package_id $VERSION is visible on NuGet.org."
-          done < <(jq -r '.packages[].packageId' eng/package-catalog.json)
+            echo "Git tag: correct."
+            exit 0
+          fi
 
-          echo "Recovery completed: all expected package IDs are visible on NuGet.org."
+          git tag "$RELEASE_TAG" "$VALIDATED_COMMIT"
+          git push origin "refs/tags/$RELEASE_TAG"
+          echo "Git tag: restored $RELEASE_TAG to validated commit $VALIDATED_COMMIT."
+
+      - name: Write recovery attestation verification metadata
+        shell: pwsh
+        env:
+          SOURCE_TYPE: ${{ steps.source.outputs.source_type }}
+          RESOLVED_REF: ${{ steps.source.outputs.resolved_ref }}
+          RESOLVED_BRANCH: ${{ steps.source.outputs.resolved_branch }}
+          RESOLVED_TAG: ${{ steps.source.outputs.resolved_tag }}
+          PACKAGE_VERSION: ${{ steps.source.outputs.resolved_version }}
+          VALIDATED_COMMIT: ${{ steps.source.outputs.resolved_commit }}
+          RELEASE_TAG: ${{ steps.source.outputs.release_tag }}
+          ARTIFACT_SOURCE: ${{ steps.artifact-source.outputs.source }}
+          WORKFLOW_COMMIT: ${{ github.sha }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_ATTEMPT: ${{ github.run_attempt }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force -Path './artifacts/release-metadata' | Out-Null
+
+          $artifactRoot = (Resolve-Path './artifacts').Path
+          $subjectFiles = @(
+            Get-ChildItem './artifacts/packages' -File |
+              Where-Object { $_.Extension -in @('.nupkg', '.snupkg') }
+            Get-ChildItem './artifacts/release-metadata' -File |
+              Where-Object { $_.Name -ne 'recovery-attestation.json' }
+          ) | Sort-Object FullName
+
+          $subjects = foreach ($file in $subjectFiles) {
+            [ordered]@{
+              path = [System.IO.Path]::GetRelativePath($artifactRoot, $file.FullName).Replace('\', '/')
+              sha256 = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            }
+          }
+
+          $metadata = [ordered]@{
+            schemaVersion = '1.0'
+            purpose = 'release-recovery-attestation-verification'
+            sourceType = $env:SOURCE_TYPE
+            resolvedRef = $env:RESOLVED_REF
+            resolvedBranch = $env:RESOLVED_BRANCH
+            resolvedTag = $env:RESOLVED_TAG
+            releaseTag = $env:RELEASE_TAG
+            packageVersion = $env:PACKAGE_VERSION
+            validatedCommit = $env:VALIDATED_COMMIT
+            workflowCommit = $env:WORKFLOW_COMMIT
+            artifactSource = $env:ARTIFACT_SOURCE
+            runId = $env:RUN_ID
+            runAttempt = $env:RUN_ATTEMPT
+            subjects = @($subjects)
+          }
+
+          $metadata | ConvertTo-Json -Depth 8 |
+            Set-Content -LiteralPath './artifacts/release-metadata/recovery-attestation.json' -Encoding utf8NoBOM
+
+      - name: Create or update GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.source.outputs.release_tag }}
+          PACKAGE_VERSION: ${{ steps.source.outputs.resolved_version }}
+        run: |
+          set -euo pipefail
+
+          shopt -s nullglob
+          assets=(
+            ./artifacts/packages/*.nupkg
+            ./artifacts/packages/*.snupkg
+            ./artifacts/release-metadata/*
+          )
+
+          if (( ${#assets[@]} == 0 )); then
+            echo "::error::No governed release assets were found."
+            exit 1
+          fi
+
+          expected_assets_file="$(mktemp)"
+          actual_assets_file="$(mktemp)"
+          printf '%s\n' "${assets[@]##*/}" | sort -u > "$expected_assets_file"
+          expected_prerelease=false
+          if [[ "$PACKAGE_VERSION" == *-* ]]; then
+            expected_prerelease=true
+          fi
+
+          refresh_actual_assets() {
+            gh release view "$RELEASE_TAG" \
+              --repo "$GH_REPO" \
+              --json assets \
+              --jq '.assets[].name' | sort -u > "$actual_assets_file"
+          }
+
+          delete_unexpected_release_assets() {
+            refresh_actual_assets
+            comm -13 "$expected_assets_file" "$actual_assets_file" | while IFS= read -r unexpected_asset; do
+              if [[ -z "$unexpected_asset" ]]; then
+                continue
+              fi
+
+              echo "Deleting unexpected GitHub Release asset '$unexpected_asset'."
+              gh release delete-asset "$RELEASE_TAG" "$unexpected_asset" --repo "$GH_REPO" --yes
+            done
+          }
+
+          normalize_release_metadata() {
+            metadata_args=(--title "$RELEASE_TAG" --draft=false)
+            if [[ "$expected_prerelease" == "true" ]]; then
+              metadata_args+=(--prerelease=true)
+            else
+              metadata_args+=(--prerelease=false)
+            fi
+
+            gh release edit "$RELEASE_TAG" --repo "$GH_REPO" "${metadata_args[@]}"
+          }
+
+          verify_release_metadata() {
+            release_metadata="$(
+              gh release view "$RELEASE_TAG" \
+                --repo "$GH_REPO" \
+                --json tagName,name,isDraft,isPrerelease \
+                --jq '[.tagName, .name, (.isDraft | tostring), (.isPrerelease | tostring)] | @tsv'
+            )"
+
+            IFS=$'\t' read -r actual_tag actual_name actual_draft actual_prerelease <<< "$release_metadata"
+            if [[ "$actual_tag" != "$RELEASE_TAG" || "$actual_name" != "$RELEASE_TAG" || "$actual_draft" != "false" || "$actual_prerelease" != "$expected_prerelease" ]]; then
+              echo "::error::GitHub Release '$RELEASE_TAG' metadata does not match governed state. Expected title=$RELEASE_TAG draft=false prerelease=$expected_prerelease; got tag=$actual_tag title=$actual_name draft=$actual_draft prerelease=$actual_prerelease."
+              exit 1
+            fi
+          }
+
+          verify_governed_release_assets() {
+            refresh_actual_assets
+            if ! diff -u "$expected_assets_file" "$actual_assets_file"; then
+              echo "::error::GitHub Release '$RELEASE_TAG' asset set does not match governed artifacts."
+              exit 1
+            fi
+          }
+
+          release_args=(--verify-tag --generate-notes --title "$RELEASE_TAG")
+          if [[ "$expected_prerelease" == "true" ]]; then
+            release_args+=(--prerelease)
+          fi
+
+          if gh release view "$RELEASE_TAG" --repo "$GH_REPO" >/dev/null 2>&1; then
+            echo "GitHub Release '$RELEASE_TAG' already exists; refreshing governed release artifacts."
+            normalize_release_metadata
+            delete_unexpected_release_assets
+            gh release upload "$RELEASE_TAG" "${assets[@]}" --repo "$GH_REPO" --clobber
+            verify_release_metadata
+            verify_governed_release_assets
+            exit 0
+          fi
+
+          gh release create "$RELEASE_TAG" \
+            "${assets[@]}" \
+            --repo "$GH_REPO" \
+            "${release_args[@]}"
+          verify_release_metadata
+          verify_governed_release_assets
+
+      - name: Attest recovered release artifacts
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            ./artifacts/packages/*.nupkg
+            ./artifacts/packages/*.snupkg
+            ./artifacts/release-metadata/artifact-manifest.json
+            ./artifacts/release-metadata/dependencies.json
+            ./artifacts/release-metadata/recovery-attestation.json
+            ./artifacts/release-metadata/SHA256SUMS
+
+      - name: Final release reconciliation summary
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.source.outputs.release_tag }}
+          PACKAGE_VERSION: ${{ steps.source.outputs.resolved_version }}
+          VALIDATED_COMMIT: ${{ steps.source.outputs.resolved_commit }}
+          ARTIFACT_SOURCE: ${{ steps.artifact-source.outputs.source }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          $tagSha = (& git rev-list -n 1 $env:RELEASE_TAG).Trim()
+          if ($tagSha -ne $env:VALIDATED_COMMIT) {
+            throw "Final reconciliation failed: $env:RELEASE_TAG points to $tagSha instead of $env:VALIDATED_COMMIT."
+          }
+
+          & gh release view $env:RELEASE_TAG --repo $env:GH_REPO *> $null
+          if ($LASTEXITCODE -ne 0) {
+            throw "Final reconciliation failed: GitHub Release $env:RELEASE_TAG is absent."
+          }
+
+          $releaseState = & gh release view $env:RELEASE_TAG --repo $env:GH_REPO --json tagName,name,isDraft,isPrerelease | ConvertFrom-Json
+          $expectedPrerelease = $env:PACKAGE_VERSION.Contains('-')
+          if ([string]$releaseState.tagName -ne $env:RELEASE_TAG -or
+              [string]$releaseState.name -ne $env:RELEASE_TAG -or
+              [bool]$releaseState.isDraft -or
+              [bool]$releaseState.isPrerelease -ne $expectedPrerelease) {
+            throw "Final reconciliation failed: GitHub Release $env:RELEASE_TAG metadata does not match governed state."
+          }
+
+          $expectedReleaseAssets = @(
+            Get-ChildItem -LiteralPath './artifacts/packages' -File |
+              Where-Object { $_.Extension -in @('.nupkg', '.snupkg') } |
+              ForEach-Object { $_.Name }
+            Get-ChildItem -LiteralPath './artifacts/release-metadata' -File |
+              ForEach-Object { $_.Name }
+          ) | Sort-Object -Unique
+          $actualReleaseAssets = @(& gh release view $env:RELEASE_TAG --repo $env:GH_REPO --json assets --jq '.assets[].name' | Sort-Object -Unique)
+          $missingReleaseAssets = @($expectedReleaseAssets | Where-Object { $_ -notin $actualReleaseAssets })
+          $unexpectedReleaseAssets = @($actualReleaseAssets | Where-Object { $_ -notin $expectedReleaseAssets })
+          if ($missingReleaseAssets.Count -gt 0 -or $unexpectedReleaseAssets.Count -gt 0) {
+            $details = @()
+            if ($missingReleaseAssets.Count -gt 0) {
+              $details += "missing: $($missingReleaseAssets -join ', ')"
+            }
+
+            if ($unexpectedReleaseAssets.Count -gt 0) {
+              $details += "unexpected: $($unexpectedReleaseAssets -join ', ')"
+            }
+
+            throw "Final reconciliation failed: GitHub Release $env:RELEASE_TAG asset set does not match governed artifacts ($($details -join '; '))."
+          }
+
+          $artifactSourceLabel = if ($env:ARTIFACT_SOURCE -eq 'original') { 'original release-package artifact' } else { 'deterministic rebuild fallback' }
+          Write-Host 'Release recovery reconciliation summary:'
+          Write-Host "validated commit: OK ($env:VALIDATED_COMMIT)"
+          Write-Host "release artifacts: $artifactSourceLabel + validated"
+          Write-Host 'NuGet.org primary packages: complete and content-validated after asynchronous convergence'
+          Write-Host 'NuGet.org symbol packages: submitted via NuGet.org V3 tooling; NuGet.org exposes no public .snupkg content-comparison endpoint'
+          Write-Host 'GitHub Packages: complete'
+          Write-Host "Git tag: correct ($env:RELEASE_TAG)"
+          Write-Host 'GitHub Release metadata and assets: exact governed state'
+          Write-Host "attestations: recreated for recovered release artifacts with validated commit metadata ($env:VALIDATED_COMMIT)"
+          Write-Host 'Release recovery completed and governed release state reconciled.'

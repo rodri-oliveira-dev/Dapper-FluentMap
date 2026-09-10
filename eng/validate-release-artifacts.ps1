@@ -14,7 +14,13 @@ param(
 
   [string]$Commit,
 
-  [string]$Branch
+  [string]$Branch,
+
+  [string]$CatalogPath,
+
+  [string]$SourceRoot,
+
+  [switch]$VerifyExistingManifest
 )
 
 Set-StrictMode -Version Latest
@@ -29,39 +35,239 @@ function Fail {
   throw "Release artifact validation failed: $Message"
 }
 
-$catalogPackages = @(Get-FluentMapPackages)
-$symbolCatalogPackages = @(Get-FluentMapPackages -WithSymbols)
-$expectedNupkgIds = @($catalogPackages | ForEach-Object { [string]$_.packageId })
-$expectedSnupkgIds = @($symbolCatalogPackages | ForEach-Object { [string]$_.packageId })
-$expectedDependencies = @{}
-foreach ($package in $catalogPackages) {
-  $expectedDependencies[[string]$package.packageId] = switch ([string]$package.project) {
-    'Dapper.FluentMap' {
-      @{
-        'Dapper' = '[2.1.79, 3.0.0)'
-        'Microsoft.Bcl.AsyncInterfaces' = '10.0.11'
-      }
+function Resolve-MSBuildValue {
+  param(
+    [string]$Value,
+    [hashtable]$Properties
+  )
+
+  $resolved = $Value
+  for ($attempt = 0; $attempt -lt 10; $attempt++) {
+    $changed = $false
+    $resolved = [regex]::Replace(
+      $resolved,
+      '\$\(([^)]+)\)',
+      {
+        param($match)
+        $propertyName = $match.Groups[1].Value
+        if ($Properties.ContainsKey($propertyName)) {
+          $changed = $true
+          return [string]$Properties[$propertyName]
+        }
+
+        return $match.Value
+      })
+
+    if (-not $changed) {
+      break
     }
-    'Dapper.FluentMap.Dommel' {
-      @{
-        'Dapper.FluentMap' = $Version
-        'Dapper' = '[2.1.79, 3.0.0)'
-        'Dommel' = '[3.5.3, 4.0.0)'
-      }
+  }
+
+  return $resolved
+}
+
+function Test-PropertyConditionAllowsSet {
+  param(
+    [string]$Condition,
+    [string]$PropertyName,
+    [hashtable]$Properties
+  )
+
+  if ([string]::IsNullOrWhiteSpace($Condition)) {
+    return $true
+  }
+
+  if ($Condition -match "^\s*'\$\(([A-Za-z0-9_.-]+)\)'\s*==\s*''\s*$") {
+    return [string]::IsNullOrWhiteSpace([string]$Properties[$Matches[1]])
+  }
+
+  if ($Condition -match "^\s*'\$\(([A-Za-z0-9_.-]+)\)'\s*!=\s*''\s*$") {
+    return -not [string]::IsNullOrWhiteSpace([string]$Properties[$Matches[1]])
+  }
+
+  if ($Condition -match "^\s*'\$\(([A-Za-z0-9_.-]+)\)'\s*==\s*'([^']*)'\s*$") {
+    return [string]$Properties[$Matches[1]] -eq $Matches[2]
+  }
+
+  if ($Condition -match "^\s*'\$\(([A-Za-z0-9_.-]+)\)'\s*!=\s*'([^']*)'\s*$") {
+    return [string]$Properties[$Matches[1]] -ne $Matches[2]
+  }
+
+  if ($Condition -match [regex]::Escape("'$(" + $PropertyName + ")' == ''")) {
+    return [string]::IsNullOrWhiteSpace([string]$Properties[$PropertyName])
+  }
+
+  return $true
+}
+
+function Add-MSBuildProperties {
+  param(
+    [string]$ProjectPath,
+    [hashtable]$Properties
+  )
+
+  [xml]$projectXml = Get-Content -LiteralPath $ProjectPath
+  foreach ($property in @($projectXml.SelectNodes('//*[local-name()="PropertyGroup"]/*'))) {
+    if ($property.ChildNodes.Count -gt 1) {
+      continue
     }
-    'Dapper.FluentMap.DependencyInjection' {
-      @{
-        'Dapper.FluentMap' = $Version
-        'Microsoft.Extensions.DependencyInjection.Abstractions' = '10.0.11'
-      }
-    }
-    'Dapper.FluentMap.Analyzers' { @{} }
-    'Dapper.FluentMap.Generators' { @{} }
-    default {
-      Fail "Package catalog contains unexpected project identity '$($package.project)'."
+
+    $propertyName = $property.LocalName
+    if (Test-PropertyConditionAllowsSet -Condition $property.GetAttribute('Condition') -PropertyName $propertyName -Properties $Properties) {
+      $Properties[$propertyName] = Resolve-MSBuildValue -Value $property.InnerText -Properties $Properties
     }
   }
 }
+
+function Get-MSBuildProperties {
+  param(
+    [string]$SourceRootPath,
+    [string]$ProjectPath
+  )
+
+  $properties = @{}
+  $directoryBuildProps = Join-Path $SourceRootPath 'Directory.Build.props'
+  if (Test-Path -LiteralPath $directoryBuildProps -PathType Leaf) {
+    Add-MSBuildProperties -ProjectPath $directoryBuildProps -Properties $properties
+  }
+
+  Add-MSBuildProperties -ProjectPath $ProjectPath -Properties $properties
+  return $properties
+}
+
+function Get-XmlChildText {
+  param(
+    [System.Xml.XmlNode]$Node,
+    [string]$Name
+  )
+
+  $child = $Node.ChildNodes |
+    Where-Object { $_.LocalName -eq $Name } |
+    Select-Object -First 1
+
+  if ($null -eq $child) {
+    return $null
+  }
+
+  return $child.InnerText
+}
+
+function Test-SuppressDependenciesWhenPacking {
+  param(
+    [xml]$ProjectXml,
+    [hashtable]$Properties
+  )
+
+  $value = Get-XmlChildText -Node $ProjectXml.Project -Name 'SuppressDependenciesWhenPacking'
+  if ([string]::IsNullOrWhiteSpace($value)) {
+    $value = [string]$Properties['SuppressDependenciesWhenPacking']
+  }
+
+  return $value -eq 'true'
+}
+
+function Test-PrivatePackageReference {
+  param([System.Xml.XmlNode]$PackageReference)
+
+  $privateAssets = $PackageReference.GetAttribute('PrivateAssets')
+  if ([string]::IsNullOrWhiteSpace($privateAssets)) {
+    $privateAssets = Get-XmlChildText -Node $PackageReference -Name 'PrivateAssets'
+  }
+
+  return @($privateAssets -split '[;, ]+' | Where-Object { $_ -eq 'all' }).Count -gt 0
+}
+
+function Normalize-PathKey {
+  param([string]$Path)
+  return [System.IO.Path]::GetFullPath($Path).TrimEnd([System.IO.Path]::DirectorySeparatorChar, [System.IO.Path]::AltDirectorySeparatorChar).ToUpperInvariant()
+}
+
+function Normalize-DependencyVersion {
+  param([string]$DependencyVersion)
+
+  if ($null -eq $DependencyVersion) {
+    return $null
+  }
+
+  return ($DependencyVersion -replace '\s+', '')
+}
+
+function Get-ExpectedDependencies {
+  param(
+    [string]$SourceRootPath,
+    [array]$Packages
+  )
+
+  $packagesByProjectPath = @{}
+  foreach ($package in $Packages) {
+    $projectPath = Join-Path $SourceRootPath ([string]$package.projectPath)
+    if (-not (Test-Path -LiteralPath $projectPath -PathType Leaf)) {
+      Fail "Package catalog references missing project '$($package.projectPath)' under '$SourceRootPath'."
+    }
+
+    $packagesByProjectPath[(Normalize-PathKey -Path $projectPath)] = $package
+  }
+
+  $expected = @{}
+  foreach ($package in $Packages) {
+    $packageId = [string]$package.packageId
+    $projectPath = [System.IO.Path]::GetFullPath((Join-Path $SourceRootPath ([string]$package.projectPath)))
+    [xml]$projectXml = Get-Content -LiteralPath $projectPath
+    $properties = Get-MSBuildProperties -SourceRootPath $SourceRootPath -ProjectPath $projectPath
+    $dependencies = @{}
+
+    foreach ($projectReference in @($projectXml.SelectNodes('//*[local-name()="ProjectReference"]'))) {
+      $include = $projectReference.GetAttribute('Include')
+      if ([string]::IsNullOrWhiteSpace($include)) {
+        continue
+      }
+
+      $referencedProjectPath = [System.IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $projectPath) $include))
+      $referencedKey = Normalize-PathKey -Path $referencedProjectPath
+      if ($packagesByProjectPath.ContainsKey($referencedKey)) {
+        $referencedPackage = $packagesByProjectPath[$referencedKey]
+        $dependencies[[string]$referencedPackage.packageId] = $Version
+      }
+    }
+
+    if (-not (Test-SuppressDependenciesWhenPacking -ProjectXml $projectXml -Properties $properties)) {
+      foreach ($packageReference in @($projectXml.SelectNodes('//*[local-name()="PackageReference"]'))) {
+        if (Test-PrivatePackageReference -PackageReference $packageReference) {
+          continue
+        }
+
+        $dependencyId = $packageReference.GetAttribute('Include')
+        if ([string]::IsNullOrWhiteSpace($dependencyId)) {
+          $dependencyId = $packageReference.GetAttribute('Update')
+        }
+
+        if ([string]::IsNullOrWhiteSpace($dependencyId)) {
+          continue
+        }
+
+        $dependencyVersion = $packageReference.GetAttribute('Version')
+        if ([string]::IsNullOrWhiteSpace($dependencyVersion)) {
+          $dependencyVersion = Get-XmlChildText -Node $packageReference -Name 'Version'
+        }
+
+        if ([string]::IsNullOrWhiteSpace($dependencyVersion)) {
+          Fail "PackageReference '$dependencyId' in '$projectPath' does not specify a Version."
+        }
+
+        $dependencies[$dependencyId] = Resolve-MSBuildValue -Value $dependencyVersion -Properties $properties
+      }
+    }
+
+    $expected[$packageId] = $dependencies
+  }
+
+  return $expected
+}
+
+$catalogPackages = @(Get-FluentMapPackages -CatalogPath $CatalogPath)
+$symbolCatalogPackages = @(Get-FluentMapPackages -CatalogPath $CatalogPath -WithSymbols)
+$expectedNupkgIds = @($catalogPackages | ForEach-Object { [string]$_.packageId })
+$expectedSnupkgIds = @($symbolCatalogPackages | ForEach-Object { [string]$_.packageId })
 
 function Get-GitOutput {
   param([string[]]$Arguments)
@@ -203,7 +409,7 @@ function Assert-Dependencies {
     -Description "Dependency IDs for $PackageId"
 
   foreach ($dependencyId in $Expected.Keys) {
-    if ($Actual[$dependencyId] -ne $Expected[$dependencyId]) {
+    if ((Normalize-DependencyVersion -DependencyVersion $Actual[$dependencyId]) -ne (Normalize-DependencyVersion -DependencyVersion $Expected[$dependencyId])) {
       Fail "Dependency $dependencyId in $PackageId has version '$($Actual[$dependencyId])', expected '$($Expected[$dependencyId])'."
     }
   }
@@ -359,6 +565,13 @@ if ([string]::IsNullOrWhiteSpace($ManifestPath)) {
   $ManifestPath = Join-Path $PackageDirectory 'release-artifact-manifest.json'
 }
 
+if ([string]::IsNullOrWhiteSpace($SourceRoot)) {
+  $SourceRoot = Join-Path $PSScriptRoot '..'
+}
+
+$sourceRootFullPath = (Resolve-Path -LiteralPath $SourceRoot).Path
+$expectedDependencies = Get-ExpectedDependencies -SourceRootPath $sourceRootFullPath -Packages $catalogPackages
+
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
 $packageRoot = (Resolve-Path -LiteralPath $PackageDirectory).Path
@@ -376,12 +589,13 @@ if ($snupkgs.Count -ne $expectedSnupkgIds.Count) {
 
 $expectedNupkgNames = @($catalogPackages | ForEach-Object { Get-FluentMapPackageFileName -Package $_ -Version $Version })
 $expectedSnupkgNames = @($symbolCatalogPackages | ForEach-Object { Get-FluentMapPackageFileName -Package $_ -Version $Version -Kind symbols })
-Assert-SetEquals -Expected $expectedNupkgNames -Actual ([string[]]@($nupkgs.Name)) -Description '.nupkg file set'
-Assert-SetEquals -Expected $expectedSnupkgNames -Actual ([string[]]@($snupkgs.Name)) -Description '.snupkg file set'
+Assert-SetEquals -Expected $expectedNupkgNames -Actual ([string[]]@($nupkgs | ForEach-Object { $_.Name })) -Description '.nupkg file set'
+Assert-SetEquals -Expected $expectedSnupkgNames -Actual ([string[]]@($snupkgs | ForEach-Object { $_.Name })) -Description '.snupkg file set'
 
 $forbiddenArtifacts = @($allArtifacts | Where-Object { $_.Name -match '(?i)(Tests|Benchmarks|AotSmoke)' })
 if ($forbiddenArtifacts.Count -gt 0) {
-  Fail "Unexpected test/benchmark/smoke artifacts: $($forbiddenArtifacts.Name -join ', ')."
+  $forbiddenArtifactNames = @($forbiddenArtifacts | ForEach-Object { $_.Name })
+  Fail "Unexpected test/benchmark/smoke artifacts: $($forbiddenArtifactNames -join ', ')."
 }
 
 $packageInfos = @{}
@@ -488,16 +702,33 @@ $manifest = [ordered]@{
 }
 
 $manifestFullPath = [System.IO.Path]::GetFullPath($ManifestPath)
-$manifestDirectory = Split-Path -Parent $manifestFullPath
-if (-not [string]::IsNullOrWhiteSpace($manifestDirectory)) {
-  New-Item -ItemType Directory -Force -Path $manifestDirectory | Out-Null
-}
 
 $manifestJson = $manifest | ConvertTo-Json -Depth 8
-[System.IO.File]::WriteAllText(
-  $manifestFullPath,
-  $manifestJson + [Environment]::NewLine,
-  [System.Text.UTF8Encoding]::new($false))
+
+if ($VerifyExistingManifest) {
+  if (-not (Test-Path -LiteralPath $manifestFullPath -PathType Leaf)) {
+    Fail "Expected existing manifest '$manifestFullPath' was not found."
+  }
+
+  $existingManifest = Get-Content -Raw -LiteralPath $manifestFullPath
+  $normalizedExistingManifest = ($existingManifest.TrimEnd() | ConvertFrom-Json | ConvertTo-Json -Depth 8).TrimEnd()
+  $normalizedExpectedManifest = $manifestJson.TrimEnd()
+
+  if ($normalizedExistingManifest -ne $normalizedExpectedManifest) {
+    Fail "Existing manifest '$manifestFullPath' does not match the validated release artifact set for $Version, repository '$Repository', commit '$Commit', and branch '$Branch'."
+  }
+}
+else {
+  $manifestDirectory = Split-Path -Parent $manifestFullPath
+  if (-not [string]::IsNullOrWhiteSpace($manifestDirectory)) {
+    New-Item -ItemType Directory -Force -Path $manifestDirectory | Out-Null
+  }
+
+  [System.IO.File]::WriteAllText(
+    $manifestFullPath,
+    $manifestJson + [Environment]::NewLine,
+    [System.Text.UTF8Encoding]::new($false))
+}
 
 $expectedArtifactCount = $expectedNupkgIds.Count + $expectedSnupkgIds.Count
 $validatedManifest = Get-Content -Raw -Path $manifestFullPath | ConvertFrom-Json
@@ -505,4 +736,9 @@ if ($validatedManifest.version -ne $Version -or @($validatedManifest.packages).C
   Fail "Generated manifest '$manifestFullPath' did not round-trip with the expected version and package count."
 }
 
-Write-Host "Validated $($expectedNupkgIds.Count) .nupkg files, $($expectedSnupkgIds.Count) .snupkg files and wrote manifest '$manifestFullPath' for $Version."
+if ($VerifyExistingManifest) {
+  Write-Host "Validated $($expectedNupkgIds.Count) .nupkg files, $($expectedSnupkgIds.Count) .snupkg files and verified existing manifest '$manifestFullPath' for $Version."
+}
+else {
+  Write-Host "Validated $($expectedNupkgIds.Count) .nupkg files, $($expectedSnupkgIds.Count) .snupkg files and wrote manifest '$manifestFullPath' for $Version."
+}
