@@ -620,6 +620,8 @@ Invoke-Test 'recovery workflow reconciles governed release state' {
       'Recover and verify GitHub Packages',
       'Restore or verify release tag',
       'Create or update GitHub Release',
+      'gh release delete-asset',
+      'GitHub Release assets: exact governed set',
       'Attest recovered release artifacts',
       'Release recovery completed and governed release state reconciled.'
     )) {
@@ -627,6 +629,7 @@ Invoke-Test 'recovery workflow reconciles governed release state' {
   }
 
   Assert-Contains $recoveryWorkflow 'Refusing to move the tag' 'recovery must fail closed when the release tag points to the wrong commit.'
+  Assert-Contains $recoveryWorkflow 'asset set does not match governed artifacts' 'recovery must fail closed when GitHub Release assets differ from governed artifacts.'
   Assert-Contains $recoveryWorkflow 'source=rebuild' 'recovery must expose deterministic rebuild fallback when original artifacts are unavailable.'
   Assert-Contains $recoveryWorkflow 'headSha' 'recovery must validate that original artifacts came from the requested commit.'
   Assert-True ($recoveryWorkflow.IndexOf('validated_commit:', [System.StringComparison]::Ordinal) -lt 0) 'validated_commit must not remain an operator-facing workflow input.'
@@ -809,6 +812,17 @@ Invoke-Test 'NuGet.org recovery fails closed on existing artifact mismatch' {
 
   Assert-True (-not $result.Succeeded) 'artifact mismatch should fail.'
   Assert-Contains $result.Output 'does not match the local artifact' 'artifact mismatch diagnostic should be precise.'
+}
+
+Invoke-Test 'NuGet.org recovery validates all existing packages before first push' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('404')
+    B = @('200')
+  } -DifferentRemotePackages @('B')
+
+  Assert-True (-not $result.Succeeded) 'later existing package mismatch should fail before publication.'
+  Assert-Contains $result.Output 'does not match the local artifact' 'artifact mismatch diagnostic should be precise.'
+  Assert-True (@($result.PushLog).Count -eq 0) 'No package should be pushed before every existing package has passed content preflight.'
 }
 
 Invoke-Test 'NuGet.org async indexing does not block submission of remaining primary packages' {

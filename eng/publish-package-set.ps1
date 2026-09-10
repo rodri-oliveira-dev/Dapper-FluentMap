@@ -357,6 +357,8 @@ $symbolPackages = @(Get-FluentMapPackages -CatalogPath $CatalogPath -WithSymbols
 
 if ($Registry -eq 'NuGetOrg') {
   $packagePaths = @{}
+  $missingPackages = @()
+  $existingPackageCount = 0
 
   foreach ($package in $packages) {
     $packageId = [string]$package.packageId
@@ -371,16 +373,26 @@ if ($Registry -eq 'NuGetOrg') {
     switch ($status) {
       '200' {
         Assert-NuGetOrgPackageMatches -PackageId $packageId -LocalPackagePath $packagePath
+        $existingPackageCount++
       }
       '404' {
-        Write-Output "NuGet.org: $packageId $Version is not currently published; submitting local artifact without waiting for indexing."
-        Invoke-DotNetNuGetPush -PackageId $packageId -PackagePath $packagePath -AdditionalArguments @('--no-symbols')
-        Write-Output "NuGet.org: accepted primary package $packageId $Version; validation and indexing continue asynchronously."
+        Write-Output "NuGet.org: $packageId $Version is not currently published; local artifact will be submitted after existing package content preflight completes."
+        $missingPackages += $package
       }
       default {
         Fail "Unexpected NuGet.org response HTTP $status for $packageId $Version. Failing closed."
       }
     }
+  }
+
+  Write-Output "NuGet.org: preflight validated $existingPackageCount existing primary package identity or identities before publishing $($missingPackages.Count) missing identity or identities."
+
+  foreach ($package in $missingPackages) {
+    $packageId = [string]$package.packageId
+    $packagePath = $packagePaths[$packageId]
+    Write-Output "NuGet.org: submitting missing primary package $packageId $Version without waiting for indexing."
+    Invoke-DotNetNuGetPush -PackageId $packageId -PackagePath $packagePath -AdditionalArguments @('--no-symbols')
+    Write-Output "NuGet.org: accepted primary package $packageId $Version; validation and indexing continue asynchronously."
   }
 
   Wait-NuGetOrgPackageSetConverged -ExpectedPackages $packages -PackagePaths $packagePaths
