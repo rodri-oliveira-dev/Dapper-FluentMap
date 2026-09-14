@@ -3,8 +3,8 @@
     <FluentMapPackageVersionPrefix Condition="'$(FluentMapPackageVersionPrefix)' == ''">3.0.1</FluentMapPackageVersionPrefix>
     <FluentMapPackageVersionSuffix Condition="'$(Version)' == '' and '$(VersionSuffix)' == '' and '$(FluentMapPackageVersionPrefix)' == '3.0.1'">dev</FluentMapPackageVersionSuffix>
     <VersionSuffix Condition="'$(FluentMapPackageVersionSuffix)' != '' and '$(VersionSuffix)' == ''">$(FluentMapPackageVersionSuffix)</VersionSuffix>
-    <DapperMinimumSupportedVersion>2.1.86</DapperMinimumSupportedVersion>
-    <DapperLatestStableVersion>2.1.79</DapperLatestStableVersion>
+    <DapperMinimumSupportedVersion>2.1.79</DapperMinimumSupportedVersion>
+    <DapperLatestStableVersion>2.1.86</DapperLatestStableVersion>
     <DapperPackageVersion Condition="'$(DapperPackageVersion)' == ''">[$(DapperMinimumSupportedVersion),3.0.0)</DapperPackageVersion>
     <DommelPackageVersion Condition="'$(DommelPackageVersion)' == ''">[3.5.3,4.0.0)</DommelPackageVersion>
   </PropertyGroup>
