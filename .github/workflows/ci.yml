@@ -70,8 +70,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - dapper-lane: minimum-and-latest-stable
+          - dapper-lane: minimum
             dapper-version: 2.1.79
+          - dapper-lane: latest-stable
+            dapper-version: 2.1.86
 
     steps:
       - name: Checkout
