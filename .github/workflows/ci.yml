@@ -70,8 +70,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - dapper-lane: minimum-and-latest-stable
+          - dapper-lane: minimum
             dapper-version: 2.1.79
+          - dapper-lane: latest-stable
+            dapper-version: 2.1.86
 
     steps:
       - name: Checkout
@@ -303,7 +305,7 @@ jobs:
           global-json-file: global.json
 
       - name: Setup Java
-        uses: actions/setup-java@dd06d9cba3e5552c54d9f8ea23572deb30010f7c # v6
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
         with:
           distribution: temurin
           java-version: "21"
@@ -516,7 +518,7 @@ jobs:
 
       - name: Comment Sonar quality gate on PR
         if: ${{ always() && github.event_name == 'pull_request' && (steps.sonar_quality_gate.outcome == 'success' || failure()) }}
-        uses: actions/github-script@373c709c69115d41ff229c7e5df9f8788daa9553 # v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           script: |
             const fs = require("fs");

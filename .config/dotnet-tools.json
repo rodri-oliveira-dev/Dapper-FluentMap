@@ -10,14 +10,14 @@
       "rollForward": false
     },
     "dotnet-coverage": {
-      "version": "18.11.0",
+      "version": "18.11.2",
       "commands": [
         "dotnet-coverage"
       ],
       "rollForward": false
     },
     "rodrioliveira.adrguard": {
-      "version": "0.1.8",
+      "version": "0.1.9",
       "commands": [
         "adr-guard"
       ],
