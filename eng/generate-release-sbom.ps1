@@ -243,7 +243,7 @@ foreach ($package in $catalogPackages) {
         }
 
         if ($dependencyVersion -match '^[0-9]+(\.[0-9A-Za-z-]+)+([+-][0-9A-Za-z.-]+)?$') {
-          $dependencyPackage.externalRefs = @(
+          $dependencyPackage['externalRefs'] = @(
             [ordered]@{
               referenceCategory = 'PACKAGE-MANAGER'
               referenceType = 'purl'
