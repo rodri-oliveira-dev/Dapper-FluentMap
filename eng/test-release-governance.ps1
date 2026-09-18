@@ -734,6 +734,7 @@ function Invoke-ReleaseSbomScenario {
     & (Join-Path $repoRoot 'eng/generate-release-sbom.ps1') @arguments
     if ($PreserveExisting) {
       $beforeHash = (Get-FileHash -LiteralPath $outputPath -Algorithm SHA256).Hash
+      $arguments.CreatedUtc = '2026-09-19T12:00:00Z'
       & (Join-Path $repoRoot 'eng/generate-release-sbom.ps1') @arguments -PreserveExisting
       $afterHash = (Get-FileHash -LiteralPath $outputPath -Algorithm SHA256).Hash
       if ($beforeHash -ne $afterHash) {
