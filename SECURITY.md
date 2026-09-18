@@ -36,7 +36,7 @@ Recovery preserves an existing SBOM when it matches the resolved package set and
 
 For byte-for-byte attestation verification, use the `.nupkg` downloaded from the GitHub Release. Package registries may add repository-signing metadata after publication, which can legitimately change the package bytes.
 
-Verify build provenance:
+Verify build provenance for a normal release:
 
 ```bash
 gh attestation verify Dapper.FluentMap.<version>.nupkg \
@@ -44,7 +44,9 @@ gh attestation verify Dapper.FluentMap.<version>.nupkg \
   --signer-workflow rodri-oliveira-dev/Dapper-FluentMap/.github/workflows/release.yml
 ```
 
-Verify the SPDX 2.3 SBOM attestation:
+If the release was reconciled by the recovery workflow, use `rodri-oliveira-dev/Dapper-FluentMap/.github/workflows/release-recovery-missing-nuget.yml` as the `--signer-workflow` value instead.
+
+Verify the SPDX 2.3 SBOM attestation for a normal release:
 
 ```bash
 gh attestation verify Dapper.FluentMap.<version>.nupkg \
@@ -52,5 +54,7 @@ gh attestation verify Dapper.FluentMap.<version>.nupkg \
   --signer-workflow rodri-oliveira-dev/Dapper-FluentMap/.github/workflows/release.yml \
   --predicate-type https://spdx.dev/Document/v2.3
 ```
+
+For a release reconciled by recovery, use the recovery workflow path above for `--signer-workflow` in the SBOM verification command as well.
 
 Artifact attestations and SBOMs establish provenance and component inventory; they complement rather than replace tests, package validation, Dependency Review, CodeQL, NuGet auditing, Trusted Publishing, and human review.
