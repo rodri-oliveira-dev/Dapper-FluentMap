@@ -361,8 +361,18 @@ jobs:
           dotnet list ./validated-source/Dapper.FluentMap.slnx package --include-transitive --format json |
             Set-Content -Encoding utf8NoBOM -Path './artifacts/release-metadata/dependencies.json'
 
-      - name: Generate and verify rebuild fallback checksums
-        if: ${{ steps.artifact-source.outputs.source == 'rebuild' }}
+      - name: Generate or preserve release SBOM
+        shell: pwsh
+        env:
+          PACKAGE_VERSION: ${{ steps.source.outputs.resolved_version }}
+          REPOSITORY: ${{ github.repository }}
+          VALIDATED_COMMIT: ${{ steps.source.outputs.resolved_commit }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $createdUtc = (& git -C './validated-source' show -s --format=%cI $env:VALIDATED_COMMIT).Trim()
+          ./eng/generate-release-sbom.ps1 -PackageDirectory './artifacts/packages' -Version $env:PACKAGE_VERSION -OutputPath './artifacts/release-metadata/release.sbom.spdx.json' -Repository $env:REPOSITORY -Commit $env:VALIDATED_COMMIT -CatalogPath './validated-source/eng/package-catalog.json' -CreatedUtc $createdUtc -PreserveExisting
+
+      - name: Generate and verify governed release checksums
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -383,6 +393,7 @@ jobs:
             $packageFiles
             Get-Item './artifacts/release-metadata/artifact-manifest.json'
             Get-Item './artifacts/release-metadata/dependencies.json'
+            Get-Item './artifacts/release-metadata/release.sbom.spdx.json'
           ) | Sort-Object FullName
 
           $lines = foreach ($file in $files) {
@@ -632,8 +643,15 @@ jobs:
             ./artifacts/packages/*.snupkg
             ./artifacts/release-metadata/artifact-manifest.json
             ./artifacts/release-metadata/dependencies.json
+            ./artifacts/release-metadata/release.sbom.spdx.json
             ./artifacts/release-metadata/recovery-attestation.json
             ./artifacts/release-metadata/SHA256SUMS
+
+      - name: Attest recovered release SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: ./artifacts/packages/*.nupkg
+          sbom-path: ./artifacts/release-metadata/release.sbom.spdx.json
 
       - name: Final release reconciliation summary
         shell: pwsh
@@ -698,5 +716,5 @@ jobs:
           Write-Host 'GitHub Packages: complete'
           Write-Host "Git tag: correct ($env:RELEASE_TAG)"
           Write-Host 'GitHub Release metadata and assets: exact governed state'
-          Write-Host "attestations: recreated for recovered release artifacts with validated commit metadata ($env:VALIDATED_COMMIT)"
+          Write-Host "attestations: build provenance and SPDX SBOM attestations recreated for recovered release artifacts with validated commit metadata ($env:VALIDATED_COMMIT)"
           Write-Host 'Release recovery completed and governed release state reconciled.'

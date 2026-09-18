@@ -234,6 +234,17 @@ jobs:
           dotnet list ./Dapper.FluentMap.slnx package --include-transitive --format json |
             Set-Content -Encoding utf8NoBOM -Path './artifacts/release-metadata/dependencies.json'
 
+      - name: Generate release SBOM
+        shell: pwsh
+        env:
+          PACKAGE_VERSION: ${{ steps.version.outputs.package_version }}
+          REPOSITORY: ${{ github.repository }}
+          COMMIT: ${{ github.sha }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $createdUtc = (& git show -s --format=%cI $env:COMMIT).Trim()
+          ./eng/generate-release-sbom.ps1 -PackageDirectory './artifacts/packages' -Version $env:PACKAGE_VERSION -OutputPath './artifacts/release-metadata/release.sbom.spdx.json' -Repository $env:REPOSITORY -Commit $env:COMMIT -CreatedUtc $createdUtc
+
       - name: Generate release checksums
         shell: pwsh
         run: |
@@ -254,6 +265,7 @@ jobs:
             $packageFiles
             Get-Item './artifacts/release-metadata/artifact-manifest.json'
             Get-Item './artifacts/release-metadata/dependencies.json'
+            Get-Item './artifacts/release-metadata/release.sbom.spdx.json'
           ) | Sort-Object FullName
 
           $lines = foreach ($file in $files) {
@@ -460,7 +472,14 @@ jobs:
             ./artifacts/packages/*.snupkg
             ./artifacts/release-metadata/artifact-manifest.json
             ./artifacts/release-metadata/dependencies.json
+            ./artifacts/release-metadata/release.sbom.spdx.json
             ./artifacts/release-metadata/SHA256SUMS
+
+      - name: Attest release SBOM
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: ./artifacts/packages/*.nupkg
+          sbom-path: ./artifacts/release-metadata/release.sbom.spdx.json
 
       - name: Create or update GitHub Release
         shell: bash

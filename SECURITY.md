@@ -24,3 +24,37 @@ The repository uses complementary controls across source code, dependencies, qua
 The CodeQL workflow uses the SDK selected by `global.json`, the preferred `Dapper.FluentMap.slnx` solution, manual build mode, SHA-pinned actions, and least-privilege workflow permissions. This keeps security analysis aligned with the repository's normal build contract instead of introducing an independent autobuild path.
 
 Dependency Review is intentionally blocking for relevant findings. Do not add `continue-on-error` to security gates solely to keep a pull request green; findings should be triaged and resolved or explicitly justified.
+
+
+## Release provenance and SBOM
+
+The governed release flow publishes one SPDX 2.3 SBOM for the coherent FluentMap package family. The SBOM is generated from the exact final `.nupkg` artifacts, records the SHA-256 digest of every primary package, and captures the dependency relationships declared by their NuGet metadata.
+
+The SBOM is stored as `release.sbom.spdx.json` under the release metadata, included in `SHA256SUMS`, attached to the GitHub Release, and covered by the normal build-provenance attestation. A separate SBOM attestation binds the same SPDX document to every primary `.nupkg` in the release.
+
+Recovery preserves an existing SBOM when it matches the resolved package set and package digests. Older release artifacts that predate SBOM support receive a newly generated SBOM from the validated package bytes, after which governed checksums are regenerated and verified before reconciliation continues.
+
+For byte-for-byte attestation verification, use the `.nupkg` downloaded from the GitHub Release. Package registries may add repository-signing metadata after publication, which can legitimately change the package bytes.
+
+Verify build provenance for a normal release:
+
+```bash
+gh attestation verify Dapper.FluentMap.<version>.nupkg \
+  --repo rodri-oliveira-dev/Dapper-FluentMap \
+  --signer-workflow rodri-oliveira-dev/Dapper-FluentMap/.github/workflows/release.yml
+```
+
+If the release was reconciled by the recovery workflow, use `rodri-oliveira-dev/Dapper-FluentMap/.github/workflows/release-recovery-missing-nuget.yml` as the `--signer-workflow` value instead.
+
+Verify the SPDX 2.3 SBOM attestation for a normal release:
+
+```bash
+gh attestation verify Dapper.FluentMap.<version>.nupkg \
+  --repo rodri-oliveira-dev/Dapper-FluentMap \
+  --signer-workflow rodri-oliveira-dev/Dapper-FluentMap/.github/workflows/release.yml \
+  --predicate-type https://spdx.dev/Document/v2.3
+```
+
+For a release reconciled by recovery, use the recovery workflow path above for `--signer-workflow` in the SBOM verification command as well.
+
+Artifact attestations and SBOMs establish provenance and component inventory; they complement rather than replace tests, package validation, Dependency Review, CodeQL, NuGet auditing, Trusted Publishing, and human review.

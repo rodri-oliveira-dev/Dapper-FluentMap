@@ -12,6 +12,7 @@ The historical archived package history is not reconstructed here. This changelo
 - A package catalog under `eng/package-catalog.json` as the authoritative distribution package inventory.
 - Public adoption documentation for README, migration, compatibility and support policy.
 - Release candidate readiness checklist under `.sdd/etapa-12/`.
+- SPDX 2.3 release SBOM generation and GitHub SBOM attestations for the governed NuGet package family, including recovery support.
 
 ### Changed
 
@@ -75,7 +76,7 @@ Release candidate status: ready for publication qualification. The date remains
 - SQL Server and PostgreSQL have conditional harnesses but are not certified in CI.
 - Full Native AOT support is not claimed.
 - SourceLink and provenance are ready in the release workflow and were validated for the previous remote RC qualification SHA; final candidate artifacts require the final commit to be pushed before remote SourceLink/provenance can be requalified.
-- Stable release remains blocked on fork-owned API/binary baseline, package signing/SBOM decision and RC feedback.
+- Stable release remains blocked on fork-owned API/binary baseline, package signing decision and RC feedback.
 
 ## Fork Release Candidate Line
 
