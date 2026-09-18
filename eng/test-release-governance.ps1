@@ -695,8 +695,115 @@ function Invoke-ReleaseArtifactValidationScenario {
   }
 }
 
+
+function Invoke-ReleaseSbomScenario {
+  param(
+    [switch]$PreserveExisting
+  )
+
+  $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) "fluentmap-sbom-test-$([System.Guid]::NewGuid())"
+  try {
+    $packageDir = Join-Path $tempRoot 'packages'
+    $metadataDir = Join-Path $tempRoot 'release-metadata'
+    New-Item -ItemType Directory -Force -Path $packageDir, $metadataDir | Out-Null
+
+    $version = '3.1.2'
+    $commit = '1111111111111111111111111111111111111111'
+    $packagePath = Join-Path $packageDir "A.$version.nupkg"
+    New-TestNuGetPackage -Path $packagePath -PackageId 'A' -Version $version -Commit $commit -Branch 'refs/heads/master'
+
+    $catalogPath = Join-Path $tempRoot 'package-catalog.json'
+    [ordered]@{
+      schemaVersion = '1.0'
+      packages = @(
+        [ordered]@{ project = 'A'; projectPath = 'src/A/A.csproj'; packageId = 'A'; assetKind = 'library'; symbols = $false }
+      )
+    } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $catalogPath -Encoding UTF8
+
+    $outputPath = Join-Path $metadataDir 'release.sbom.spdx.json'
+    $arguments = @{
+      PackageDirectory = $packageDir
+      Version = $version
+      OutputPath = $outputPath
+      Repository = 'rodri-oliveira-dev/Dapper-FluentMap'
+      Commit = $commit
+      CatalogPath = $catalogPath
+      CreatedUtc = '2026-09-18T12:00:00Z'
+    }
+
+    & (Join-Path $repoRoot 'eng/generate-release-sbom.ps1') @arguments
+    if ($PreserveExisting) {
+      $beforeHash = (Get-FileHash -LiteralPath $outputPath -Algorithm SHA256).Hash
+      & (Join-Path $repoRoot 'eng/generate-release-sbom.ps1') @arguments -PreserveExisting
+      $afterHash = (Get-FileHash -LiteralPath $outputPath -Algorithm SHA256).Hash
+      if ($beforeHash -ne $afterHash) {
+        throw 'PreserveExisting changed an already valid SBOM.'
+      }
+    }
+
+    $document = Get-Content -Raw -LiteralPath $outputPath | ConvertFrom-Json
+    $rootPackage = @($document.packages | Where-Object { [string]$_.name -eq 'A' }) | Select-Object -First 1
+    $packageHash = (Get-FileHash -LiteralPath $packagePath -Algorithm SHA256).Hash.ToLowerInvariant()
+    $sbomHash = @(
+      $rootPackage.checksums |
+        Where-Object { [string]$_.algorithm -eq 'SHA256' } |
+        ForEach-Object { [string]$_.checksumValue }
+    ) | Select-Object -First 1
+
+    return [pscustomobject]@{
+      SpdxVersion = [string]$document.spdxVersion
+      PackageName = [string]$rootPackage.name
+      PackageVersion = [string]$rootPackage.versionInfo
+      PackageHash = $packageHash
+      SbomHash = [string]$sbomHash
+      DocumentDescribes = @($document.documentDescribes)
+      RootSpdxId = [string]$rootPackage.SPDXID
+    }
+  }
+  finally {
+    if (Test-Path -LiteralPath $tempRoot) {
+      Remove-Item -LiteralPath $tempRoot -Recurse -Force
+    }
+  }
+}
+
 $releaseWorkflow = Get-Content -Raw -LiteralPath (Join-Path $repoRoot '.github/workflows/release.yml')
 $recoveryWorkflow = Get-Content -Raw -LiteralPath (Join-Path $repoRoot '.github/workflows/release-recovery-missing-nuget.yml')
+
+Invoke-Test 'release SBOM is generated from governed package artifacts' {
+  $result = Invoke-ReleaseSbomScenario
+  Assert-True ($result.SpdxVersion -eq 'SPDX-2.3') 'release SBOM must use SPDX 2.3.'
+  Assert-True ($result.PackageName -eq 'A') 'release SBOM must describe the package identity.'
+  Assert-True ($result.PackageVersion -eq '3.1.2') 'release SBOM must describe the package version.'
+  Assert-True ($result.PackageHash -eq $result.SbomHash) 'release SBOM package checksum must match the final .nupkg.'
+  Assert-True ($result.RootSpdxId -in $result.DocumentDescribes) 'release SBOM must list the release package in documentDescribes.'
+}
+
+Invoke-Test 'recovery preserves an existing valid release SBOM' {
+  $result = Invoke-ReleaseSbomScenario -PreserveExisting
+  Assert-True ($result.PackageHash -eq $result.SbomHash) 'preserved release SBOM must remain bound to the final .nupkg.'
+}
+
+Invoke-Test 'release and recovery workflows carry and attest the release SBOM' {
+  foreach ($expected in @(
+      'Generate release SBOM',
+      'release.sbom.spdx.json',
+      'Attest release SBOM',
+      'sbom-path: ./artifacts/release-metadata/release.sbom.spdx.json'
+    )) {
+    Assert-Contains $releaseWorkflow $expected "normal release workflow must contain '$expected'."
+  }
+
+  foreach ($expected in @(
+      'Generate or preserve release SBOM',
+      '-PreserveExisting',
+      'release.sbom.spdx.json',
+      'Attest recovered release SBOM',
+      'sbom-path: ./artifacts/release-metadata/release.sbom.spdx.json'
+    )) {
+    Assert-Contains $recoveryWorkflow $expected "recovery workflow must contain '$expected'."
+  }
+}
 
 Invoke-Test 'release and recovery share a non-cancelling release lock' {
   Assert-Contains $releaseWorkflow 'group: release' 'normal release must use the shared release lock.'
@@ -726,6 +833,8 @@ Invoke-Test 'recovery workflow reconciles governed release state' {
       'validatedCommit',
       'GitHub Release metadata and assets: exact governed state',
       'Attest recovered release artifacts',
+      'Attest recovered release SBOM',
+      'release.sbom.spdx.json',
       'Release recovery completed and governed release state reconciled.'
     )) {
     Assert-Contains $recoveryWorkflow $expected "recovery workflow must contain '$expected'."
