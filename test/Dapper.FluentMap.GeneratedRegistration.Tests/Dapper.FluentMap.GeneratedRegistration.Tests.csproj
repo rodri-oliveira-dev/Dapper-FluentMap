@@ -7,7 +7,7 @@
     <ProjectReference Include="..\..\src\Dapper.FluentMap.DependencyInjection\Dapper.FluentMap.DependencyInjection.csproj" />
     <ProjectReference Include="..\..\src\Dapper.FluentMap\Dapper.FluentMap.csproj" />
     <ProjectReference Include="..\..\src\Dapper.FluentMap.Generators\Dapper.FluentMap.Generators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
     <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="10.0.12" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />
