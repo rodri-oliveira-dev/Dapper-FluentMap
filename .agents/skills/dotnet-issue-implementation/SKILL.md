@@ -1,46 +1,48 @@
 ---
 name: dotnet-issue-implementation
-description: Use this skill to turn a well-defined issue into a small Dapper-FluentMap library change with requirements, implementation, tests, validation, and Definition of Done traceability. Do not use for open-ended bug investigation or PR review.
+description: Use esta skill para transformar uma issue bem definida em uma alteração pequena de biblioteca .NET, com requisitos explícitos, implementação, testes, validação e conferência do Definition of Done. Não use para investigação de bug sem causa conhecida ou revisão de PR existente.
 license: MIT
 ---
 
-# Purpose
+# Objetivo
 
-Implement a defined issue end to end without expanding scope, while preserving Dapper-FluentMap's public contracts, package boundaries, compatibility promises, and release safety.
+Executar uma issue de ponta a ponta sem ampliar escopo, preservando contrato público, baseline técnica e rastreabilidade entre requisito, código, testes e validação.
 
-# Process
+# Processo
 
-1. Read root `AGENTS.md`, then the full issue or user-provided requirements.
-2. Extract the problem, expected behavior, constraints, Definition of Done, non-goals, and ambiguities.
-3. Search before opening large files. Locate only the relevant contracts, implementation, tests, package metadata, docs, and workflows.
-4. Identify the affected package(s): core, Dommel, DependencyInjection, Analyzers, Generators, tests, benchmarks, docs, or CI/release.
-5. Check whether the change affects public API, source/binary/behavior compatibility, Dapper integration, global state/cache behavior, dependencies, package output, or release flow.
-6. Choose the smallest implementation that satisfies the issue without opportunistic modernization.
-7. Add or update tests for behavior changes. For bugs, prefer a regression test that fails before the fix when practical.
-8. Update `README.md`, `COMPATIBILITY.md`, `MIGRATION.md`, XML docs, or `CHANGELOG.md` only when the consumer-facing contract changes.
-9. Run the nearest validation from `AGENTS.md`; broaden to solution or package validation only when the risk warrants it.
-10. Review the complete diff and mark each DoD item as satisfied, blocked, or not applicable.
+1. Leia `AGENTS.md` e a issue completa.
+2. Extraia problema, comportamento esperado, restrições, DoD e ambiguidades.
+3. Pesquise antes de abrir arquivos grandes e localize implementação, contratos, testes, configuração e documentação relacionados.
+4. Identifique impacto em API pública, dependências, packaging, segurança, compatibilidade e changelog.
+5. Defina a menor estratégia capaz de satisfazer o DoD.
+6. Delegue somente tarefas mecânicas quando workers/subagentes estiverem disponíveis; mantenha decisões de design, comportamento e risco no agente principal.
+7. Implemente com diff focado e adicione ou atualize testes que comprovem o comportamento pedido.
+8. Atualize `CHANGELOG.md` quando houver impacto relevante para consumidores.
+9. Execute a baseline definida em `AGENTS.md` e validações adicionais exigidas pelo tipo de mudança.
+10. Revise o diff completo e confira o DoD item a item como comprovado, bloqueado ou não aplicável.
 
-# Combine With
+# Combinação com outras skills
 
-- `dotnet-library-change` when production code, project files, dependencies, public contracts, or package metadata change.
-- `dotnet-refactoring-engineer` when the implementation includes behavior-preserving restructuring.
-- `ci-release-governance` when workflows, packaging, versioning, release, or recovery are involved.
-- `dotnet-pr-review` only when the task is to review an existing diff rather than implement it.
+Combine quando necessário com:
 
-# Dapper-FluentMap Constraints
+- `dotnet-library-change` para mudança funcional/técnica;
+- `dotnet-refactoring-engineer` para refatoração preservando comportamento;
+- `coverage-analysis` ou `test-anti-patterns` para riscos de teste;
+- `ci-release-governance` para CI, packaging ou release;
+- `dotnet-security-review` para superfície de segurança relevante.
 
-- The default branch is `master`; do not implement on `master`.
-- Treat this as a public multi-package .NET library, not an application.
-- Do not assume project name, assembly name, namespace, path, and NuGet `PackageId` are the same identity.
-- Preserve `netstandard2.0` for public packages unless the issue explicitly changes compatibility.
-- Keep core focused on mapping; do not add ORM, CRUD, SQL generation, migrations, or connection abstractions as incidental scope.
-- Do not publish, tag, release, or push unless explicitly requested by the user.
+# Restrições específicas
 
-# Expected Output
+- Não invente requisitos ausentes na issue.
+- Não faça refatoração oportunista fora da área necessária.
+- Não faça breaking change incidental.
 
-Report what changed, main files, validation commands and results, DoD status, compatibility impact, and remaining risks or blockers.
+As demais restrições e validações globais são definidas em `AGENTS.md`.
 
-# Quality Bar
+# Saída esperada
 
-A good issue implementation satisfies the stated DoD with the smallest coherent diff, tests the relevant observable behavior, preserves unrelated contracts, and leaves validation evidence proportional to the risk.
+Informe de forma objetiva o que mudou, arquivos principais, testes/validações executados, estado do DoD e riscos ou bloqueios restantes.
+
+# Critério de qualidade
+
+Uma boa implementação satisfaz o DoD com o menor diff coerente, possui evidência proporcional ao risco e passa pelos gates determinísticos aplicáveis.
