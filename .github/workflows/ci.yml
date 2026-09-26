@@ -256,6 +256,7 @@ jobs:
           mkdir -p ./artifacts/test-results/providers
           dotnet ./test/Dapper.FluentMap.ProviderCompatibility.Tests/bin/Release/net10.0/Dapper.FluentMap.ProviderCompatibility.Tests.dll \
             -failSkips \
+            -parallelMode none \
             -result-trx ./artifacts/test-results/providers/provider-compatibility.trx
 
       - name: Upload provider test results

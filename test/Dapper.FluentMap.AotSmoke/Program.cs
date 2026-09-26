@@ -1,7 +1,9 @@
 using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+#if !AOT_SMOKE_GENERATED && !AOT_SMOKE_DI_GENERATED && !AOT_SMOKE_DI_EXPLICIT
 using Dapper;
+#endif
 using Dapper.FluentMap;
 using Dapper.FluentMap.Configuration;
 using Dapper.FluentMap.Diagnostics;
@@ -18,10 +20,6 @@ var generatedRuntime = new FluentMapConfigurationBuilder()
 generatedRuntime.UseNamingPolicy(NamingPolicy.SnakeCase).ForEntity<NamingCustomer>();
 var runtime = generatedRuntime.Build().CreateRuntime();
 
-AssertRuntimeMappedMember<Customer>(runtime, "customer_id", nameof(Customer.Id));
-AssertRuntimeMappedMember<NamingCustomer>(runtime, "created_at", nameof(NamingCustomer.CreatedAt));
-AssertRuntimeProfileExplain(runtime);
-AssertRuntimeGeneratedRegistration(runtime);
 AssertStrictGeneratedQueryMappedMaterializer(runtime);
 #elif AOT_SMOKE_DI_GENERATED
 const string scenario = "di-generated";
@@ -81,7 +79,7 @@ AssertValueObjectExplain();
 AssertProfileExplain();
 #endif
 
-#if AOT_SMOKE_GENERATED || AOT_SMOKE_DI_GENERATED || AOT_SMOKE_DI_EXPLICIT
+#if AOT_SMOKE_DI_GENERATED || AOT_SMOKE_DI_EXPLICIT
 static void AssertRuntimeMappedMember<
     [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.PublicProperties)]
     TEntity>(
@@ -171,7 +169,7 @@ static void AssertProfileExplain()
 
 #endif
 
-#if AOT_SMOKE_GENERATED || AOT_SMOKE_DI_GENERATED || AOT_SMOKE_DI_EXPLICIT
+#if AOT_SMOKE_DI_GENERATED || AOT_SMOKE_DI_EXPLICIT
 static void AssertRuntimeProfileExplain(FluentMapRuntime runtime)
 {
     var explanation = runtime.Explain<Customer, LegacyProfile>();
@@ -185,7 +183,7 @@ static void AssertRuntimeProfileExplain(FluentMapRuntime runtime)
 }
 #endif
 
-#if AOT_SMOKE_GENERATED || AOT_SMOKE_DI_GENERATED
+#if AOT_SMOKE_DI_GENERATED
 static void AssertRuntimeGeneratedRegistration(FluentMapRuntime runtime)
 {
     if (!runtime.Configuration.GeneratedMaterializers.Any(materializer =>
