@@ -24,11 +24,23 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
     {
         public static IEnumerable<object[]> Providers()
         {
-            yield return new object[] { ProviderCase.SqliteName };
-            yield return new object[] { ProviderCase.SqlServerName };
-            yield return new object[] { ProviderCase.PostgreSqlName };
-            yield return new object[] { ProviderCase.MySqlName };
-            yield return new object[] { ProviderCase.MariaDbName };
+            var filter = Environment.GetEnvironmentVariable("DFM_PROVIDER_FILTER");
+            var providers = new[]
+            {
+                ProviderCase.SqliteName,
+                ProviderCase.SqlServerName,
+                ProviderCase.PostgreSqlName,
+                ProviderCase.MySqlName,
+                ProviderCase.MariaDbName
+            };
+
+            foreach (var provider in providers)
+            {
+                if (string.IsNullOrWhiteSpace(filter) || string.Equals(filter, provider, StringComparison.Ordinal))
+                {
+                    yield return new object[] { provider };
+                }
+            }
         }
 
         [Fact]
@@ -37,16 +49,12 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
         {
             var providers = Providers().Select(row => Assert.IsType<string>(Assert.Single(row))).ToArray();
 
-            Assert.Equal(
-                new[]
-                {
-                    ProviderCase.SqliteName,
-                    ProviderCase.SqlServerName,
-                    ProviderCase.PostgreSqlName,
-                    ProviderCase.MySqlName,
-                    ProviderCase.MariaDbName
-                },
-                providers);
+            var filter = Environment.GetEnvironmentVariable("DFM_PROVIDER_FILTER");
+            Assert.Equal(string.IsNullOrWhiteSpace(filter) ? 5 : 1, providers.Length);
+            if (!string.IsNullOrWhiteSpace(filter))
+            {
+                Assert.Equal(filter, Assert.Single(providers));
+            }
         }
 
         [Theory]

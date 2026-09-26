@@ -254,10 +254,14 @@ jobs:
           DFM_MARIADB_CONNECTION_STRING: "Server=localhost;Port=3307;Database=fluentmap;User ID=root;Password=MariaDb-Provider-2026!;SslMode=None;Allow User Variables=True;"
         run: |
           mkdir -p ./artifacts/test-results/providers
-          dotnet ./test/Dapper.FluentMap.ProviderCompatibility.Tests/bin/Release/net10.0/Dapper.FluentMap.ProviderCompatibility.Tests.dll \
-            -failSkips \
-            -parallelMode none \
-            -result-trx ./artifacts/test-results/providers/provider-compatibility.trx
+          for provider in "SQLite" "SQL Server" "PostgreSQL" "MySQL" "MariaDB"; do
+            result_name="$(echo "$provider" | tr '[:upper:] ' '[:lower:]-')"
+            DFM_PROVIDER_FILTER="$provider" \
+              dotnet ./test/Dapper.FluentMap.ProviderCompatibility.Tests/bin/Release/net10.0/Dapper.FluentMap.ProviderCompatibility.Tests.dll \
+                -failSkips \
+                -parallelMode none \
+                -result-trx "./artifacts/test-results/providers/${result_name}.trx"
+          done
 
       - name: Upload provider test results
         if: ${{ always() }}

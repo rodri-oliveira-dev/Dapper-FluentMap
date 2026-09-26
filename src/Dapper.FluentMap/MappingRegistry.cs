@@ -118,7 +118,6 @@ namespace Dapper.FluentMap
             }
 
             InvalidateType(type);
-            SetDapperTypeMap(type);
         }
 
         internal void AddProfileMap(Type type, Type profileType, IEntityMap mapper)
@@ -186,7 +185,6 @@ namespace Dapper.FluentMap
                 });
 
             InvalidateType(type);
-            SetDapperTypeMap(type);
         }
 
         internal void ResetDapperTypeMap<TEntity>()
