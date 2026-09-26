@@ -73,7 +73,7 @@ Current status:
 | --- | --- |
 | Explicit map registration | Preferred for trimmed and Native AOT applications. |
 | Generated registration | Preferred alternative to assembly scanning for maps in the current compilation. |
-| Strict generated runtime | `UseStrictGeneratedMaterialization()` and `QueryGeneratedMapped*` provide a generated-only path; unsupported shapes fail deterministically. |
+| Strict generated runtime | `UseStrictGeneratedMaterialization()` and `QueryGeneratedMapped*` provide a generated-only path for parameterless commands; unsupported shapes and dynamic parameter objects fail deterministically. |
 | Assembly scanning | Reflection-based and annotated as trimming-sensitive. |
 | `QueryMapped*`, `ReadMapped*`, `QueryMultipleMapped`, streaming | Annotated with trimming/dynamic-code warnings because runtime fallback can occur. |
 | Full Native AOT compatibility | Not claimed. |

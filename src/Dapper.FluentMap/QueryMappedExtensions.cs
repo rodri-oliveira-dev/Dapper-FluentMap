@@ -792,7 +792,10 @@ namespace Dapper.FluentMap
 
         internal static IEnumerable<TEntity> ExecuteGeneratedMapped<TEntity>(
             IDbConnection connection,
-            CommandDefinition command,
+            string sql,
+            IDbTransaction transaction,
+            int? commandTimeout,
+            CommandType? commandType,
             Type profileType,
             FluentMapRuntime runtime)
             where TEntity : class
@@ -807,17 +810,48 @@ namespace Dapper.FluentMap
                 throw new ArgumentNullException(nameof(runtime));
             }
 
-            using (var reader = SqlMapper.ExecuteReader(connection, command))
+            var openedHere = connection.State == ConnectionState.Closed;
+            if (openedHere)
             {
-                var results = new List<TEntity>();
-                var materializer = MappedRowMaterializer.CreateGeneratedMaterializer<TEntity>(reader, profileType, runtime);
+                connection.Open();
+            }
 
-                while (reader.Read())
+            try
+            {
+                using (var command = connection.CreateCommand())
                 {
-                    results.Add(materializer(reader));
-                }
+                    command.CommandText = sql;
+                    command.Transaction = transaction;
+                    if (commandTimeout.HasValue)
+                    {
+                        command.CommandTimeout = commandTimeout.Value;
+                    }
 
-                return results;
+                    if (commandType.HasValue)
+                    {
+                        command.CommandType = commandType.Value;
+                    }
+
+                    using (var reader = command.ExecuteReader())
+                    {
+                        var results = new List<TEntity>();
+                        var materializer = MappedRowMaterializer.CreateGeneratedMaterializer<TEntity>(reader, profileType, runtime);
+
+                        while (reader.Read())
+                        {
+                            results.Add(materializer(reader));
+                        }
+
+                        return results;
+                    }
+                }
+            }
+            finally
+            {
+                if (openedHere)
+                {
+                    connection.Close();
+                }
             }
         }
 

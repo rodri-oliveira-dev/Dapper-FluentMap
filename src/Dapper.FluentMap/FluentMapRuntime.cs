@@ -196,9 +196,17 @@ namespace Dapper.FluentMap
                 throw new ArgumentNullException(nameof(sql));
             }
 
+            if (param != null)
+            {
+                throw new NotSupportedException("Strict generated materialization does not support dynamic parameter objects. Use a parameterless command or a non-strict query API.");
+            }
+
             return QueryMappedExtensions.ExecuteGeneratedMapped<TEntity>(
                 connection,
-                new CommandDefinition(sql, param, transaction, commandTimeout, commandType),
+                sql,
+                transaction,
+                commandTimeout,
+                commandType,
                 profileType: null,
                 runtime: this);
         }
@@ -233,9 +241,17 @@ namespace Dapper.FluentMap
                 throw new ArgumentNullException(nameof(sql));
             }
 
+            if (param != null)
+            {
+                throw new NotSupportedException("Strict generated materialization does not support dynamic parameter objects. Use a parameterless command or a non-strict query API.");
+            }
+
             return QueryMappedExtensions.ExecuteGeneratedMapped<TEntity>(
                 connection,
-                new CommandDefinition(sql, param, transaction, commandTimeout, commandType),
+                sql,
+                transaction,
+                commandTimeout,
+                commandType,
                 typeof(TProfile),
                 this);
         }

@@ -466,7 +466,7 @@ FluentMap tem prontidão parcial para trimming/AOT, não compatibilidade Native 
 | --- | --- |
 | Registro explícito com `AddMap<TMap>()` | Preferencial para cenários com trimming e Native AOT. |
 | Registro gerado com `AddGeneratedMappings()` | Alternativa preferencial ao assembly scanning para maps da compilação atual. |
-| `UseStrictGeneratedMaterialization()` com `QueryGeneratedMapped*` | Caminho exclusivamente gerado validado pelo smoke Native AOT; shapes não suportados falham deterministicamente em vez de usar fallback runtime. |
+| `UseStrictGeneratedMaterialization()` com `QueryGeneratedMapped*` | Caminho exclusivamente gerado, para comandos sem parâmetros, validado pelo smoke Native AOT; shapes não suportados falham deterministicamente em vez de usar fallback runtime. |
 | Assembly scanning | Baseado em reflection e anotado como sensível a trimming. |
 | `QueryMapped*`, `ReadMapped*`, `QueryMultipleMapped`, streaming | Anotados como sensíveis a trimming/dynamic code porque fallback runtime pode ocorrer. |
 
@@ -499,6 +499,7 @@ Para migrar do FluentMap 2.x, consulte [MIGRATION.md](MIGRATION.md).
 - FluentMap não agrega linhas de joins em grafos e não mantém identity map.
 - Write converters são apenas metadata no caminho atual de escrita Dapper/Dommel.
 - Materializers gerados suportam shapes exatos e permutações seguras de colunas distintas; shapes com colunas ausentes, adicionais ou duplicadas usam fallback, exceto no modo gerado estrito.
+- O subconjunto `QueryGeneratedMapped*` certificado em Native AOT aceita comandos sem parâmetros; objetos de parâmetros dinâmicos permanecem fora desse contrato estrito.
 - Assembly scanning e fallback runtime são sensíveis a trimming/AOT.
 - Construção de value objects usa construtores públicos compatíveis, não factory methods.
 

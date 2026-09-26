@@ -308,6 +308,30 @@ namespace Dapper.FluentMap.Tests
 
         [Fact]
         [Trait("Category", "Integration")]
+        public void QueryGeneratedMappedShouldRejectDynamicParameterObjects()
+        {
+            var runtime = CreateRuntime(builder =>
+            {
+                builder
+                    .AddMap(new GeneratedContractCustomerMap())
+                    .AddGeneratedMaterializer(DefaultColumns(), ReadDefaultGeneratedCustomer)
+                    .UseStrictGeneratedMaterialization();
+            });
+
+            using (var connection = OpenConnection())
+            {
+                var exception = Assert.Throws<NotSupportedException>(() =>
+                    runtime.QueryGeneratedMappedSingle<GeneratedContractCustomer>(
+                        connection,
+                        "SELECT @Id AS customer_id, 'GeneratedOnly' AS full_name;",
+                        new { Id = 86 }));
+
+                Assert.Contains("dynamic parameter objects", exception.Message, StringComparison.Ordinal);
+            }
+        }
+
+        [Fact]
+        [Trait("Category", "Integration")]
         public void StrictGeneratedRuntimeShouldRejectMissingGeneratedMaterializer()
         {
             var runtime = CreateRuntime(builder =>

@@ -466,7 +466,7 @@ FluentMap has partial trimming/AOT readiness, not full Native AOT compatibility:
 | --- | --- |
 | Explicit registration with `AddMap<TMap>()` | Preferred for trimming and Native AOT scenarios. |
 | Generated registration with `AddGeneratedMappings()` | Preferred alternative to assembly scanning for maps in the current compilation. |
-| `UseStrictGeneratedMaterialization()` with `QueryGeneratedMapped*` | Generated-only path validated by the Native AOT smoke; unsupported result shapes fail deterministically instead of using runtime fallback. |
+| `UseStrictGeneratedMaterialization()` with `QueryGeneratedMapped*` | Generated-only, parameterless-command path validated by the Native AOT smoke; unsupported result shapes fail deterministically instead of using runtime fallback. |
 | Assembly scanning | Reflection-based and annotated as trimming-sensitive. |
 | `QueryMapped*`, `ReadMapped*`, `QueryMultipleMapped`, streaming | Annotated as trimming/dynamic-code sensitive because runtime fallback can occur. |
 
@@ -499,6 +499,7 @@ For users moving from FluentMap 2.x, see [MIGRATION.md](MIGRATION.md).
 - FluentMap does not aggregate joined rows into graphs or maintain identity maps.
 - Write converters are metadata-only in the current Dapper/Dommel write path.
 - Generated materializers support exact shapes and safe permutations of distinct columns; missing, additional or duplicate-column shapes fall back unless strict generated materialization is enabled.
+- The Native AOT-certified `QueryGeneratedMapped*` subset accepts parameterless commands; dynamic parameter objects remain outside that strict contract.
 - Assembly scanning and runtime fallback are trimming/AOT-sensitive.
 - Value object construction uses compatible public constructors, not factory methods.
 
