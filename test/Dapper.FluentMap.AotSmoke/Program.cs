@@ -3,6 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using Dapper;
 using Dapper.FluentMap;
+using Dapper.FluentMap.Configuration;
 using Dapper.FluentMap.Diagnostics;
 using Dapper.FluentMap.Mapping;
 using Dapper.FluentMap.Naming;
@@ -11,19 +12,17 @@ using Microsoft.Extensions.DependencyInjection;
 
 #if AOT_SMOKE_GENERATED
 const string scenario = "generated";
-FluentMapper.Initialize(configuration =>
-{
-    configuration.AddGeneratedMappings();
-    configuration.UseNamingPolicy(NamingPolicy.SnakeCase).ForEntity<NamingCustomer>();
-});
+var generatedRuntime = new FluentMapConfigurationBuilder()
+    .Configure(configuration => configuration.AddGeneratedMappings())
+    .UseStrictGeneratedMaterialization();
+generatedRuntime.UseNamingPolicy(NamingPolicy.SnakeCase).ForEntity<NamingCustomer>();
+var runtime = generatedRuntime.Build().CreateRuntime();
 
-AssertMappedMember<Customer>("customer_id", nameof(Customer.Id));
-AssertMappedMember<NamingCustomer>("created_at", nameof(NamingCustomer.CreatedAt));
-AssertConstructorMapping();
-AssertExplain();
-AssertValueObjectExplain();
-AssertProfileExplain();
-AssertGeneratedQueryMappedMaterializer();
+AssertRuntimeMappedMember<Customer>(runtime, "customer_id", nameof(Customer.Id));
+AssertRuntimeMappedMember<NamingCustomer>(runtime, "created_at", nameof(NamingCustomer.CreatedAt));
+AssertRuntimeProfileExplain(runtime);
+AssertRuntimeGeneratedRegistration(runtime);
+AssertStrictGeneratedQueryMappedMaterializer(runtime);
 #elif AOT_SMOKE_DI_GENERATED
 const string scenario = "di-generated";
 using (var provider = new ServiceCollection()
@@ -82,7 +81,7 @@ AssertValueObjectExplain();
 AssertProfileExplain();
 #endif
 
-#if AOT_SMOKE_DI_GENERATED || AOT_SMOKE_DI_EXPLICIT
+#if AOT_SMOKE_GENERATED || AOT_SMOKE_DI_GENERATED || AOT_SMOKE_DI_EXPLICIT
 static void AssertRuntimeMappedMember<
     [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.PublicProperties)]
     TEntity>(
@@ -103,7 +102,7 @@ static void AssertRuntimeMappedMember<
 
 Console.WriteLine(scenario + ":ok");
 
-#if !AOT_SMOKE_DI_GENERATED && !AOT_SMOKE_DI_EXPLICIT
+#if !AOT_SMOKE_GENERATED && !AOT_SMOKE_DI_GENERATED && !AOT_SMOKE_DI_EXPLICIT
 static void AssertMappedMember<TEntity>(string columnName, string propertyName)
 {
     var member = SqlMapper.GetTypeMap(typeof(TEntity)).GetMember(columnName);
@@ -115,7 +114,7 @@ static void AssertMappedMember<TEntity>(string columnName, string propertyName)
 }
 #endif
 
-#if !AOT_SMOKE_SCANNING && !AOT_SMOKE_DI_GENERATED && !AOT_SMOKE_DI_EXPLICIT
+#if !AOT_SMOKE_GENERATED && !AOT_SMOKE_SCANNING && !AOT_SMOKE_DI_GENERATED && !AOT_SMOKE_DI_EXPLICIT
 static void AssertConstructorMapping()
 {
     var typeMap = SqlMapper.GetTypeMap(typeof(ImmutableCustomer));
@@ -172,7 +171,7 @@ static void AssertProfileExplain()
 
 #endif
 
-#if AOT_SMOKE_DI_GENERATED || AOT_SMOKE_DI_EXPLICIT
+#if AOT_SMOKE_GENERATED || AOT_SMOKE_DI_GENERATED || AOT_SMOKE_DI_EXPLICIT
 static void AssertRuntimeProfileExplain(FluentMapRuntime runtime)
 {
     var explanation = runtime.Explain<Customer, LegacyProfile>();
@@ -186,7 +185,7 @@ static void AssertRuntimeProfileExplain(FluentMapRuntime runtime)
 }
 #endif
 
-#if AOT_SMOKE_DI_GENERATED
+#if AOT_SMOKE_GENERATED || AOT_SMOKE_DI_GENERATED
 static void AssertRuntimeGeneratedRegistration(FluentMapRuntime runtime)
 {
     if (!runtime.Configuration.GeneratedMaterializers.Any(materializer =>
@@ -198,32 +197,50 @@ static void AssertRuntimeGeneratedRegistration(FluentMapRuntime runtime)
 #endif
 
 #if AOT_SMOKE_GENERATED
-static void AssertGeneratedQueryMappedMaterializer()
+static void AssertStrictGeneratedQueryMappedMaterializer(FluentMapRuntime runtime)
 {
     SQLitePCL.Batteries_V2.Init();
 
     using var connection = new SqliteConnection("Data Source=:memory:");
     connection.Open();
 
-    var customer = connection.QueryMappedSingle<Customer>(
+    var customer = runtime.QueryGeneratedMappedSingle<Customer>(
+        connection,
         "SELECT 42 AS customer_id;");
     if (customer.Id != 42)
     {
         throw new InvalidOperationException("Generated flat QueryMapped materializer was not used correctly.");
     }
 
-    var valueObjectCustomer = connection.QueryMappedSingle<ValueObjectCustomer>(
+    var valueObjectCustomer = runtime.QueryGeneratedMappedSingle<ValueObjectCustomer>(
+        connection,
         "SELECT '12345678909' AS cpf;");
     if (valueObjectCustomer.Cpf?.Number != "12345678909")
     {
         throw new InvalidOperationException("Generated Value Object QueryMapped materializer was not used correctly.");
     }
 
-    var converted = connection.QueryMappedSingle<ConvertedCustomer>(
+    var converted = runtime.QueryGeneratedMappedSingle<ConvertedCustomer>(
+        connection,
         "SELECT 'A' AS status;");
     if (converted.Status != AccountStatus.Active)
     {
         throw new InvalidOperationException("Generated property converter materializer was not used correctly.");
+    }
+
+    try
+    {
+        runtime.QueryGeneratedMappedSingle<Customer>(
+            connection,
+            "SELECT 'unsupported' AS unmapped_column;");
+        throw new InvalidOperationException("Strict generated materialization did not reject an unsupported shape.");
+    }
+    catch (FluentMapConfigurationException exception)
+    {
+        if (!exception.Message.Contains("Strict generated materialization", StringComparison.Ordinal))
+        {
+            throw;
+        }
     }
 }
 #endif

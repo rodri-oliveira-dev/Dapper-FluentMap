@@ -5,6 +5,7 @@ using System.Data.Common;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using Dapper.FluentMap.Configuration;
 using Dapper.FluentMap.Diagnostics;
 using Dapper.FluentMap.Mapping;
@@ -51,6 +52,9 @@ namespace Dapper.FluentMap
         internal int MaterializationPlanCacheEntryCount => Registry.MaterializationPlanCacheEntryCount;
 
         internal int GeneratedMaterializerCount => Registry.GeneratedMaterializerCount;
+
+        internal bool StrictGeneratedMaterialization =>
+            Configuration != null && Configuration.StrictGeneratedMaterialization;
 
         /// <summary>
         /// Validates this runtime's effective configuration without accessing global FluentMap state.
@@ -165,6 +169,109 @@ namespace Dapper.FluentMap
         }
 
         /// <summary>
+        /// Executes a query and materializes rows only through registered generated materializers.
+        /// </summary>
+        /// <typeparam name="TEntity">The entity type to materialize.</typeparam>
+        /// <param name="connection">The database connection.</param>
+        /// <param name="sql">The SQL query to execute.</param>
+        /// <param name="param">Optional query parameters.</param>
+        /// <param name="transaction">Optional transaction.</param>
+        /// <param name="commandTimeout">Optional command timeout.</param>
+        /// <param name="commandType">Optional command type.</param>
+        /// <returns>The materialized rows.</returns>
+        /// <exception cref="T:Dapper.FluentMap.FluentMapConfigurationException">
+        /// Thrown when the runtime cannot resolve a generated materializer for the entity, profile and result-column shape.
+        /// </exception>
+        public IEnumerable<TEntity> QueryGeneratedMapped<TEntity>(
+            IDbConnection connection,
+            string sql,
+            object param = null,
+            IDbTransaction transaction = null,
+            int? commandTimeout = null,
+            CommandType? commandType = null)
+            where TEntity : class
+        {
+            if (sql == null)
+            {
+                throw new ArgumentNullException(nameof(sql));
+            }
+
+            return QueryMappedExtensions.ExecuteGeneratedMapped<TEntity>(
+                connection,
+                new CommandDefinition(sql, param, transaction, commandTimeout, commandType),
+                profileType: null,
+                runtime: this);
+        }
+
+        /// <summary>
+        /// Executes a query and materializes rows for the specified profile only through registered generated materializers.
+        /// </summary>
+        /// <typeparam name="TEntity">The entity type to materialize.</typeparam>
+        /// <typeparam name="TProfile">The mapping profile marker type to use.</typeparam>
+        /// <param name="connection">The database connection.</param>
+        /// <param name="sql">The SQL query to execute.</param>
+        /// <param name="param">Optional query parameters.</param>
+        /// <param name="transaction">Optional transaction.</param>
+        /// <param name="commandTimeout">Optional command timeout.</param>
+        /// <param name="commandType">Optional command type.</param>
+        /// <returns>The materialized rows.</returns>
+        /// <exception cref="T:Dapper.FluentMap.FluentMapConfigurationException">
+        /// Thrown when the runtime cannot resolve a generated materializer for the entity, profile and result-column shape.
+        /// </exception>
+        public IEnumerable<TEntity> QueryGeneratedMapped<TEntity, TProfile>(
+            IDbConnection connection,
+            string sql,
+            object param = null,
+            IDbTransaction transaction = null,
+            int? commandTimeout = null,
+            CommandType? commandType = null)
+            where TEntity : class
+            where TProfile : IMappingProfile
+        {
+            if (sql == null)
+            {
+                throw new ArgumentNullException(nameof(sql));
+            }
+
+            return QueryMappedExtensions.ExecuteGeneratedMapped<TEntity>(
+                connection,
+                new CommandDefinition(sql, param, transaction, commandTimeout, commandType),
+                typeof(TProfile),
+                this);
+        }
+
+        /// <summary>
+        /// Executes a query and materializes exactly one row only through registered generated materializers.
+        /// </summary>
+        public TEntity QueryGeneratedMappedSingle<TEntity>(
+            IDbConnection connection,
+            string sql,
+            object param = null,
+            IDbTransaction transaction = null,
+            int? commandTimeout = null,
+            CommandType? commandType = null)
+            where TEntity : class
+        {
+            return QueryGeneratedMapped<TEntity>(connection, sql, param, transaction, commandTimeout, commandType).Single();
+        }
+
+        /// <summary>
+        /// Executes a query and materializes exactly one row for the specified profile only through registered generated materializers.
+        /// </summary>
+        public TEntity QueryGeneratedMappedSingle<TEntity, TProfile>(
+            IDbConnection connection,
+            string sql,
+            object param = null,
+            IDbTransaction transaction = null,
+            int? commandTimeout = null,
+            CommandType? commandType = null)
+            where TEntity : class
+            where TProfile : IMappingProfile
+        {
+            return QueryGeneratedMapped<TEntity, TProfile>(connection, sql, param, transaction, commandTimeout, commandType).Single();
+        }
+
+        /// <summary>
         /// Executes a query and materializes exactly one row using this runtime and mapping profile.
         /// </summary>
         [RequiresUnreferencedCode(QueryMappedApiAnnotations.RequiresUnreferencedCodeMessage)]
@@ -183,6 +290,43 @@ namespace Dapper.FluentMap
             where TProfile : IMappingProfile
         {
             return QueryMapped<TEntity, TProfile>(connection, sql, param, transaction, commandTimeout, commandType).Single();
+        }
+
+        /// <summary>
+        /// Executes a query, splits each row at <paramref name="splitOn"/>, materializes two segments using this runtime and composes the return value.
+        /// </summary>
+        [RequiresUnreferencedCode(QueryMappedApiAnnotations.RequiresUnreferencedCodeMessage)]
+        [RequiresDynamicCode(QueryMappedApiAnnotations.RequiresDynamicCodeMessage)]
+        public IEnumerable<TReturn> QueryMapped<
+            [DynamicallyAccessedMembers(QueryMappedApiAnnotations.MaterializedEntityMemberTypes)]
+            TFirst,
+            [DynamicallyAccessedMembers(QueryMappedApiAnnotations.MaterializedEntityMemberTypes)]
+            TSecond,
+            TReturn>(
+            IDbConnection connection,
+            string sql,
+            Func<TFirst, TSecond, TReturn> map,
+            object param = null,
+            IDbTransaction transaction = null,
+            int? commandTimeout = null,
+            CommandType? commandType = null,
+            string splitOn = "Id")
+            where TFirst : class
+            where TSecond : class
+        {
+            if (sql == null)
+            {
+                throw new ArgumentNullException(nameof(sql));
+            }
+
+            return QueryMappedExtensions.ExecuteMapped<TFirst, TSecond, TReturn>(
+                connection,
+                new CommandDefinition(sql, param, transaction, commandTimeout, commandType),
+                map,
+                splitOn,
+                firstProfileType: null,
+                secondProfileType: null,
+                runtime: this);
         }
 
         /// <summary>
@@ -301,6 +445,31 @@ namespace Dapper.FluentMap
 
             return new MappedGridReader(
                 SqlMapper.ExecuteReader(connection, new CommandDefinition(sql, param)),
+                this);
+        }
+
+        /// <summary>
+        /// Asynchronously executes a command and returns a reader for sequential materialization using this runtime.
+        /// </summary>
+        [RequiresUnreferencedCode(QueryMappedApiAnnotations.RequiresUnreferencedCodeMessage)]
+        [RequiresDynamicCode(QueryMappedApiAnnotations.RequiresDynamicCodeMessage)]
+        public Task<MappedGridReader> QueryMultipleMappedAsync(
+            DbConnection connection,
+            string sql,
+            object param = null,
+            IDbTransaction transaction = null,
+            int? commandTimeout = null,
+            CommandType? commandType = null,
+            CancellationToken cancellationToken = default)
+        {
+            if (sql == null)
+            {
+                throw new ArgumentNullException(nameof(sql));
+            }
+
+            return QueryMappedExtensions.ExecuteMultipleMappedAsync(
+                connection,
+                new CommandDefinition(sql, param, transaction, commandTimeout, commandType, CommandFlags.None, cancellationToken),
                 this);
         }
     }

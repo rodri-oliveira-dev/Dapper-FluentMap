@@ -10,9 +10,11 @@ using Dapper;
 using Dapper.FluentMap.Dommel;
 using Dapper.FluentMap.Dommel.Mapping;
 using Dapper.FluentMap.Mapping;
+using Dapper.FluentMap.Materialization;
 using Dommel;
 using Microsoft.Data.SqlClient;
 using Microsoft.Data.Sqlite;
+using MySqlConnector;
 using Npgsql;
 using Xunit;
 
@@ -22,16 +24,37 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
     {
         public static IEnumerable<object[]> Providers()
         {
-            yield return new object[] { ProviderCase.Sqlite() };
-            yield return new object[] { ProviderCase.SqlServer() };
-            yield return new object[] { ProviderCase.PostgreSql() };
+            yield return new object[] { ProviderCase.SqliteName };
+            yield return new object[] { ProviderCase.SqlServerName };
+            yield return new object[] { ProviderCase.PostgreSqlName };
+            yield return new object[] { ProviderCase.MySqlName };
+            yield return new object[] { ProviderCase.MariaDbName };
+        }
+
+        [Fact]
+        [Trait("Category", "ProviderCompatibility")]
+        public void ProviderMatrixShouldNameAllCertificationProviders()
+        {
+            var providers = Providers().Select(row => Assert.IsType<string>(Assert.Single(row))).ToArray();
+
+            Assert.Equal(
+                new[]
+                {
+                    ProviderCase.SqliteName,
+                    ProviderCase.SqlServerName,
+                    ProviderCase.PostgreSqlName,
+                    ProviderCase.MySqlName,
+                    ProviderCase.MariaDbName
+                },
+                providers);
         }
 
         [Theory]
         [MemberData(nameof(Providers))]
         [Trait("Category", "ProviderCompatibility")]
-        public void BasicReadShouldMaterializeProviderValues(ProviderCase provider)
+        public void BasicReadShouldMaterializeProviderValues(string providerName)
         {
+            var provider = ProviderCase.Create(providerName);
             provider.SkipIfUnavailable();
             PreTest(typeof(BasicProviderCustomer));
 
@@ -79,8 +102,9 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
         [Theory]
         [MemberData(nameof(Providers))]
         [Trait("Category", "ProviderCompatibility")]
-        public void AdvancedReadShouldMaterializeConstructorNestedValueObjectProfileAndConverter(ProviderCase provider)
+        public void AdvancedReadShouldMaterializeConstructorNestedValueObjectProfileAndConverter(string providerName)
         {
+            var provider = ProviderCase.Create(providerName);
             provider.SkipIfUnavailable();
             PreTest(typeof(AdvancedProviderCustomer));
 
@@ -137,8 +161,57 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
         [Theory]
         [MemberData(nameof(Providers))]
         [Trait("Category", "ProviderCompatibility")]
-        public void QueryMultipleMappedShouldReadSequentialProviderResultSets(ProviderCase provider)
+        public void GeneratedMaterializerShouldMatchRuntimeMaterialization(string providerName)
         {
+            var provider = ProviderCase.Create(providerName);
+            provider.SkipIfUnavailable();
+            PreTest(typeof(MultipleCustomer));
+
+            try
+            {
+                var generatedMaterializerCalls = 0;
+                FluentMapper.Initialize(configuration =>
+                {
+                    configuration.AddMap(new MultipleCustomerMap());
+                    configuration.AddGeneratedMaterializer(
+                        new[]
+                        {
+                            GeneratedMaterializerColumn.Map("customer_id", nameof(MultipleCustomer.Id)),
+                            GeneratedMaterializerColumn.Map("customer_name", nameof(MultipleCustomer.Name))
+                        },
+                        record =>
+                        {
+                            generatedMaterializerCalls++;
+                            return new MultipleCustomer
+                            {
+                                Id = record.GetInt32(0),
+                                Name = record.GetString(1)
+                            };
+                        });
+                });
+
+                using (var connection = provider.OpenConnection())
+                {
+                    var customer = connection.QueryMappedSingle<MultipleCustomer>(
+                        provider.SingleCustomerSql(21, "Generated"));
+
+                    Assert.Equal(21, customer.Id);
+                    Assert.Equal("Generated", customer.Name);
+                    Assert.Equal(1, generatedMaterializerCalls);
+                }
+            }
+            finally
+            {
+                PreTest(typeof(MultipleCustomer));
+            }
+        }
+
+        [Theory]
+        [MemberData(nameof(Providers))]
+        [Trait("Category", "ProviderCompatibility")]
+        public void QueryMultipleMappedShouldReadSequentialProviderResultSets(string providerName)
+        {
+            var provider = ProviderCase.Create(providerName);
             provider.SkipIfUnavailable();
             provider.SkipIfMultipleResultsUnsupported();
             PreTest(typeof(MultipleCustomer), typeof(MultipleOrder));
@@ -173,8 +246,9 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
         [Theory]
         [MemberData(nameof(Providers))]
         [Trait("Category", "ProviderCompatibility")]
-        public void UnbufferedStreamingShouldKeepReaderOpenAndReleaseOnEarlyTermination(ProviderCase provider)
+        public void UnbufferedStreamingShouldKeepReaderOpenAndReleaseOnEarlyTermination(string providerName)
         {
+            var provider = ProviderCase.Create(providerName);
             provider.SkipIfUnavailable();
             PreTest(typeof(StreamCustomer));
 
@@ -204,8 +278,9 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
         [Theory]
         [MemberData(nameof(Providers))]
         [Trait("Category", "ProviderCompatibility")]
-        public async Task AsyncStreamingShouldPropagateCancellationAndReleaseReader(ProviderCase provider)
+        public async Task AsyncStreamingShouldPropagateCancellationAndReleaseReader(string providerName)
         {
+            var provider = ProviderCase.Create(providerName);
             provider.SkipIfUnavailable();
             PreTest(typeof(StreamCustomer));
 
@@ -244,8 +319,9 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
         [Theory]
         [MemberData(nameof(Providers))]
         [Trait("Category", "ProviderCompatibility")]
-        public void DommelPersistenceShouldHonorGeneratedDefaultsAndReadOnlyMetadata(ProviderCase provider)
+        public void DommelPersistenceShouldHonorGeneratedDefaultsAndReadOnlyMetadata(string providerName)
         {
+            var provider = ProviderCase.Create(providerName);
             provider.SkipIfUnavailable();
             provider.SkipIfPersistenceUnsupported();
             PreTest(typeof(ProviderPersistenceEntity));
@@ -304,8 +380,9 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
         [Theory]
         [MemberData(nameof(Providers))]
         [Trait("Category", "ProviderCompatibility")]
-        public void DommelPersistenceShouldInsertNonIdentityKeyAndKeepItOutOfUpdateSet(ProviderCase provider)
+        public void DommelPersistenceShouldInsertNonIdentityKeyAndKeepItOutOfUpdateSet(string providerName)
         {
+            var provider = ProviderCase.Create(providerName);
             provider.SkipIfUnavailable();
             provider.SkipIfPersistenceUnsupported();
             PreTest(typeof(ProviderAssignedKeyEntity));
@@ -371,6 +448,12 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
 
         public sealed class ProviderCase
         {
+            public const string SqliteName = "SQLite";
+            public const string SqlServerName = "SQL Server";
+            public const string PostgreSqlName = "PostgreSQL";
+            public const string MySqlName = "MySQL";
+            public const string MariaDbName = "MariaDB";
+
             private readonly string connectionString;
             private readonly Func<string, DbConnection> connectionFactory;
 
@@ -409,7 +492,7 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
             public static ProviderCase Sqlite()
             {
                 return new ProviderCase(
-                    "SQLite",
+                    SqliteName,
                     null,
                     "Data Source=:memory:",
                     connectionString => new SqliteConnection(connectionString),
@@ -421,7 +504,7 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
             {
                 const string environmentVariable = "DFM_SQLSERVER_CONNECTION_STRING";
                 return new ProviderCase(
-                    "SQL Server",
+                    SqlServerName,
                     environmentVariable,
                     Environment.GetEnvironmentVariable(environmentVariable),
                     connectionString => new SqlConnection(connectionString),
@@ -432,11 +515,52 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
             {
                 const string environmentVariable = "DFM_POSTGRESQL_CONNECTION_STRING";
                 return new ProviderCase(
-                    "PostgreSQL",
+                    PostgreSqlName,
                     environmentVariable,
                     Environment.GetEnvironmentVariable(environmentVariable),
                     connectionString => new NpgsqlConnection(connectionString),
                     ProviderDialect.PostgreSql);
+            }
+
+            public static ProviderCase MySql()
+            {
+                const string environmentVariable = "DFM_MYSQL_CONNECTION_STRING";
+                return new ProviderCase(
+                    MySqlName,
+                    environmentVariable,
+                    Environment.GetEnvironmentVariable(environmentVariable),
+                    connectionString => new MySqlConnection(connectionString),
+                    ProviderDialect.MySql);
+            }
+
+            public static ProviderCase MariaDb()
+            {
+                const string environmentVariable = "DFM_MARIADB_CONNECTION_STRING";
+                return new ProviderCase(
+                    MariaDbName,
+                    environmentVariable,
+                    Environment.GetEnvironmentVariable(environmentVariable),
+                    connectionString => new MySqlConnection(connectionString),
+                    ProviderDialect.MariaDb);
+            }
+
+            public static ProviderCase Create(string name)
+            {
+                switch (name)
+                {
+                    case SqliteName:
+                        return Sqlite();
+                    case SqlServerName:
+                        return SqlServer();
+                    case PostgreSqlName:
+                        return PostgreSql();
+                    case MySqlName:
+                        return MySql();
+                    case MariaDbName:
+                        return MariaDb();
+                    default:
+                        throw new ArgumentOutOfRangeException(nameof(name), name, "Unknown provider.");
+                }
             }
 
             public override string ToString()
@@ -448,6 +572,11 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
             {
                 if (!IsAlwaysAvailable && string.IsNullOrWhiteSpace(connectionString))
                 {
+                    if (IsStrictProviderCertification())
+                    {
+                        throw new InvalidOperationException(Name + " provider certification requires " + ConnectionStringEnvironmentVariable + ".");
+                    }
+
                     Assert.Skip(Name + " provider tests require " + ConnectionStringEnvironmentVariable + ".");
                 }
             }
@@ -496,7 +625,11 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
 
             public object GuidParameter(Guid value)
             {
-                return Dialect == ProviderDialect.Sqlite ? value.ToString() : (object)value;
+                return Dialect == ProviderDialect.Sqlite ||
+                       Dialect == ProviderDialect.MySql ||
+                       Dialect == ProviderDialect.MariaDb
+                    ? value.ToString()
+                    : (object)value;
             }
 
             public void Execute(IDbConnection connection, string sql)
@@ -536,6 +669,15 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
     external_id UUID NOT NULL,
     created_at TIMESTAMP NOT NULL,
     balance NUMERIC(18, 2) NOT NULL
+);";
+                    case ProviderDialect.MySql:
+                    case ProviderDialect.MariaDb:
+                        return @"CREATE TABLE " + tableName + @" (
+    customer_id INT NOT NULL,
+    optional_name TEXT NULL,
+    external_id CHAR(36) NOT NULL,
+    created_at DATETIME(6) NOT NULL,
+    balance DECIMAL(18, 2) NOT NULL
 );";
                     default:
                         return @"CREATE TABLE " + tableName + @" (
@@ -599,6 +741,11 @@ FROM " + tableName + ";";
                     "SELECT 99 AS order_id, " + DecimalLiteral(12.34m) + " AS total;";
             }
 
+            public string SingleCustomerSql(int id, string name)
+            {
+                return "SELECT " + Literal(id) + " AS customer_id, " + TextLiteral(name) + " AS customer_name;";
+            }
+
             public string StreamingRowsSql()
             {
                 return "SELECT 1 AS customer_id, " + TextLiteral("One") + " AS customer_name UNION ALL " +
@@ -625,6 +772,15 @@ FROM " + tableName + ";";
     default_value TEXT NOT NULL DEFAULT 'default-value-default',
     computed TEXT GENERATED ALWAYS AS (normal || '-computed') STORED
 );";
+                    case ProviderDialect.MySql:
+                    case ProviderDialect.MariaDb:
+                        return @"CREATE TABLE " + tableName + @" (
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    normal VARCHAR(100) NOT NULL,
+    read_only VARCHAR(100) NOT NULL DEFAULT 'read-only-default',
+    default_value VARCHAR(100) NOT NULL DEFAULT 'default-value-default',
+    computed VARCHAR(128) GENERATED ALWAYS AS (CONCAT(normal, '-computed')) STORED
+);";
                     default:
                         return @"CREATE TABLE " + tableName + @" (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -645,6 +801,13 @@ FROM " + tableName + ";";
     code NVARCHAR(32) NOT NULL PRIMARY KEY,
     name NVARCHAR(100) NOT NULL,
     update_excluded NVARCHAR(100) NULL
+);";
+                    case ProviderDialect.MySql:
+                    case ProviderDialect.MariaDb:
+                        return @"CREATE TABLE " + tableName + @" (
+    code VARCHAR(32) NOT NULL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    update_excluded VARCHAR(100) NULL
 );";
                     case ProviderDialect.PostgreSql:
                     case ProviderDialect.Sqlite:
@@ -681,13 +844,23 @@ WHERE code = @Code;";
             {
                 return "'" + value.Replace("'", "''") + "'";
             }
+
+            private static bool IsStrictProviderCertification()
+            {
+                return string.Equals(
+                    Environment.GetEnvironmentVariable("DFM_PROVIDER_COMPATIBILITY_STRICT"),
+                    "true",
+                    StringComparison.OrdinalIgnoreCase);
+            }
         }
 
         public enum ProviderDialect
         {
             Sqlite,
             SqlServer,
-            PostgreSql
+            PostgreSql,
+            MySql,
+            MariaDb
         }
 
         private sealed class BasicProviderCustomer

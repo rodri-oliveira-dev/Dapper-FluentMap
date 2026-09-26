@@ -1,6 +1,6 @@
 # FluentMap
 
-[![CI](https://github.com/rodri-oliveira-dev/Dapper-FluentMap/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/rodri-oliveira-dev/Dapper-FluentMap/actions/workflows/ci.yml)
+[![CI](https://github.com/rodri-oliveira-dev/Dapper-FluentMap/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rodri-oliveira-dev/Dapper-FluentMap/actions/workflows/ci.yml)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=rodri-oliveira-dev_Dapper-FluentMap&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=rodri-oliveira-dev_Dapper-FluentMap)
 [![.NET Standard 2.0](https://img.shields.io/badge/.NET%20Standard-2.0-512BD4?logo=dotnet&logoColor=white)](https://learn.microsoft.com/dotnet/standard/net-standard)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=rodri-oliveira-dev_Dapper-FluentMap&metric=coverage)](https://sonarcloud.io/summary/new_code?id=rodri-oliveira-dev_Dapper-FluentMap)
@@ -87,7 +87,7 @@ dotnet add package FluentMap.Generators
 
 Os PackageIds `FluentMap.*` são apenas identidades de distribuição. Eles não renomeiam assemblies, namespaces C# ou APIs públicas existentes.
 
-Os pacotes públicos targetam `netstandard2.0`. Consulte [COMPATIBILITY.md](COMPATIBILITY.md) antes de adotar um release candidate.
+Os pacotes públicos targetam `netstandard2.0`. Consulte [COMPATIBILITY.md](COMPATIBILITY.md) antes de adotar uma nova release.
 
 ## Início Rápido
 
@@ -325,6 +325,17 @@ var customer = connection.QueryMappedSingle<Customer>(sql);
 var legacy = connection.QueryMappedSingle<Customer, LegacyProfile>(legacySql);
 ```
 
+Para linhas de JOIN com duas entidades, use `splitOn` explícito e um delegate de composição:
+
+```csharp
+var rows = connection.QueryMapped<Customer, Order, CustomerOrder>(
+    sql,
+    (customer, order) => new CustomerOrder(customer, order),
+    splitOn: "order_id");
+```
+
+Cada segmento é materializado com seu próprio mapping FluentMap. Se todas as colunas do segundo segmento forem `NULL`, o segundo argumento será `null`, cobrindo a semântica comum de ausência de filho em `LEFT JOIN`.
+
 Para múltiplos result sets:
 
 ```csharp
@@ -334,7 +345,16 @@ var customers = multi.ReadMapped<Customer>();
 var orders = multi.ReadMapped<Order>();
 ```
 
-`ReadMapped*` consome result sets em sequência e bufferiza o result set atual.
+`ReadMapped*` consome result sets em sequência e bufferiza o result set atual. Chamadores assíncronos podem usar as APIs async correspondentes:
+
+```csharp
+await using var multi = await connection.QueryMultipleMappedAsync(
+    sql,
+    cancellationToken: cancellationToken);
+
+var customers = await multi.ReadMappedAsync<Customer>(cancellationToken);
+var orders = await multi.ReadMappedAsync<Order>(cancellationToken);
+```
 
 Para processamento incremental:
 
@@ -446,6 +466,7 @@ FluentMap tem prontidão parcial para trimming/AOT, não compatibilidade Native 
 | --- | --- |
 | Registro explícito com `AddMap<TMap>()` | Preferencial para cenários com trimming e Native AOT. |
 | Registro gerado com `AddGeneratedMappings()` | Alternativa preferencial ao assembly scanning para maps da compilação atual. |
+| `UseStrictGeneratedMaterialization()` com `QueryGeneratedMapped*` | Caminho exclusivamente gerado validado pelo smoke Native AOT; shapes não suportados falham deterministicamente em vez de usar fallback runtime. |
 | Assembly scanning | Baseado em reflection e anotado como sensível a trimming. |
 | `QueryMapped*`, `ReadMapped*`, `QueryMultipleMapped`, streaming | Anotados como sensíveis a trimming/dynamic code porque fallback runtime pode ocorrer. |
 
@@ -462,8 +483,8 @@ Resumo:
 - a faixa de Dapper é `[2.1.79,3.0.0)`, com `2.1.79` validado na matriz atual;
 - a faixa de Dommel é `[3.5.3,4.0.0)` no pacote opcional Dommel;
 - SQLite é validado por testes automatizados de provider;
-- SQL Server e PostgreSQL têm harness condicional, mas ainda não são certificados em CI;
-- MySQL/MariaDB não está validado;
+- SQL Server 2022 CU23 e PostgreSQL 18.6 são certificados por lanes obrigatórias de CI com bancos reais usando `Microsoft.Data.SqlClient` 7.1.0 e `Npgsql` 10.0.3;
+- MySQL 8.4.11 e MariaDB 11.8.9 são certificados por lanes obrigatórias de CI com bancos reais usando `MySqlConnector` 2.6.2;
 - SQL Server CE permanece legado/limitado por upstream.
 
 Para migrar do FluentMap 2.x, consulte [MIGRATION.md](MIGRATION.md).
@@ -473,11 +494,11 @@ Para migrar do FluentMap 2.x, consulte [MIGRATION.md](MIGRATION.md).
 - `FluentMapper.Initialize(...)`, `Dapper.Query<T>()` normal e integrações Dommel usam estado global process-wide.
 - Runtimes isolados se aplicam à materialização controlada pelo FluentMap, não a queries Dapper normais nem Dommel.
 - Dommel usa resolvers/builders globais do `DommelMapper`.
-- `QueryMultipleMapped` é sequencial e bufferizado por result set; não há `QueryMultipleMappedAsync`.
-- `QueryMultipleMapped` não é multi-mapping do Dapper com `splitOn`.
+- `QueryMultipleMapped` e `QueryMultipleMappedAsync` são sequenciais e bufferizados por result set.
+- `QueryMapped<TFirst,TSecond,TReturn>` suporta split de uma linha em dois tipos com `splitOn`; ele não agrega linhas em grafos um-para-muitos.
 - FluentMap não agrega linhas de joins em grafos e não mantém identity map.
 - Write converters são apenas metadata no caminho atual de escrita Dapper/Dommel.
-- Materializers gerados cobrem um subconjunto suportado e podem cair para materialização runtime.
+- Materializers gerados suportam shapes exatos e permutações seguras de colunas distintas; shapes com colunas ausentes, adicionais ou duplicadas usam fallback, exceto no modo gerado estrito.
 - Assembly scanning e fallback runtime são sensíveis a trimming/AOT.
 - Construção de value objects usa construtores públicos compatíveis, não factory methods.
 

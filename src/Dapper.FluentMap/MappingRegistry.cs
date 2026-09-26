@@ -28,6 +28,8 @@ namespace Dapper.FluentMap
 
         private readonly ConcurrentDictionary<MaterializationPlanCacheKey, GeneratedMaterializerEntry> _generatedMaterializers =
             new ConcurrentDictionary<MaterializationPlanCacheKey, GeneratedMaterializerEntry>();
+        private readonly ConcurrentDictionary<MaterializationPlanCacheKey, GeneratedMaterializerEntry> _generatedMaterializerResolutionCache =
+            new ConcurrentDictionary<MaterializationPlanCacheKey, GeneratedMaterializerEntry>();
 
         internal ConcurrentDictionary<Type, IEntityMap> EntityMaps { get; } =
             new ConcurrentDictionary<Type, IEntityMap>();
@@ -350,15 +352,105 @@ namespace Dapper.FluentMap
 
             var cacheKey = new MaterializationPlanCacheKey(type, profileType, columnNames);
             GeneratedMaterializerEntry entry;
-            if (!_generatedMaterializers.TryGetValue(cacheKey, out entry) ||
-                !GeneratedMaterializerMatchesEffectiveMapping(type, profileType, entry.Columns))
+            if (_generatedMaterializers.TryGetValue(cacheKey, out entry) &&
+                GeneratedMaterializerMatchesEffectiveMapping(type, profileType, entry.Columns))
             {
-                materializer = null;
+                materializer = entry.Materialize;
+                return true;
+            }
+
+            if (_generatedMaterializerResolutionCache.TryGetValue(cacheKey, out entry))
+            {
+                materializer = entry.Materialize;
+                return true;
+            }
+
+            if (TryCreateReorderedGeneratedMaterializer(type, profileType, columnNames, out entry))
+            {
+                _generatedMaterializerResolutionCache.TryAdd(cacheKey, entry);
+                materializer = entry.Materialize;
+                return true;
+            }
+
+            materializer = null;
+            return false;
+        }
+
+        private bool TryCreateReorderedGeneratedMaterializer(
+            Type type,
+            Type profileType,
+            string[] columnNames,
+            out GeneratedMaterializerEntry reorderedEntry)
+        {
+            reorderedEntry = null;
+
+            if (HasDuplicateColumnNames(columnNames))
+            {
                 return false;
             }
 
-            materializer = entry.Materialize;
-            return true;
+            foreach (var candidate in _generatedMaterializers
+                         .Where(pair => pair.Key.Type == type && pair.Key.ProfileType == profileType)
+                         .OrderBy(pair => FormatColumnShape(pair.Key.ColumnNames), StringComparer.Ordinal))
+            {
+                var generatedColumnNames = candidate.Key.ColumnNames;
+                if (generatedColumnNames.Count != columnNames.Length ||
+                    HasDuplicateColumnNames(generatedColumnNames) ||
+                    !HaveSameColumnSet(generatedColumnNames, columnNames) ||
+                    !GeneratedMaterializerMatchesEffectiveMapping(type, profileType, candidate.Value.Columns))
+                {
+                    continue;
+                }
+
+                var ordinalMap = CreateOrdinalMap(generatedColumnNames, columnNames);
+                var materializer = candidate.Value.Materialize;
+                reorderedEntry = GeneratedMaterializerEntry.Create(
+                    candidate.Value.Columns,
+                    record => materializer(new OrdinalMappedDataRecord(record, ordinalMap)));
+                return true;
+            }
+
+            return false;
+        }
+
+        internal string DescribeMissingGeneratedMaterializer(Type type, Type profileType, string[] columnNames)
+        {
+            if (type == null)
+            {
+                throw new ArgumentNullException(nameof(type));
+            }
+
+            if (columnNames == null)
+            {
+                throw new ArgumentNullException(nameof(columnNames));
+            }
+
+            EnsureProfileRegistered(type, profileType);
+
+            var profileContext = profileType == null
+                ? "default profile"
+                : $"profile '{profileType.FullName}'";
+            var requestedShape = FormatColumnShape(columnNames);
+            var candidates = _generatedMaterializers
+                .Where(pair => pair.Key.Type == type && pair.Key.ProfileType == profileType)
+                .OrderBy(pair => FormatColumnShape(pair.Key.ColumnNames), StringComparer.Ordinal)
+                .ToList();
+
+            if (candidates.Count == 0)
+            {
+                return $"Entity '{type.FullName}' ({profileContext}) has no registered generated materializer. Requested result columns: {requestedShape}.";
+            }
+
+            var cacheKey = new MaterializationPlanCacheKey(type, profileType, columnNames);
+            GeneratedMaterializerEntry exactEntry;
+            if (_generatedMaterializers.TryGetValue(cacheKey, out exactEntry) &&
+                !GeneratedMaterializerMatchesEffectiveMapping(type, profileType, exactEntry.Columns))
+            {
+                return $"Entity '{type.FullName}' ({profileContext}) has a generated materializer for requested result columns {requestedShape}, but its member/converter contract does not match the effective FluentMap mapping.";
+            }
+
+            var availableShapes = string.Join(", ", candidates.Select(pair => FormatColumnShape(pair.Key.ColumnNames)));
+            return $"Entity '{type.FullName}' ({profileContext}) has generated materializers, but none match requested result columns {requestedShape}. Registered generated shapes: {availableShapes}.";
         }
 
         internal void ValidateConfiguration()
@@ -632,6 +724,43 @@ namespace Dapper.FluentMap
             return defaultMember.Field == null ? null : defaultMember.Field.Name;
         }
 
+        private static string FormatColumnShape(IEnumerable<string> columnNames)
+        {
+            return "[" + string.Join(", ", columnNames.Select(columnName => "'" + columnName + "'")) + "]";
+        }
+
+        private static bool HasDuplicateColumnNames(IEnumerable<string> columnNames)
+        {
+            var seen = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var columnName in columnNames)
+            {
+                if (!seen.Add(columnName))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool HaveSameColumnSet(IReadOnlyList<string> generatedColumnNames, string[] requestedColumnNames)
+        {
+            var requested = new HashSet<string>(requestedColumnNames, StringComparer.Ordinal);
+            return requested.Count == generatedColumnNames.Count &&
+                   generatedColumnNames.All(columnName => requested.Contains(columnName));
+        }
+
+        private static int[] CreateOrdinalMap(IReadOnlyList<string> generatedColumnNames, string[] requestedColumnNames)
+        {
+            var ordinalByColumn = requestedColumnNames
+                .Select((columnName, ordinal) => new { columnName, ordinal })
+                .ToDictionary(item => item.columnName, item => item.ordinal, StringComparer.Ordinal);
+
+            return generatedColumnNames
+                .Select(columnName => ordinalByColumn[columnName])
+                .ToArray();
+        }
+
         private static bool GeneratedReadConverterMatchesEffectiveMapping(
             PropertyConversionMetadata conversion,
             GeneratedMaterializerColumn column)
@@ -659,6 +788,11 @@ namespace Dapper.FluentMap
             foreach (var key in _materializationPlanCache.Keys.Where(k => k.Type == type))
             {
                 _materializationPlanCache.TryRemove(key, out _);
+            }
+
+            foreach (var key in _generatedMaterializerResolutionCache.Keys.Where(k => k.Type == type))
+            {
+                _generatedMaterializerResolutionCache.TryRemove(key, out _);
             }
         }
 

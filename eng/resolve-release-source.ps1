@@ -11,7 +11,7 @@ param(
 
   [string]$Remote = 'origin',
 
-  [string]$AllowedBranch = 'master',
+  [string]$AllowedBranch = 'main',
 
   [string]$CurrentWorkflowRef,
 

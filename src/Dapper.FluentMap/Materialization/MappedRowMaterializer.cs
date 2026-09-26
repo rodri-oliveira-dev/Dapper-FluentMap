@@ -51,8 +51,52 @@ namespace Dapper.FluentMap.Materialization
                 return record => (TEntity)generatedMaterializer(record);
             }
 
+            if (runtime.StrictGeneratedMaterialization)
+            {
+                ThrowMissingGeneratedMaterializer<TEntity>(profileType, runtime, columnNames);
+            }
+
             var plan = runtime.Registry.GetMaterializationPlan(typeof(TEntity), profileType, columnNames);
             return record => (TEntity)plan.Materialize(record);
+        }
+
+        internal static Func<IDataRecord, TEntity> CreateGeneratedMaterializer<TEntity>(
+            IDataRecord reader,
+            Type profileType,
+            FluentMapRuntime runtime)
+            where TEntity : class
+        {
+            if (runtime == null)
+            {
+                throw new ArgumentNullException(nameof(runtime));
+            }
+
+            var columnNames = GetColumnNames(reader);
+
+            Func<IDataRecord, object> generatedMaterializer;
+            if (runtime.Registry.TryGetGeneratedMaterializer(
+                typeof(TEntity),
+                profileType,
+                columnNames,
+                out generatedMaterializer))
+            {
+                return record => (TEntity)generatedMaterializer(record);
+            }
+
+            ThrowMissingGeneratedMaterializer<TEntity>(profileType, runtime, columnNames);
+            return null;
+        }
+
+        private static void ThrowMissingGeneratedMaterializer<TEntity>(
+            Type profileType,
+            FluentMapRuntime runtime,
+            string[] columnNames)
+            where TEntity : class
+        {
+            throw new FluentMapConfigurationException(
+                "Strict generated materialization is enabled, but FluentMap could not resolve a compatible generated materializer. " +
+                runtime.Registry.DescribeMissingGeneratedMaterializer(typeof(TEntity), profileType, columnNames) +
+                " Register a generated materializer for this exact entity/profile/result-column shape, query the documented generated shape, or disable strict generated materialization for this runtime.");
         }
 
         private static string[] GetColumnNames(IDataRecord reader)
