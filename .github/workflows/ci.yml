@@ -289,7 +289,11 @@ jobs:
         run: dotnet --info
 
       - name: Restore AOT smoke
-        run: dotnet restore ./test/Dapper.FluentMap.AotSmoke/Dapper.FluentMap.AotSmoke.csproj --runtime win-x64
+        run: >-
+          dotnet restore ./test/Dapper.FluentMap.AotSmoke/Dapper.FluentMap.AotSmoke.csproj
+          --runtime win-x64
+          -p:PublishAot=true
+          -p:DefineConstants=AOT_SMOKE_GENERATED
 
       - name: Build AOT smoke dependencies
         run: |
