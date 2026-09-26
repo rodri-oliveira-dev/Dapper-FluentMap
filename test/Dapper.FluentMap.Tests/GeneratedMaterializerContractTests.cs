@@ -3,6 +3,7 @@ using System.Data;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Dapper.FluentMap.Configuration;
 using Dapper.FluentMap.Mapping;
 using Dapper.FluentMap.Materialization;
 using Microsoft.Data.Sqlite;
@@ -255,6 +256,227 @@ namespace Dapper.FluentMap.Tests
 
         [Fact]
         [Trait("Category", "Integration")]
+        public void StrictGeneratedRuntimeShouldUseRegisteredGeneratedMaterializer()
+        {
+            var runtime = CreateRuntime(builder =>
+            {
+                builder
+                    .AddMap(new GeneratedContractCustomerMap())
+                    .AddGeneratedMaterializer(
+                        DefaultColumns(),
+                        ReadDefaultGeneratedCustomer)
+                    .UseStrictGeneratedMaterialization();
+            });
+
+            using (var connection = OpenConnection())
+            {
+                var customer = runtime.QueryMappedSingle<GeneratedContractCustomer>(
+                    connection,
+                    "SELECT 81 AS customer_id, 'Strict' AS full_name;");
+
+                Assert.Equal(81, customer.Id);
+                Assert.Equal("generated:Strict", customer.Name);
+                Assert.Equal(0, runtime.MaterializationPlanCacheEntryCount);
+            }
+        }
+
+        [Fact]
+        [Trait("Category", "Integration")]
+        public void QueryGeneratedMappedShouldUseRegisteredGeneratedMaterializerWithoutRuntimeFallback()
+        {
+            var runtime = CreateRuntime(builder =>
+            {
+                builder
+                    .AddMap(new GeneratedContractCustomerMap())
+                    .AddGeneratedMaterializer(
+                        DefaultColumns(),
+                        ReadDefaultGeneratedCustomer)
+                    .UseStrictGeneratedMaterialization();
+            });
+
+            using (var connection = OpenConnection())
+            {
+                var customer = runtime.QueryGeneratedMappedSingle<GeneratedContractCustomer>(
+                    connection,
+                    "SELECT 86 AS customer_id, 'GeneratedOnly' AS full_name;");
+
+                Assert.Equal(86, customer.Id);
+                Assert.Equal("generated:GeneratedOnly", customer.Name);
+                Assert.Equal(0, runtime.MaterializationPlanCacheEntryCount);
+            }
+        }
+
+        [Fact]
+        [Trait("Category", "Integration")]
+        public void QueryGeneratedMappedShouldRejectDynamicParameterObjects()
+        {
+            var runtime = CreateRuntime(builder =>
+            {
+                builder
+                    .AddMap(new GeneratedContractCustomerMap())
+                    .AddGeneratedMaterializer(DefaultColumns(), ReadDefaultGeneratedCustomer)
+                    .UseStrictGeneratedMaterialization();
+            });
+
+            using (var connection = OpenConnection())
+            {
+                var exception = Assert.Throws<NotSupportedException>(() =>
+                    runtime.QueryGeneratedMappedSingle<GeneratedContractCustomer>(
+                        connection,
+                        "SELECT @Id AS customer_id, 'GeneratedOnly' AS full_name;",
+                        new { Id = 86 }));
+
+                Assert.Contains("dynamic parameter objects", exception.Message, StringComparison.Ordinal);
+            }
+        }
+
+        [Fact]
+        [Trait("Category", "Integration")]
+        public void StrictGeneratedRuntimeShouldRejectMissingGeneratedMaterializer()
+        {
+            var runtime = CreateRuntime(builder =>
+            {
+                builder
+                    .AddMap(new GeneratedContractCustomerMap())
+                    .UseStrictGeneratedMaterialization();
+            });
+
+            using (var connection = OpenConnection())
+            {
+                var exception = Assert.Throws<FluentMapConfigurationException>(() =>
+                    runtime.QueryMappedSingle<GeneratedContractCustomer>(
+                        connection,
+                        "SELECT 91 AS customer_id, 'Missing' AS full_name;"));
+
+                Assert.Contains("Strict generated materialization is enabled", exception.Message);
+                Assert.Contains(typeof(GeneratedContractCustomer).FullName, exception.Message);
+                Assert.Contains("no registered generated materializer", exception.Message);
+                Assert.Contains("['customer_id', 'full_name']", exception.Message);
+                Assert.DoesNotContain("SELECT", exception.Message);
+                Assert.DoesNotContain("Data Source", exception.Message);
+                Assert.Equal(0, runtime.MaterializationPlanCacheEntryCount);
+            }
+        }
+
+        [Fact]
+        [Trait("Category", "Integration")]
+        public void StrictGeneratedRuntimeShouldRejectUnsupportedColumnShape()
+        {
+            var runtime = CreateRuntime(builder =>
+            {
+                builder
+                    .AddMap(new GeneratedContractCustomerMap())
+                    .AddGeneratedMaterializer(
+                        DefaultColumns(),
+                        ReadDefaultGeneratedCustomer)
+                    .UseStrictGeneratedMaterialization();
+            });
+
+            using (var connection = OpenConnection())
+            {
+                var exception = Assert.Throws<FluentMapConfigurationException>(() =>
+                    runtime.QueryMappedSingle<GeneratedContractCustomer>(
+                        connection,
+                        "SELECT 92 AS customer_id;"));
+
+                Assert.Contains("none match requested result columns", exception.Message);
+                Assert.Contains("['customer_id']", exception.Message);
+                Assert.Contains("['customer_id', 'full_name']", exception.Message);
+                Assert.DoesNotContain("SELECT", exception.Message);
+                Assert.Equal(0, runtime.MaterializationPlanCacheEntryCount);
+            }
+        }
+
+        [Fact]
+        [Trait("Category", "Integration")]
+        public void StrictGeneratedRuntimeShouldUseGeneratedMaterializerForReorderedColumns()
+        {
+            var runtime = CreateRuntime(builder =>
+            {
+                builder
+                    .AddMap(new GeneratedContractCustomerMap())
+                    .AddGeneratedMaterializer(
+                        DefaultColumns(),
+                        ReadDefaultGeneratedCustomer)
+                    .UseStrictGeneratedMaterialization();
+            });
+
+            using (var connection = OpenConnection())
+            {
+                var customer = runtime.QueryMappedSingle<GeneratedContractCustomer>(
+                    connection,
+                    "SELECT 'Reordered' AS full_name, 94 AS customer_id;");
+
+                Assert.Equal(94, customer.Id);
+                Assert.Equal("generated:Reordered", customer.Name);
+                Assert.Equal(0, runtime.MaterializationPlanCacheEntryCount);
+            }
+        }
+
+        [Fact]
+        [Trait("Category", "Integration")]
+        public void StrictGeneratedRuntimeShouldRejectIncompatibleGeneratedContract()
+        {
+            var runtime = CreateRuntime(builder =>
+            {
+                builder
+                    .AddMap(new GeneratedContractCustomerMap())
+                    .AddGeneratedMaterializer(
+                        new[]
+                        {
+                            GeneratedMaterializerColumn.Map("customer_id", nameof(GeneratedContractCustomer.Name)),
+                            GeneratedMaterializerColumn.Map("full_name", nameof(GeneratedContractCustomer.Name))
+                        },
+                        ReadDefaultGeneratedCustomer)
+                    .UseStrictGeneratedMaterialization();
+            });
+
+            using (var connection = OpenConnection())
+            {
+                var exception = Assert.Throws<FluentMapConfigurationException>(() =>
+                    runtime.QueryMappedSingle<GeneratedContractCustomer>(
+                        connection,
+                        "SELECT 93 AS customer_id, 'Mismatch' AS full_name;"));
+
+                Assert.Contains("member/converter contract does not match", exception.Message);
+                Assert.Contains("['customer_id', 'full_name']", exception.Message);
+                Assert.DoesNotContain("SELECT", exception.Message);
+                Assert.Equal(0, runtime.MaterializationPlanCacheEntryCount);
+            }
+        }
+
+        [Fact]
+        [Trait("Category", "Integration")]
+        public void StrictGeneratedRuntimeShouldRemainIsolatedFromLegacyFallbackRuntime()
+        {
+            var strictRuntime = CreateRuntime(builder =>
+            {
+                builder
+                    .AddMap(new GeneratedContractCustomerMap())
+                    .UseStrictGeneratedMaterialization();
+            });
+            var fallbackRuntime = CreateRuntime(builder => builder.AddMap(new GeneratedContractCustomerMap()));
+
+            using (var connection = OpenConnection())
+            {
+                Assert.Throws<FluentMapConfigurationException>(() =>
+                    strictRuntime.QueryMappedSingle<GeneratedContractCustomer>(
+                        connection,
+                        "SELECT 101 AS customer_id, 'Strict' AS full_name;"));
+
+                var customer = fallbackRuntime.QueryMappedSingle<GeneratedContractCustomer>(
+                    connection,
+                    "SELECT 102 AS customer_id, 'Fallback' AS full_name;");
+
+                Assert.Equal(102, customer.Id);
+                Assert.Equal("Fallback", customer.Name);
+                Assert.Equal(0, strictRuntime.MaterializationPlanCacheEntryCount);
+                Assert.Equal(1, fallbackRuntime.MaterializationPlanCacheEntryCount);
+            }
+        }
+
+        [Fact]
+        [Trait("Category", "Integration")]
         public void QueryMappedShouldUseGeneratedProfileMaterializerWhenRegistered()
         {
             PreTest(typeof(GeneratedContractCustomer));
@@ -323,7 +545,7 @@ namespace Dapper.FluentMap.Tests
 
         [Fact]
         [Trait("Category", "Integration")]
-        public void QueryMappedGeneratedAndRuntimeFallbackShouldReturnEquivalentResults()
+        public void QueryMappedGeneratedMaterializerShouldSupportReorderedColumnsWithoutRuntimeFallback()
         {
             PreTest(typeof(GeneratedContractCustomer));
 
@@ -345,21 +567,66 @@ namespace Dapper.FluentMap.Tests
                 {
                     var generated = connection.QueryMappedSingle<GeneratedContractCustomer>(
                         "SELECT 71 AS customer_id, 'Equivalent' AS full_name;");
-                    var runtimeFallback = connection.QueryMappedSingle<GeneratedContractCustomer>(
+                    var reordered = connection.QueryMappedSingle<GeneratedContractCustomer>(
                         "SELECT 'Equivalent' AS full_name, 71 AS customer_id;");
-                    var repeatedRuntimeFallback = connection.QueryMappedSingle<GeneratedContractCustomer>(
+                    var repeatedReordered = connection.QueryMappedSingle<GeneratedContractCustomer>(
                         "SELECT 'Equivalent' AS full_name, 71 AS customer_id;");
 
-                    Assert.Equal(generated.Id, runtimeFallback.Id);
-                    Assert.Equal(generated.Name, runtimeFallback.Name);
-                    Assert.Equal(runtimeFallback.Id, repeatedRuntimeFallback.Id);
-                    Assert.Equal(runtimeFallback.Name, repeatedRuntimeFallback.Name);
-                    Assert.Equal(1, FluentMapper.Registry.MaterializationPlanCacheEntryCount);
+                    Assert.Equal(generated.Id, reordered.Id);
+                    Assert.Equal(generated.Name, reordered.Name);
+                    Assert.Equal(reordered.Id, repeatedReordered.Id);
+                    Assert.Equal(reordered.Name, repeatedReordered.Name);
+                    Assert.Equal(0, FluentMapper.Registry.MaterializationPlanCacheEntryCount);
                 }
             }
             finally
             {
                 PreTest(typeof(GeneratedContractCustomer));
+            }
+        }
+
+        [Fact]
+        [Trait("Category", "Integration")]
+        public void ReorderedGeneratedMaterializerResolutionShouldRemainRuntimeScoped()
+        {
+            var first = CreateRuntime(builder =>
+            {
+                builder
+                    .AddMap(new GeneratedContractCustomerMap())
+                    .AddGeneratedMaterializer(
+                        DefaultColumns(),
+                        record => new GeneratedContractCustomer
+                        {
+                            Id = Convert.ToInt32(record.GetValue(0)),
+                            Name = "first:" + Convert.ToString(record.GetValue(1))
+                        });
+            });
+            var second = CreateRuntime(builder =>
+            {
+                builder
+                    .AddMap(new GeneratedContractCustomerMap())
+                    .AddGeneratedMaterializer(
+                        DefaultColumns(),
+                        record => new GeneratedContractCustomer
+                        {
+                            Id = Convert.ToInt32(record.GetValue(0)),
+                            Name = "second:" + Convert.ToString(record.GetValue(1))
+                        });
+            });
+
+            using (var connection = OpenConnection())
+            {
+                var firstCustomer = first.QueryMappedSingle<GeneratedContractCustomer>(
+                    connection,
+                    "SELECT 'Scoped' AS full_name, 111 AS customer_id;");
+                var secondCustomer = second.QueryMappedSingle<GeneratedContractCustomer>(
+                    connection,
+                    "SELECT 'Scoped' AS full_name, 112 AS customer_id;");
+
+                Assert.Equal("first:Scoped", firstCustomer.Name);
+                Assert.Equal("second:Scoped", secondCustomer.Name);
+                Assert.Equal(0, first.MaterializationPlanCacheEntryCount);
+                Assert.Equal(0, second.MaterializationPlanCacheEntryCount);
             }
         }
 
@@ -504,6 +771,13 @@ namespace Dapper.FluentMap.Tests
             var connection = new SqliteConnection("Data Source=:memory:");
             connection.Open();
             return connection;
+        }
+
+        private static FluentMapRuntime CreateRuntime(Action<FluentMapConfigurationBuilder> configure)
+        {
+            var builder = new FluentMapConfigurationBuilder();
+            configure(builder);
+            return builder.Build().CreateRuntime();
         }
 
         private static void PreTest(params Type[] types)

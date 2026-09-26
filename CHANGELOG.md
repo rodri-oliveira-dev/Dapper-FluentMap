@@ -16,14 +16,25 @@ The historical archived package history is not reconstructed here. This changelo
 
 ### Changed
 
+- Mainline CI, release/recovery branch guards and badges now target `main`.
+- The documented Dapper minimum, package range and CI minimum lane are aligned on `2.1.79`; the latest-stable lane is `2.1.89`.
+- SQL Server 2022 CU23 and PostgreSQL 18.6 provider compatibility now run as a mandatory real-database CI lane with strict no-skip certification semantics.
+- Added FluentMap-controlled two-type `QueryMapped<TFirst,TSecond,TReturn>` multi-mapping with `splitOn` and an isolated `FluentMapRuntime` equivalent.
+- Added `QueryMultipleMappedAsync` and async `MappedGridReader.ReadMappedAsync*` APIs for ordered multiple-result-set materialization.
+- Added strict generated materialization through `UseStrictGeneratedMaterialization()` and `QueryGeneratedMapped*`, with deterministic diagnostics and a Native AOT CI smoke.
+- Generated materializers now support safe permutations of distinct result columns without entering the runtime materializer fallback.
+- MySQL 8.4.11 and MariaDB 11.8.9 provider compatibility now run in the mandatory real-database CI lane with `MySqlConnector` 2.6.2.
 - The new Dependency Injection, analyzer and generator NuGet PackageIds are now `FluentMap.DependencyInjection`, `FluentMap.Analyzers` and `FluentMap.Generators`. Project names, assemblies, namespaces and public APIs remain `Dapper.FluentMap.*`.
 - Release and recovery automation now distinguish package-version existence from publisher authorization, validate existing NuGet.org artifacts before accepting them and publish only genuinely missing packages.
 - README is now a concise bilingual entrypoint and delegates detailed release/adoption policy to dedicated documents.
 
+## [3.0.3] - Published
+
+Stable 3.0.3 packages have been published for the maintained fork line. The historical release-candidate notes below are retained as history, not as the current release status.
+
 ## [3.0.0-rc.1] - Unreleased
 
-Release candidate status: ready for publication qualification. The date remains
-`Unreleased` until the packages are actually published.
+Historical release-candidate status retained for traceability. This section does not describe the current stable 3.0.3 package state.
 
 ### Added
 
@@ -76,10 +87,10 @@ Release candidate status: ready for publication qualification. The date remains
 - SQL Server and PostgreSQL have conditional harnesses but are not certified in CI.
 - Full Native AOT support is not claimed.
 - SourceLink and provenance are ready in the release workflow and were validated for the previous remote RC qualification SHA; final candidate artifacts require the final commit to be pushed before remote SourceLink/provenance can be requalified.
-- Stable release remains blocked on fork-owned API/binary baseline, package signing decision and RC feedback.
+- The RC-era SourceLink/provenance and package-signing caveats are historical; current release readiness is governed by the active workflow and compatibility documentation.
 
-## Fork Release Candidate Line
+## Historical Fork Release Candidate Line
 
-The first fork release candidate is expected to use a prerelease version such as `3.0.0-rc.1`, unless API compatibility review proves a different versioning path is safer.
+The first fork release candidate used a prerelease version such as `3.0.0-rc.1`; this section is retained only to explain the fork line's history.
 
 Do not reuse `2.0.0` for the fork line because `Dapper.FluentMap` and `Dapper.FluentMap.Dommel` already have historical `2.0.0` packages.

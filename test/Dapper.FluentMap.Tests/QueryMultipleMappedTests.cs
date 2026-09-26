@@ -1,6 +1,7 @@
 using System;
 using System.Data;
 using System.Linq;
+using System.Threading.Tasks;
 using Dapper;
 using Dapper.FluentMap.Conventions;
 using Dapper.FluentMap.Mapping;
@@ -793,6 +794,117 @@ namespace Dapper.FluentMap.Tests
                 }
 
                 Assert.Equal(ConnectionState.Open, connection.State);
+            }
+        }
+
+        [Fact]
+        [Trait("Category", "Integration")]
+        public async Task QueryMultipleMappedAsyncShouldReadSequentialResultSets()
+        {
+            PreTest(typeof(MappedCustomer), typeof(MappedOrder));
+
+            try
+            {
+                var cancellationToken = TestContext.Current.CancellationToken;
+                FluentMapper.Initialize(configuration =>
+                {
+                    configuration.AddMap(new MappedCustomerMap());
+                    configuration.AddMap(new MappedOrderMap());
+                });
+
+                using (var connection = OpenConnection())
+                await using (var multi = await connection.QueryMultipleMappedAsync(
+                    "SELECT 1 AS customer_id, 'Ada' AS customer_name; SELECT 10 AS order_id, 12.5 AS total;",
+                    cancellationToken: cancellationToken))
+                {
+                    var customer = await multi.ReadMappedSingleAsync<MappedCustomer>(cancellationToken);
+                    var order = await multi.ReadMappedSingleAsync<MappedOrder>(cancellationToken);
+
+                    Assert.Equal(1, customer.Id);
+                    Assert.Equal("Ada", customer.Name);
+                    Assert.Equal(10, order.Id);
+                    Assert.Equal(12.5m, order.Total);
+                    Assert.True(multi.IsConsumed);
+                }
+            }
+            finally
+            {
+                PreTest(typeof(MappedCustomer), typeof(MappedOrder));
+            }
+        }
+
+        [Fact]
+        [Trait("Category", "Integration")]
+        public async Task QueryMultipleMappedAsyncShouldUseRuntimeIsolation()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var runtime = new Configuration.FluentMapConfigurationBuilder()
+                .AddMap<MappedCustomerMap>()
+                .AddMap<MappedOrderMap>()
+                .Build()
+                .CreateRuntime();
+
+            using (var connection = OpenConnection())
+            await using (var multi = await runtime.QueryMultipleMappedAsync(
+                connection,
+                "SELECT 2 AS customer_id, 'Runtime' AS customer_name; SELECT 20 AS order_id, 30.5 AS total;",
+                cancellationToken: cancellationToken))
+            {
+                var customer = await multi.ReadMappedSingleAsync<MappedCustomer>(cancellationToken);
+                var order = await multi.ReadMappedSingleAsync<MappedOrder>(cancellationToken);
+
+                Assert.Equal(2, customer.Id);
+                Assert.Equal("Runtime", customer.Name);
+                Assert.Equal(20, order.Id);
+                Assert.Equal(30.5m, order.Total);
+            }
+        }
+
+        [Fact]
+        [Trait("Category", "Integration")]
+        public async Task ReadMappedAsyncShouldThrowAfterFinalResultSet()
+        {
+            PreTest(typeof(MappedCustomer));
+
+            try
+            {
+                var cancellationToken = TestContext.Current.CancellationToken;
+                FluentMapper.Initialize(configuration => configuration.AddMap(new MappedCustomerMap()));
+
+                using (var connection = OpenConnection())
+                await using (var multi = await connection.QueryMultipleMappedAsync(
+                    "SELECT 1 AS customer_id, 'Ada' AS customer_name;",
+                    cancellationToken: cancellationToken))
+                {
+                    Assert.NotNull(await multi.ReadMappedSingleAsync<MappedCustomer>(cancellationToken));
+
+                    var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+                        () => multi.ReadMappedAsync<MappedCustomer>(cancellationToken));
+
+                    Assert.Contains("no remaining result sets", exception.Message, StringComparison.OrdinalIgnoreCase);
+                }
+            }
+            finally
+            {
+                PreTest(typeof(MappedCustomer));
+            }
+        }
+
+        [Fact]
+        [Trait("Category", "Integration")]
+        public async Task DisposeAsyncShouldReleaseReader()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            using (var connection = new SqliteConnection("Data Source=:memory:"))
+            {
+                var multi = await connection.QueryMultipleMappedAsync("SELECT 1 AS Id;", cancellationToken: cancellationToken);
+
+                Assert.Equal(ConnectionState.Open, connection.State);
+
+                await multi.DisposeAsync();
+
+                Assert.Equal(ConnectionState.Closed, connection.State);
+                await Assert.ThrowsAsync<ObjectDisposedException>(() => multi.ReadMappedAsync<DefaultEntity>(cancellationToken));
             }
         }
 

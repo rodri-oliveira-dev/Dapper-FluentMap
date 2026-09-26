@@ -23,12 +23,14 @@ namespace Dapper.FluentMap.Configuration
             IReadOnlyDictionary<Type, EntityMappingConfiguration> entityMaps,
             IReadOnlyList<ProfileMappingConfiguration> profileMaps,
             IReadOnlyDictionary<Type, IReadOnlyList<ConventionMappingConfiguration>> typeConventions,
-            IReadOnlyList<GeneratedMaterializerConfiguration> generatedMaterializers)
+            IReadOnlyList<GeneratedMaterializerConfiguration> generatedMaterializers,
+            bool strictGeneratedMaterialization)
         {
             EntityMaps = entityMaps;
             ProfileMaps = profileMaps;
             TypeConventions = typeConventions;
             GeneratedMaterializers = generatedMaterializers;
+            StrictGeneratedMaterialization = strictGeneratedMaterialization;
         }
 
         /// <summary>
@@ -52,6 +54,12 @@ namespace Dapper.FluentMap.Configuration
         public IReadOnlyList<GeneratedMaterializerConfiguration> GeneratedMaterializers { get; }
 
         /// <summary>
+        /// Gets a value indicating whether runtimes created from this snapshot must reject runtime-reflection
+        /// materialization fallback for FluentMap-controlled query APIs.
+        /// </summary>
+        public bool StrictGeneratedMaterialization { get; }
+
+        /// <summary>
         /// Creates a runtime that uses this immutable configuration and owns its derived caches.
         /// </summary>
         /// <returns>A FluentMap runtime bound to this configuration.</returns>
@@ -61,6 +69,11 @@ namespace Dapper.FluentMap.Configuration
         }
 
         internal static ImmutableFluentMapConfiguration Create(MappingRegistry registry)
+        {
+            return Create(registry, strictGeneratedMaterialization: false);
+        }
+
+        internal static ImmutableFluentMapConfiguration Create(MappingRegistry registry, bool strictGeneratedMaterialization)
         {
             if (registry == null)
             {
@@ -96,7 +109,8 @@ namespace Dapper.FluentMap.Configuration
                 new ReadOnlyDictionary<Type, EntityMappingConfiguration>(entityMaps),
                 new ReadOnlyCollection<ProfileMappingConfiguration>(profileMaps),
                 new ReadOnlyDictionary<Type, IReadOnlyList<ConventionMappingConfiguration>>(conventions),
-                new ReadOnlyCollection<GeneratedMaterializerConfiguration>(materializers));
+                new ReadOnlyCollection<GeneratedMaterializerConfiguration>(materializers),
+                strictGeneratedMaterialization);
         }
     }
 

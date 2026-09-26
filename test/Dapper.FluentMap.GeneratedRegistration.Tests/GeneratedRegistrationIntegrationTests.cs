@@ -115,6 +115,37 @@ namespace Dapper.FluentMap.GeneratedRegistration.Tests
 
         [Fact]
         [Trait("Category", "Integration")]
+        public void GeneratedRegistrationShouldUseGeneratedMaterializersForReorderedFlatProjections()
+        {
+            ResetMapper();
+
+            try
+            {
+                FluentMapper.Initialize(configuration => configuration.AddGeneratedMappings());
+
+                using (var connection = OpenConnection())
+                {
+                    var nullable = connection.QueryMappedSingle<GeneratedNullableCustomer>(
+                        "SELECT 'Reordered' AS note, 44 AS age;");
+                    var converted = connection.QueryMappedSingle<GeneratedConvertedCustomer>(
+                        "SELECT '42' AS optional_score, 'A' AS status, 45 AS customer_id;");
+
+                    Assert.Equal(44, nullable.Age);
+                    Assert.Equal("Reordered", nullable.Note);
+                    Assert.Equal(45, converted.Id);
+                    Assert.Equal(GeneratedAccountStatus.Active, converted.Status);
+                    Assert.Equal(42, converted.OptionalScore);
+                    Assert.Equal(0, FluentMapper.Registry.MaterializationPlanCacheEntryCount);
+                }
+            }
+            finally
+            {
+                ResetMapper();
+            }
+        }
+
+        [Fact]
+        [Trait("Category", "Integration")]
         public void GeneratedRegistrationShouldWorkThroughDependencyInjection()
         {
             using (var provider = new ServiceCollection()

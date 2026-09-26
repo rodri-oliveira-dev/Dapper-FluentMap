@@ -59,10 +59,10 @@ public class MaterializationSteadyStateBenchmarks
         RuntimeQueryMappedSimpleUnbuffered();
         await QueryMappedSimpleUnbufferedAsync();
         await RuntimeQueryMappedSimpleUnbufferedAsync();
-        QueryMappedSimpleRuntimeFallback();
-        RuntimeQueryMappedSimpleRuntimeFallback();
-        QueryMappedSimpleUnbufferedRuntimeFallback();
-        await QueryMappedSimpleUnbufferedAsyncRuntimeFallback();
+        QueryMappedSimpleReorderedGenerated();
+        RuntimeQueryMappedSimpleReorderedGenerated();
+        QueryMappedSimpleUnbufferedReorderedGenerated();
+        await QueryMappedSimpleUnbufferedAsyncReorderedGenerated();
         QueryMappedImmutableConstructor();
         QueryMappedNestedObject();
         QueryMappedNestedObjectRuntimeFallback();
@@ -171,7 +171,7 @@ public class MaterializationSteadyStateBenchmarks
     }
 
     [Benchmark]
-    public int QueryMappedSimpleRuntimeFallback()
+    public int QueryMappedSimpleReorderedGenerated()
     {
         return _connection.QueryMapped<QueryMappedSimpleCustomer>(
                 "SELECT Name AS full_name, Id AS customer_id, Age AS customer_age, Balance AS account_balance, CreatedAt AS created_at FROM BenchmarkRows;")
@@ -179,7 +179,7 @@ public class MaterializationSteadyStateBenchmarks
     }
 
     [Benchmark]
-    public int RuntimeQueryMappedSimpleRuntimeFallback()
+    public int RuntimeQueryMappedSimpleReorderedGenerated()
     {
         return _runtime.QueryMapped<QueryMappedSimpleCustomer>(
                 _connection,
@@ -188,7 +188,7 @@ public class MaterializationSteadyStateBenchmarks
     }
 
     [Benchmark]
-    public int QueryMappedSimpleUnbufferedRuntimeFallback()
+    public int QueryMappedSimpleUnbufferedReorderedGenerated()
     {
         return _connection.QueryMappedUnbuffered<QueryMappedSimpleCustomer>(
                 "SELECT Name AS full_name, Id AS customer_id, Age AS customer_age, Balance AS account_balance, CreatedAt AS created_at FROM BenchmarkRows;")
@@ -196,7 +196,7 @@ public class MaterializationSteadyStateBenchmarks
     }
 
     [Benchmark]
-    public Task<int> QueryMappedSimpleUnbufferedAsyncRuntimeFallback()
+    public Task<int> QueryMappedSimpleUnbufferedAsyncReorderedGenerated()
     {
         return CountAsync(_connection.QueryMappedUnbufferedAsync<QueryMappedSimpleCustomer>(
             "SELECT Name AS full_name, Id AS customer_id, Age AS customer_age, Balance AS account_balance, CreatedAt AS created_at FROM BenchmarkRows;"));

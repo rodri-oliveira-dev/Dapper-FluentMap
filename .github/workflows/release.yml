@@ -59,8 +59,8 @@ jobs:
           $ErrorActionPreference = 'Stop'
           Import-Module './eng/PackageCatalog.psm1' -Force
 
-          if ($env:GITHUB_REF -ne 'refs/heads/master') {
-            Write-Error "Releases must be started from the master branch. Current ref: $env:GITHUB_REF"
+          if ($env:GITHUB_REF -ne 'refs/heads/main') {
+            Write-Error "Releases must be started from the main branch. Current ref: $env:GITHUB_REF"
             exit 1
           }
 

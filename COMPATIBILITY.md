@@ -28,7 +28,8 @@ Validated in the current matrix:
 
 | Dapper | Status | Notes |
 | --- | --- | --- |
-| `2.1.79` | Validated | Current minimum and matrix lane used by the repository. |
+| `2.1.79` | Validated | Current minimum supported version and minimum CI matrix lane. |
+| `2.1.89` | Validated | Current latest-stable CI matrix lane. |
 
 Known risk: `Dapper.FluentMap` uses public Dapper APIs for type maps/readers, but TypeHandler interoperability depends on resolving `SqlMapper.TypeHandlerCache<T>.Parse(object)` by reflection. This is covered by tests and remains the highest-risk Dapper compatibility boundary.
 
@@ -54,11 +55,12 @@ Provider support is split into certification levels:
 
 | Provider | Status | Evidence |
 | --- | --- | --- |
-| SQLite (`Microsoft.Data.Sqlite`) | Validated | Automated provider compatibility tests cover basic reads, nested/value-object reads, `QueryMultipleMapped`, sync/async streaming and Dommel persistence. |
+| SQLite (`Microsoft.Data.Sqlite` 10.0.12) | Validated | Automated provider compatibility tests cover basic reads, immutable/nested/value-object reads, generated/runtime materialization, `QueryMultipleMapped`, `QueryMultipleMappedAsync`, sync/async streaming and Dommel persistence. |
 | Provider-independent ADO.NET readers | Validated for core behavior | Tests use `DataTableReader` and common ADO.NET contracts. |
-| SQL Server (`Microsoft.Data.SqlClient`) | Not certified | Conditional harness exists via `DFM_SQLSERVER_CONNECTION_STRING`, but it is not executed in CI by default. |
-| PostgreSQL (`Npgsql`) | Not certified | Conditional harness exists via `DFM_POSTGRESQL_CONNECTION_STRING`, but it is not executed in CI by default. |
-| MySQL/MariaDB | Not validated | Dommel builder registration exists by design; no automated provider lane is present. |
+| SQL Server 2022 CU23 (`Microsoft.Data.SqlClient` 7.1.0) | CI certified | Mandatory CI provider lane uses `mcr.microsoft.com/mssql/server:2022-CU23-ubuntu-22.04` and fails if the service or connection string is unavailable. |
+| PostgreSQL 18.6 (`Npgsql` 10.0.3) | CI certified | Mandatory CI provider lane uses `postgres:18.6-bookworm` and fails if the service or connection string is unavailable. |
+| MySQL 8.4.11 (`MySqlConnector` 2.6.2) | CI certified | Mandatory CI provider lane uses `mysql:8.4.11-oraclelinux9` and exercises reads, generated/runtime materialization, multiple results, streaming and Dommel persistence. |
+| MariaDB 11.8.9 (`MySqlConnector` 2.6.2) | CI certified | Mandatory CI provider lane uses `mariadb:11.8.9-ubi9` with the same strict no-skip provider contract. |
 | SQL Server CE | Legacy/upstream-limited | Dommel builder remains registered for compatibility; no modern validation lane is present. |
 
 Provider certification requires real integration tests against that provider and database. A Dommel SQL builder being registered is not the same as provider certification.
@@ -71,11 +73,14 @@ Current status:
 | --- | --- |
 | Explicit map registration | Preferred for trimmed and Native AOT applications. |
 | Generated registration | Preferred alternative to assembly scanning for maps in the current compilation. |
+| Strict generated runtime | `UseStrictGeneratedMaterialization()` and `QueryGeneratedMapped*` provide a generated-only path for parameterless commands; unsupported shapes and dynamic parameter objects fail deterministically. |
 | Assembly scanning | Reflection-based and annotated as trimming-sensitive. |
 | `QueryMapped*`, `ReadMapped*`, `QueryMultipleMapped`, streaming | Annotated with trimming/dynamic-code warnings because runtime fallback can occur. |
 | Full Native AOT compatibility | Not claimed. |
 
-Trimmed smoke tests have passed for explicit, generated and DI scenarios with known warnings. Native AOT publish/run has not been validated locally because the environment lacked the native linker toolchain.
+Trimmed smoke tests cover explicit, generated and DI scenarios. The CI Native AOT lane publishes and runs the strict generated SQLite smoke on `windows-latest`/`win-x64`, treating relevant trimming and AOT warnings as errors. Local Native AOT publishing still requires the Visual C++ linker toolchain and full Native AOT compatibility is not claimed.
+
+Generated materializers accept their exact registered shape and safe permutations when column names are distinct. Missing, additional or duplicate-column shapes remain unsupported and use runtime fallback unless strict generated materialization is enabled. Resolution is based on reader metadata, not SQL parsing.
 
 ## Global State Limitations
 
@@ -96,7 +101,7 @@ var runtime = new FluentMapConfigurationBuilder()
 var customer = runtime.QueryMappedSingle<Customer>(connection, sql);
 ```
 
-That isolation applies to `QueryMapped*`, `ReadMapped*`, `QueryMultipleMapped`, streaming, profiles, converters, diagnostics and generated materializer lookup. It does not make normal Dapper queries or Dommel select a runtime per call.
+That isolation applies to `QueryMapped*`, `QueryGeneratedMapped*`, two-type `splitOn` multi-mapping, `ReadMapped*`, `QueryMultipleMapped`, streaming, profiles, converters, diagnostics and generated materializer lookup. It does not make normal Dapper queries or Dommel select a runtime per call.
 
 ## API Compatibility
 
@@ -113,13 +118,13 @@ The fork preserves the main historical source-compatible API surface where possi
 
 The fork also adds public APIs for profiles, naming policies, generated materializers, persistence metadata, property converters, query helpers, immutable configuration, isolated runtime and DI.
 
-Stable release readiness still requires a formal fork-owned API/binary compatibility baseline after the first release candidate.
+The fork-owned 3.0 line has published stable packages through 3.0.3. Public compatibility remains governed by SemVer and the package/API boundaries listed above.
 
 ## Unsupported Environments Or Claims
 
 - Dapper major versions outside `[2.1.79,3.0.0)` are not currently supported.
 - Dommel major versions outside `[3.5.3,4.0.0)` are not currently supported.
 - Full Native AOT support is not claimed.
-- Provider behavior that has not been validated by real integration tests is not certified.
+- Provider behavior outside the exact tested server/client versions listed above is not certified.
 - Dommel configuration isolation per `FluentMapRuntime` is not supported.
-- `QueryMultipleMappedAsync`, Dapper multi-mapping with `splitOn`, graph aggregation and CRUD generation are not implemented.
+- Three-or-more-type multi-mapping, graph aggregation and CRUD generation are not implemented.

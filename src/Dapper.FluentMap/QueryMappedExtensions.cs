@@ -606,6 +606,80 @@ namespace Dapper.FluentMap
         }
 
         /// <summary>
+        /// Executes a query, splits each row at <paramref name="splitOn"/>, materializes two FluentMap-controlled segments and composes the return value.
+        /// </summary>
+        /// <typeparam name="TFirst">The entity type materialized from columns before the split boundary.</typeparam>
+        /// <typeparam name="TSecond">The entity type materialized from columns starting at the split boundary.</typeparam>
+        /// <typeparam name="TReturn">The projected return type.</typeparam>
+        /// <param name="connection">The database connection.</param>
+        /// <param name="sql">The SQL query to execute.</param>
+        /// <param name="map">The composition delegate called for each materialized row.</param>
+        /// <param name="param">Optional query parameters.</param>
+        /// <param name="transaction">Optional transaction.</param>
+        /// <param name="commandTimeout">Optional command timeout.</param>
+        /// <param name="commandType">Optional command type.</param>
+        /// <param name="splitOn">The column name where the second row segment begins. The default is <c>Id</c>.</param>
+        /// <returns>The composed rows.</returns>
+        [RequiresUnreferencedCode(QueryMappedApiAnnotations.RequiresUnreferencedCodeMessage)]
+        [RequiresDynamicCode(QueryMappedApiAnnotations.RequiresDynamicCodeMessage)]
+        public static IEnumerable<TReturn> QueryMapped<
+            [DynamicallyAccessedMembers(QueryMappedApiAnnotations.MaterializedEntityMemberTypes)]
+            TFirst,
+            [DynamicallyAccessedMembers(QueryMappedApiAnnotations.MaterializedEntityMemberTypes)]
+            TSecond,
+            TReturn>(
+            this IDbConnection connection,
+            string sql,
+            Func<TFirst, TSecond, TReturn> map,
+            object param = null,
+            IDbTransaction transaction = null,
+            int? commandTimeout = null,
+            CommandType? commandType = null,
+            string splitOn = "Id")
+            where TFirst : class
+            where TSecond : class
+        {
+            if (sql == null)
+            {
+                throw new ArgumentNullException(nameof(sql));
+            }
+
+            return QueryMapped<TFirst, TSecond, TReturn>(
+                connection,
+                new CommandDefinition(sql, param, transaction, commandTimeout, commandType),
+                map,
+                splitOn);
+        }
+
+        /// <summary>
+        /// Executes a command, splits each row at <paramref name="splitOn"/>, materializes two FluentMap-controlled segments and composes the return value.
+        /// </summary>
+        [RequiresUnreferencedCode(QueryMappedApiAnnotations.RequiresUnreferencedCodeMessage)]
+        [RequiresDynamicCode(QueryMappedApiAnnotations.RequiresDynamicCodeMessage)]
+        public static IEnumerable<TReturn> QueryMapped<
+            [DynamicallyAccessedMembers(QueryMappedApiAnnotations.MaterializedEntityMemberTypes)]
+            TFirst,
+            [DynamicallyAccessedMembers(QueryMappedApiAnnotations.MaterializedEntityMemberTypes)]
+            TSecond,
+            TReturn>(
+            this IDbConnection connection,
+            CommandDefinition command,
+            Func<TFirst, TSecond, TReturn> map,
+            string splitOn = "Id")
+            where TFirst : class
+            where TSecond : class
+        {
+            return ExecuteMapped<TFirst, TSecond, TReturn>(
+                connection,
+                command,
+                map,
+                splitOn,
+                firstProfileType: null,
+                secondProfileType: null,
+                runtime: FluentMapper.Runtime);
+        }
+
+        /// <summary>
         /// Executes a query and returns a reader for sequential FluentMap-controlled materialization of multiple result sets.
         /// </summary>
         /// <param name="connection">The database connection.</param>
@@ -655,6 +729,42 @@ namespace Dapper.FluentMap
             return new MappedGridReader(SqlMapper.ExecuteReader(connection, command), FluentMapper.Runtime);
         }
 
+        /// <summary>
+        /// Asynchronously executes a query and returns a reader for sequential FluentMap-controlled materialization of multiple result sets.
+        /// </summary>
+        [RequiresUnreferencedCode(QueryMappedApiAnnotations.RequiresUnreferencedCodeMessage)]
+        [RequiresDynamicCode(QueryMappedApiAnnotations.RequiresDynamicCodeMessage)]
+        public static Task<MappedGridReader> QueryMultipleMappedAsync(
+            this DbConnection connection,
+            string sql,
+            object param = null,
+            IDbTransaction transaction = null,
+            int? commandTimeout = null,
+            CommandType? commandType = null,
+            CancellationToken cancellationToken = default)
+        {
+            if (sql == null)
+            {
+                throw new ArgumentNullException(nameof(sql));
+            }
+
+            return QueryMultipleMappedAsync(
+                connection,
+                new CommandDefinition(sql, param, transaction, commandTimeout, commandType, CommandFlags.None, cancellationToken));
+        }
+
+        /// <summary>
+        /// Asynchronously executes a command and returns a reader for sequential FluentMap-controlled materialization of multiple result sets.
+        /// </summary>
+        [RequiresUnreferencedCode(QueryMappedApiAnnotations.RequiresUnreferencedCodeMessage)]
+        [RequiresDynamicCode(QueryMappedApiAnnotations.RequiresDynamicCodeMessage)]
+        public static Task<MappedGridReader> QueryMultipleMappedAsync(
+            this DbConnection connection,
+            CommandDefinition command)
+        {
+            return ExecuteMultipleMappedAsync(connection, command, FluentMapper.Runtime);
+        }
+
         internal static IEnumerable<TEntity> ExecuteMapped<
             [DynamicallyAccessedMembers(QueryMappedApiAnnotations.MaterializedEntityMemberTypes)]
             TEntity>(
@@ -678,6 +788,190 @@ namespace Dapper.FluentMap
             {
                 return MappedRowMaterializer.Materialize<TEntity>(reader, profileType, runtime);
             }
+        }
+
+        internal static IEnumerable<TEntity> ExecuteGeneratedMapped<TEntity>(
+            IDbConnection connection,
+            string sql,
+            IDbTransaction transaction,
+            int? commandTimeout,
+            CommandType? commandType,
+            Type profileType,
+            FluentMapRuntime runtime)
+            where TEntity : class
+        {
+            if (connection == null)
+            {
+                throw new ArgumentNullException(nameof(connection));
+            }
+
+            if (runtime == null)
+            {
+                throw new ArgumentNullException(nameof(runtime));
+            }
+
+            var openedHere = connection.State == ConnectionState.Closed;
+            if (openedHere)
+            {
+                connection.Open();
+            }
+
+            try
+            {
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandText = sql;
+                    command.Transaction = transaction;
+                    if (commandTimeout.HasValue)
+                    {
+                        command.CommandTimeout = commandTimeout.Value;
+                    }
+
+                    if (commandType.HasValue)
+                    {
+                        command.CommandType = commandType.Value;
+                    }
+
+                    using (var reader = command.ExecuteReader())
+                    {
+                        var results = new List<TEntity>();
+                        var materializer = MappedRowMaterializer.CreateGeneratedMaterializer<TEntity>(reader, profileType, runtime);
+
+                        while (reader.Read())
+                        {
+                            results.Add(materializer(reader));
+                        }
+
+                        return results;
+                    }
+                }
+            }
+            finally
+            {
+                if (openedHere)
+                {
+                    connection.Close();
+                }
+            }
+        }
+
+        internal static IEnumerable<TReturn> ExecuteMapped<
+            [DynamicallyAccessedMembers(QueryMappedApiAnnotations.MaterializedEntityMemberTypes)]
+            TFirst,
+            [DynamicallyAccessedMembers(QueryMappedApiAnnotations.MaterializedEntityMemberTypes)]
+            TSecond,
+            TReturn>(
+            IDbConnection connection,
+            CommandDefinition command,
+            Func<TFirst, TSecond, TReturn> map,
+            string splitOn,
+            Type firstProfileType,
+            Type secondProfileType,
+            FluentMapRuntime runtime)
+            where TFirst : class
+            where TSecond : class
+        {
+            if (connection == null)
+            {
+                throw new ArgumentNullException(nameof(connection));
+            }
+
+            if (map == null)
+            {
+                throw new ArgumentNullException(nameof(map));
+            }
+
+            if (string.IsNullOrWhiteSpace(splitOn))
+            {
+                throw new ArgumentException("A splitOn column name is required.", nameof(splitOn));
+            }
+
+            if (runtime == null)
+            {
+                throw new ArgumentNullException(nameof(runtime));
+            }
+
+            using (var reader = SqlMapper.ExecuteReader(connection, command))
+            {
+                var splitIndex = GetSplitIndex(reader, splitOn);
+                var firstSegment = new SegmentDataRecord(reader, 0, splitIndex);
+                var secondSegment = new SegmentDataRecord(reader, splitIndex, reader.FieldCount - splitIndex);
+                var firstMaterializer = MappedRowMaterializer.CreateMaterializer<TFirst>(firstSegment, firstProfileType, runtime);
+                var secondMaterializer = MappedRowMaterializer.CreateMaterializer<TSecond>(secondSegment, secondProfileType, runtime);
+                var results = new List<TReturn>();
+
+                while (reader.Read())
+                {
+                    var first = firstMaterializer(firstSegment);
+                    var second = IsAllNull(secondSegment) ? null : secondMaterializer(secondSegment);
+                    results.Add(map(first, second));
+                }
+
+                return results;
+            }
+        }
+
+        internal static async Task<MappedGridReader> ExecuteMultipleMappedAsync(
+            DbConnection connection,
+            CommandDefinition command,
+            FluentMapRuntime runtime)
+        {
+            if (connection == null)
+            {
+                throw new ArgumentNullException(nameof(connection));
+            }
+
+            if (runtime == null)
+            {
+                throw new ArgumentNullException(nameof(runtime));
+            }
+
+            var reader = await SqlMapper.ExecuteReaderAsync(connection, command).ConfigureAwait(false);
+            return new MappedGridReader(reader, runtime);
+        }
+
+        private static int GetSplitIndex(IDataRecord reader, string splitOn)
+        {
+            var splitIndex = -1;
+            for (var i = 1; i < reader.FieldCount; i++)
+            {
+                if (!string.Equals(reader.GetName(i), splitOn, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (splitIndex >= 0)
+                {
+                    throw new InvalidOperationException("The splitOn column '" + splitOn + "' is ambiguous in the result set.");
+                }
+
+                splitIndex = i;
+            }
+
+            if (splitIndex < 0)
+            {
+                throw new InvalidOperationException("The splitOn column '" + splitOn + "' was not found in the result set.");
+            }
+
+            if (splitIndex == 0 || splitIndex >= reader.FieldCount)
+            {
+                throw new InvalidOperationException("The splitOn column '" + splitOn + "' produced an empty row segment.");
+            }
+
+            return splitIndex;
+        }
+
+        private static bool IsAllNull(IDataRecord record)
+        {
+            for (var i = 0; i < record.FieldCount; i++)
+            {
+                if (!record.IsDBNull(i) && record.GetValue(i) != null)
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         internal static IEnumerable<TEntity> ExecuteMappedUnbuffered<

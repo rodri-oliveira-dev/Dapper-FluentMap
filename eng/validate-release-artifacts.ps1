@@ -192,6 +192,95 @@ function Normalize-DependencyVersion {
   return ($DependencyVersion -replace '\s+', '')
 }
 
+function Add-ExpectedProjectReferenceDependencies {
+  param(
+    [xml]$ProjectXml,
+    [string]$ProjectPath,
+    [hashtable]$PackagesByProjectPath,
+    [hashtable]$Dependencies
+  )
+
+  foreach ($projectReference in @($ProjectXml.SelectNodes('//*[local-name()="ProjectReference"]'))) {
+    $include = $projectReference.GetAttribute('Include')
+    if ([string]::IsNullOrWhiteSpace($include)) {
+      continue
+    }
+
+    $referencedProjectPath = [System.IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $ProjectPath) $include))
+    $referencedKey = Normalize-PathKey -Path $referencedProjectPath
+    if ($PackagesByProjectPath.ContainsKey($referencedKey)) {
+      $referencedPackage = $PackagesByProjectPath[$referencedKey]
+      $Dependencies[[string]$referencedPackage.packageId] = $Version
+    }
+  }
+}
+
+function Add-ExpectedPackageReferenceDependencies {
+  param(
+    [xml]$ProjectXml,
+    [string]$ProjectPath,
+    [hashtable]$Properties,
+    [hashtable]$Dependencies
+  )
+
+  if (Test-SuppressDependenciesWhenPacking -ProjectXml $ProjectXml -Properties $Properties) {
+    return
+  }
+
+  foreach ($packageReference in @($ProjectXml.SelectNodes('//*[local-name()="PackageReference"]'))) {
+    if (Test-PrivatePackageReference -PackageReference $packageReference) {
+      continue
+    }
+
+    $dependencyId = $packageReference.GetAttribute('Include')
+    if ([string]::IsNullOrWhiteSpace($dependencyId)) {
+      $dependencyId = $packageReference.GetAttribute('Update')
+    }
+
+    if ([string]::IsNullOrWhiteSpace($dependencyId)) {
+      continue
+    }
+
+    $dependencyVersion = $packageReference.GetAttribute('Version')
+    if ([string]::IsNullOrWhiteSpace($dependencyVersion)) {
+      $dependencyVersion = Get-XmlChildText -Node $packageReference -Name 'Version'
+    }
+
+    if ([string]::IsNullOrWhiteSpace($dependencyVersion)) {
+      Fail "PackageReference '$dependencyId' in '$ProjectPath' does not specify a Version."
+    }
+
+    $Dependencies[$dependencyId] = Resolve-MSBuildValue -Value $dependencyVersion -Properties $Properties
+  }
+}
+
+function Get-ExpectedDependencyMapForProject {
+  param(
+    [string]$SourceRootPath,
+    [object]$Package,
+    [hashtable]$PackagesByProjectPath
+  )
+
+  $projectPath = [System.IO.Path]::GetFullPath((Join-Path $SourceRootPath ([string]$Package.projectPath)))
+  [xml]$projectXml = Get-Content -LiteralPath $projectPath
+  $properties = Get-MSBuildProperties -SourceRootPath $SourceRootPath -ProjectPath $projectPath
+  $dependencies = @{}
+
+  Add-ExpectedProjectReferenceDependencies `
+    -ProjectXml $projectXml `
+    -ProjectPath $projectPath `
+    -PackagesByProjectPath $PackagesByProjectPath `
+    -Dependencies $dependencies
+
+  Add-ExpectedPackageReferenceDependencies `
+    -ProjectXml $projectXml `
+    -ProjectPath $projectPath `
+    -Properties $properties `
+    -Dependencies $dependencies
+
+  return $dependencies
+}
+
 function Get-ExpectedDependencies {
   param(
     [string]$SourceRootPath,
@@ -211,54 +300,10 @@ function Get-ExpectedDependencies {
   $expected = @{}
   foreach ($package in $Packages) {
     $packageId = [string]$package.packageId
-    $projectPath = [System.IO.Path]::GetFullPath((Join-Path $SourceRootPath ([string]$package.projectPath)))
-    [xml]$projectXml = Get-Content -LiteralPath $projectPath
-    $properties = Get-MSBuildProperties -SourceRootPath $SourceRootPath -ProjectPath $projectPath
-    $dependencies = @{}
-
-    foreach ($projectReference in @($projectXml.SelectNodes('//*[local-name()="ProjectReference"]'))) {
-      $include = $projectReference.GetAttribute('Include')
-      if ([string]::IsNullOrWhiteSpace($include)) {
-        continue
-      }
-
-      $referencedProjectPath = [System.IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $projectPath) $include))
-      $referencedKey = Normalize-PathKey -Path $referencedProjectPath
-      if ($packagesByProjectPath.ContainsKey($referencedKey)) {
-        $referencedPackage = $packagesByProjectPath[$referencedKey]
-        $dependencies[[string]$referencedPackage.packageId] = $Version
-      }
-    }
-
-    if (-not (Test-SuppressDependenciesWhenPacking -ProjectXml $projectXml -Properties $properties)) {
-      foreach ($packageReference in @($projectXml.SelectNodes('//*[local-name()="PackageReference"]'))) {
-        if (Test-PrivatePackageReference -PackageReference $packageReference) {
-          continue
-        }
-
-        $dependencyId = $packageReference.GetAttribute('Include')
-        if ([string]::IsNullOrWhiteSpace($dependencyId)) {
-          $dependencyId = $packageReference.GetAttribute('Update')
-        }
-
-        if ([string]::IsNullOrWhiteSpace($dependencyId)) {
-          continue
-        }
-
-        $dependencyVersion = $packageReference.GetAttribute('Version')
-        if ([string]::IsNullOrWhiteSpace($dependencyVersion)) {
-          $dependencyVersion = Get-XmlChildText -Node $packageReference -Name 'Version'
-        }
-
-        if ([string]::IsNullOrWhiteSpace($dependencyVersion)) {
-          Fail "PackageReference '$dependencyId' in '$projectPath' does not specify a Version."
-        }
-
-        $dependencies[$dependencyId] = Resolve-MSBuildValue -Value $dependencyVersion -Properties $properties
-      }
-    }
-
-    $expected[$packageId] = $dependencies
+    $expected[$packageId] = Get-ExpectedDependencyMapForProject `
+      -SourceRootPath $SourceRootPath `
+      -Package $package `
+      -PackagesByProjectPath $packagesByProjectPath
   }
 
   return $expected

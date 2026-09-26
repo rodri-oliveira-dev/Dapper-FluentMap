@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     branches:
-      - master
+      - main
   pull_request:
   workflow_dispatch:
 
@@ -73,7 +73,7 @@ jobs:
           - dapper-lane: minimum
             dapper-version: 2.1.79
           - dapper-lane: latest-stable
-            dapper-version: 2.1.86
+            dapper-version: 2.1.89
 
     steps:
       - name: Checkout
@@ -94,6 +94,18 @@ jobs:
       - name: Restore
         run: dotnet restore ./Dapper.FluentMap.slnx -p:DapperPackageVersion=${{ matrix.dapper-version }}
 
+      - name: Show resolved Dapper version
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $assets = Get-Content -Raw './src/Dapper.FluentMap/obj/project.assets.json' | ConvertFrom-Json
+          $resolved = @($assets.libraries.PSObject.Properties.Name | Where-Object { $_ -like 'Dapper/*' })
+          if ($resolved.Count -ne 1) {
+            throw "Expected exactly one resolved Dapper package entry, found $($resolved.Count): $($resolved -join ', ')"
+          }
+
+          Write-Host "Resolved $($resolved[0]) for ${{ matrix.dapper-lane }} lane."
+
       - name: Audit NuGet dependencies
         run: dotnet list ./Dapper.FluentMap.slnx package --vulnerable --include-transitive
 
@@ -113,7 +125,8 @@ jobs:
         run: dotnet test ./test/Dapper.FluentMap.Dommel.Tests/Dapper.FluentMap.Dommel.Tests.csproj --configuration Release --no-build
 
       - name: Test provider compatibility
-        run: dotnet test ./test/Dapper.FluentMap.ProviderCompatibility.Tests/Dapper.FluentMap.ProviderCompatibility.Tests.csproj --configuration Release --no-build
+        run: >-
+          dotnet ./test/Dapper.FluentMap.ProviderCompatibility.Tests/bin/Release/net10.0/Dapper.FluentMap.ProviderCompatibility.Tests.dll
 
   roslyn-components:
     name: Analyzer and generator compatibility
@@ -151,6 +164,175 @@ jobs:
       - name: Test generators
         run: dotnet test ./test/Dapper.FluentMap.Generators.Tests/Dapper.FluentMap.Generators.Tests.csproj --configuration Release
 
+  provider-compatibility:
+    name: Provider compatibility (SQL Server, PostgreSQL, MySQL, MariaDB)
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-CU23-ubuntu-22.04
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_PID: Developer
+          MSSQL_SA_PASSWORD: "SqlServer-Provider-2026!"
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'SqlServer-Provider-2026!' -C -Q 'SELECT 1' -b -o /dev/null"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 30
+          --health-start-period 20s
+      postgres:
+        image: postgres:18.6-bookworm
+        env:
+          POSTGRES_DB: fluentmap
+          POSTGRES_PASSWORD: "Postgres-Provider-2026!"
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d fluentmap"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 20
+      mysql:
+        image: mysql:8.4.11-oraclelinux9
+        env:
+          MYSQL_DATABASE: fluentmap
+          MYSQL_ROOT_PASSWORD: "MySql-Provider-2026!"
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -pMySql-Provider-2026! --silent"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 30
+          --health-start-period 30s
+      mariadb:
+        image: mariadb:11.8.9-ubi9
+        env:
+          MARIADB_DATABASE: fluentmap
+          MARIADB_ROOT_PASSWORD: "MariaDb-Provider-2026!"
+        ports:
+          - 3307:3306
+        options: >-
+          --health-cmd "mariadb-admin ping -h 127.0.0.1 -uroot -pMariaDb-Provider-2026! --silent"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 30
+          --health-start-period 30s
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          show-progress: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+
+      - name: Show .NET info
+        run: dotnet --info
+
+      - name: Restore
+        run: dotnet restore ./Dapper.FluentMap.slnx
+
+      - name: Build provider compatibility tests
+        run: dotnet build ./test/Dapper.FluentMap.ProviderCompatibility.Tests/Dapper.FluentMap.ProviderCompatibility.Tests.csproj --configuration Release --no-restore
+
+      - name: Test provider compatibility
+        env:
+          DFM_PROVIDER_COMPATIBILITY_STRICT: "true"
+          DFM_SQLSERVER_CONNECTION_STRING: "Server=localhost,1433;Database=tempdb;User Id=sa;Password=SqlServer-Provider-2026!;Encrypt=True;TrustServerCertificate=True;"
+          DFM_POSTGRESQL_CONNECTION_STRING: "Host=localhost;Port=5432;Database=fluentmap;Username=postgres;Password=Postgres-Provider-2026!;"
+          DFM_MYSQL_CONNECTION_STRING: "Server=localhost;Port=3306;Database=fluentmap;User ID=root;Password=MySql-Provider-2026!;SslMode=None;Allow User Variables=True;"
+          DFM_MARIADB_CONNECTION_STRING: "Server=localhost;Port=3307;Database=fluentmap;User ID=root;Password=MariaDb-Provider-2026!;SslMode=None;Allow User Variables=True;"
+        run: |
+          mkdir -p ./artifacts/test-results/providers
+          for provider in "SQLite" "SQL Server" "PostgreSQL" "MySQL" "MariaDB"; do
+            result_name="$(echo "$provider" | tr '[:upper:] ' '[:lower:]-')"
+            DFM_PROVIDER_FILTER="$provider" \
+              dotnet ./test/Dapper.FluentMap.ProviderCompatibility.Tests/bin/Release/net10.0/Dapper.FluentMap.ProviderCompatibility.Tests.dll \
+                -failSkips \
+                -parallelMode none \
+                -result-trx "./artifacts/test-results/providers/${result_name}.trx"
+          done
+
+      - name: Upload provider test results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: provider-compatibility-results
+          path: ./artifacts/test-results/providers/*.trx
+          if-no-files-found: error
+          retention-days: 14
+
+  native-aot:
+    name: Native AOT strict generated smoke (SQLite, win-x64)
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          show-progress: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+
+      - name: Show .NET info
+        run: dotnet --info
+
+      - name: Restore AOT smoke
+        run: >-
+          dotnet restore ./test/Dapper.FluentMap.AotSmoke/Dapper.FluentMap.AotSmoke.csproj
+          --runtime win-x64
+          -p:PublishAot=true
+          -p:DefineConstants=AOT_SMOKE_GENERATED
+
+      - name: Build AOT smoke dependencies
+        run: |
+          dotnet build ./src/Dapper.FluentMap/Dapper.FluentMap.csproj --configuration Release
+          dotnet build ./src/Dapper.FluentMap.DependencyInjection/Dapper.FluentMap.DependencyInjection.csproj --configuration Release
+          dotnet build ./src/Dapper.FluentMap.Generators/Dapper.FluentMap.Generators.csproj --configuration Release
+
+      - name: Publish Native AOT strict generated smoke
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path ./artifacts/native-aot | Out-Null
+          dotnet publish ./test/Dapper.FluentMap.AotSmoke/Dapper.FluentMap.AotSmoke.csproj `
+            --configuration Release `
+            --runtime win-x64 `
+            --self-contained true `
+            --no-restore `
+            -p:PublishAot=true `
+            -p:DefineConstants=AOT_SMOKE_GENERATED `
+            -p:WarningsAsErrors=IL2026%3BIL3050%3BIL3053%3BIL2070%3BIL2072%3BIL2075%3BIL2077%3BIL2090%3BIL2111 `
+            -bl:./artifacts/native-aot/aot-smoke.binlog
+
+      - name: Run Native AOT strict generated smoke
+        shell: pwsh
+        run: ./test/Dapper.FluentMap.AotSmoke/bin/Release/net10.0/win-x64/publish/Dapper.FluentMap.AotSmoke.exe
+
+      - name: Upload Native AOT diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: native-aot-strict-generated-diagnostics
+          path: ./artifacts/native-aot/*.binlog
+          if-no-files-found: error
+          retention-days: 14
+
   pack:
     name: Pack
     runs-on: ubuntu-latest
@@ -158,6 +340,7 @@ jobs:
     needs:
       - compatibility
       - roslyn-components
+      - provider-compatibility
 
     steps:
       - name: Checkout
@@ -275,7 +458,8 @@ jobs:
       - repository-configuration
       - compatibility
       - roslyn-components
-    if: ${{ vars.SONAR_CI_ENABLED == 'true' && ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || github.ref == 'refs/heads/master' || github.event_name == 'workflow_dispatch') }}
+      - provider-compatibility
+    if: ${{ vars.SONAR_CI_ENABLED == 'true' && ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch') }}
     permissions:
       contents: read
       issues: write
@@ -569,6 +753,8 @@ jobs:
       - repository-configuration
       - compatibility
       - roslyn-components
+      - provider-compatibility
+      - native-aot
       - pack
       - sonar
 
@@ -579,11 +765,15 @@ jobs:
           echo "repository-configuration=${{ needs.repository-configuration.result }}"
           echo "compatibility=${{ needs.compatibility.result }}"
           echo "roslyn-components=${{ needs.roslyn-components.result }}"
+          echo "provider-compatibility=${{ needs.provider-compatibility.result }}"
+          echo "native-aot=${{ needs.native-aot.result }}"
           echo "pack=${{ needs.pack.result }}"
           echo "sonar=${{ needs.sonar.result }}"
 
           if [[ "${{ needs.repository-configuration.result }}" != "success" || \
                 "${{ needs.compatibility.result }}" != "success" || \
+                "${{ needs.provider-compatibility.result }}" != "success" || \
+                "${{ needs.native-aot.result }}" != "success" || \
                 "${{ needs.roslyn-components.result }}" != "success" || \
                 "${{ needs.pack.result }}" != "success" ]]; then
             echo "One or more required CI jobs did not complete successfully."
