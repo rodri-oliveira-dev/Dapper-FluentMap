@@ -212,6 +212,20 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
 
             try
             {
+                FluentMapper.Initialize(configuration =>
+                {
+                    configuration.AddMap(new MultipleCustomerMap());
+                });
+
+                MultipleCustomer fallbackCustomer;
+                using (var connection = provider.OpenConnection())
+                {
+                    fallbackCustomer = connection.QueryMappedSingle<MultipleCustomer>(
+                        provider.SingleCustomerSql(21, "Generated"));
+                }
+
+                PreTest(typeof(MultipleCustomer));
+
                 var generatedMaterializerCalls = 0;
                 FluentMapper.Initialize(configuration =>
                 {
@@ -240,6 +254,8 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
 
                     Assert.Equal(21, customer.Id);
                     Assert.Equal("Generated", customer.Name);
+                    Assert.Equal(fallbackCustomer.Id, customer.Id);
+                    Assert.Equal(fallbackCustomer.Name, customer.Name);
                     Assert.Equal(1, generatedMaterializerCalls);
                 }
             }
