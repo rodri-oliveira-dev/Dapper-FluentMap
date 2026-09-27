@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Security fixes are prioritized for the latest supported release line and the current `master` branch. Older versions may receive fixes when the impact is high and a safe backport is practical, but long-term support is not implied unless explicitly documented.
+Security fixes are prioritized for the latest supported release line and the current `main` branch. Older versions may receive fixes when the impact is high and a safe backport is practical, but long-term support is not implied unless explicitly documented.
 
 ## Reporting a vulnerability
 
@@ -16,7 +16,7 @@ If private GitHub reporting is unavailable, contact the maintainer through the c
 
 The repository uses complementary controls across source code, dependencies, quality, and release automation:
 
-- CodeQL performs semantic C# security analysis on pull requests targeting `master`, pushes to `master`, and a weekly schedule;
+- CodeQL performs semantic C# security analysis on pull requests targeting `main`, pushes to `main`, and a weekly schedule;
 - Dependency Review evaluates dependency changes introduced by pull requests and blocks additions with vulnerabilities of `high` severity or above;
 - Dependabot maintains NuGet packages, the .NET SDK, and GitHub Actions references;
 - SonarQube Cloud and the main CI workflow provide complementary static analysis, compatibility, build, test, package, and governance validation.

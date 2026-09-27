@@ -13,7 +13,7 @@ $ErrorActionPreference = 'Stop'
 
 Import-Module (Join-Path $PSScriptRoot '../PackageCatalog.psm1') -Force
 
-$packageVersion = if ([string]::IsNullOrWhiteSpace($PackageVersion)) { '3.0.1' } else { $PackageVersion }
+$packageVersion = if ([string]::IsNullOrWhiteSpace($PackageVersion)) { '3.4.0' } else { $PackageVersion }
 $catalogPackages = @(Get-FluentMapPackages -CatalogPath $CatalogPath)
 $expectedPackageIds = @($catalogPackages | ForEach-Object { [string]$_.packageId })
 
@@ -353,7 +353,7 @@ function Invoke-DotNetForProject {
 $repoRoot = Get-RepoRoot
 $artifactFiles = @{}
 if ([string]::IsNullOrWhiteSpace($PackageDirectory)) {
-  $releaseDirectory = Join-Path $repoRoot '.sdd/release-3.0.1'
+  $releaseDirectory = Join-Path $repoRoot ".sdd/release-$packageVersion"
   $manifestPath = Join-Path $releaseDirectory 'artifacts.json'
   if (-not (Test-Path -LiteralPath $manifestPath)) {
     Fail "Manifest not found at '$manifestPath'."
@@ -365,7 +365,7 @@ if ([string]::IsNullOrWhiteSpace($PackageDirectory)) {
   }
 
   $remoteRoot = if ([string]::IsNullOrWhiteSpace($RemoteArtifactDirectory)) {
-    Join-Path $repoRoot 'artifacts/release-3.0.1/remote'
+    Join-Path $repoRoot "artifacts/release-$packageVersion/remote"
   }
   else {
     $RemoteArtifactDirectory

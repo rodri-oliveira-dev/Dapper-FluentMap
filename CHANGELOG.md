@@ -6,6 +6,8 @@ The historical archived package history is not reconstructed here. This changelo
 
 ## [Unreleased]
 
+## [3.4.0] - 2026-09-27
+
 ### Added
 
 - ADR Guard local tooling and ADR documentation for the NuGet PackageId architecture decision.
