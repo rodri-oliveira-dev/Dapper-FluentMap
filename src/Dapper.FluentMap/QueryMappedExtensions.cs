@@ -1017,7 +1017,7 @@ namespace Dapper.FluentMap
         private static int GetSplitIndex(IDataRecord reader, string splitOn)
         {
             var splitIndex = -1;
-            for (var i = 1; i < reader.FieldCount; i++)
+            for (var i = 0; i < reader.FieldCount; i++)
             {
                 if (!string.Equals(reader.GetName(i), splitOn, StringComparison.OrdinalIgnoreCase))
                 {

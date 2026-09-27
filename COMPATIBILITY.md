@@ -63,6 +63,8 @@ Provider support is split into certification levels:
 | MariaDB 11.8.9 (`MySqlConnector` 2.6.2) | CI certified | Mandatory CI provider lane uses `mariadb:11.8.9-ubi9` with the same strict no-skip provider contract. |
 | SQL Server CE | Legacy/upstream-limited | Dommel builder remains registered for compatibility; no modern validation lane is present. |
 
+`MySqlConnector` 2.6.2 is used only by the provider-certification test project because one async ADO.NET driver can exercise both pinned MySQL and MariaDB services, targets `netstandard2.0`, and is distributed under the MIT license. This choice does not add a runtime dependency to the FluentMap packages or certify any server, driver version, or feature outside the matrix above.
+
 Provider certification requires real integration tests against that provider and database. A Dommel SQL builder being registered is not the same as provider certification.
 
 ## AOT And Trimming
@@ -128,3 +130,4 @@ The fork-owned 3.0 line has published stable packages through 3.0.3. Public comp
 - Provider behavior outside the exact tested server/client versions listed above is not certified.
 - Dommel configuration isolation per `FluentMapRuntime` is not supported.
 - Three-or-more-type multi-mapping, graph aggregation and CRUD generation are not implemented.
+- `MappedGridReader` result sets must be consumed sequentially; concurrent reads are rejected deterministically.

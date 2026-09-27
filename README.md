@@ -345,7 +345,7 @@ var customers = multi.ReadMapped<Customer>();
 var orders = multi.ReadMapped<Order>();
 ```
 
-`ReadMapped*` consumes result sets sequentially and buffers the current result set. Async callers can use the corresponding async APIs:
+`ReadMapped*` consumes result sets sequentially and buffers the current result set. Concurrent reads on the same `MappedGridReader` are not supported; a competing read fails deterministically with `InvalidOperationException`. Async callers can use the corresponding async APIs:
 
 ```csharp
 await using var multi = await connection.QueryMultipleMappedAsync(

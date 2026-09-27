@@ -1043,6 +1043,70 @@ namespace Dapper.FluentMap.Tests
         }
 
         [Fact]
+        public async Task ReadMappedAsyncShouldAllowOnlyOneConcurrentAcquisition()
+        {
+            const int contenderCount = 16;
+            var reader = new TrackingDbDataReader(CreateReader(CreateTable(
+                new[] { "Id" },
+                new object[] { 1 })))
+            {
+                HoldFirstReadAsync = true
+            };
+            var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            await using (var multi = new MappedGridReader(reader))
+            {
+                var contenders = Enumerable.Range(0, contenderCount)
+                    .Select(async _ =>
+                    {
+                        await start.Task.ConfigureAwait(false);
+                        try
+                        {
+                            await multi.ReadMappedAsync<DefaultEntity>(TestContext.Current.CancellationToken).ConfigureAwait(false);
+                            return true;
+                        }
+                        catch (InvalidOperationException exception) when (
+                            exception.Message.Contains("already in progress", StringComparison.OrdinalIgnoreCase))
+                        {
+                            return false;
+                        }
+                    })
+                    .ToArray();
+
+                start.SetResult();
+                await reader.FirstReadStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+                Assert.Equal(1, reader.ReadAsyncCallCount);
+
+                reader.ReleaseFirstRead.SetResult();
+                var acquired = await Task.WhenAll(contenders);
+
+                Assert.Single(acquired, value => value);
+                Assert.Equal(contenderCount - 1, acquired.Count(value => !value));
+            }
+        }
+
+        [Fact]
+        public async Task QueryMultipleMappedAsyncShouldPropagateCancellationDuringExecuteReaderAsync()
+        {
+            using (var connection = new CancelingExecuteReaderConnection())
+            using (var cancellation = new CancellationTokenSource())
+            {
+                connection.Open();
+                var operation = connection.QueryMultipleMappedAsync(
+                    "SELECT 1 AS Id;",
+                    cancellationToken: cancellation.Token);
+
+                await connection.Command.ExecuteReaderStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+                cancellation.Cancel();
+
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(() => operation);
+                Assert.Equal(cancellation.Token, connection.Command.ReceivedCancellationToken);
+                Assert.True(connection.Command.IsDisposed);
+                Assert.Equal(ConnectionState.Open, connection.State);
+            }
+        }
+
+        [Fact]
         public async Task ReadMappedAsyncShouldDisposeReaderWhenNextResultAsyncIsCanceled()
         {
             PreTest(typeof(MappedCustomer));
@@ -1409,6 +1473,147 @@ namespace Dapper.FluentMap.Tests
                 await ReleaseFirstRead.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
                 return await inner.ReadAsync(cancellationToken).ConfigureAwait(false);
             }
+        }
+
+        private sealed class CancelingExecuteReaderConnection : DbConnection
+        {
+            private ConnectionState state;
+
+            public CancelingExecuteReaderCommand Command { get; } = new CancelingExecuteReaderCommand();
+
+            public override string ConnectionString { get; set; }
+
+            public override string Database => "Instrumented";
+
+            public override string DataSource => "Instrumented";
+
+            public override string ServerVersion => "1.0";
+
+            public override ConnectionState State => state;
+
+            public override void ChangeDatabase(string databaseName)
+            {
+            }
+
+            public override void Close() => state = ConnectionState.Closed;
+
+            public override void Open() => state = ConnectionState.Open;
+
+            protected override DbTransaction BeginDbTransaction(IsolationLevel isolationLevel) => throw new NotSupportedException();
+
+            protected override DbCommand CreateDbCommand()
+            {
+                Command.Connection = this;
+                return Command;
+            }
+        }
+
+        private sealed class CancelingExecuteReaderCommand : DbCommand
+        {
+            private readonly DbParameterCollection parameters = new InstrumentedParameterCollection();
+
+            public TaskCompletionSource ExecuteReaderStarted { get; } = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public CancellationToken ReceivedCancellationToken { get; private set; }
+
+            public bool IsDisposed { get; private set; }
+
+            public override string CommandText { get; set; }
+
+            public override int CommandTimeout { get; set; }
+
+            public override CommandType CommandType { get; set; }
+
+            public override bool DesignTimeVisible { get; set; }
+
+            public override UpdateRowSource UpdatedRowSource { get; set; }
+
+            protected override DbConnection DbConnection { get; set; }
+
+            protected override DbParameterCollection DbParameterCollection => parameters;
+
+            protected override DbTransaction DbTransaction { get; set; }
+
+            public override void Cancel()
+            {
+            }
+
+            public override int ExecuteNonQuery() => throw new NotSupportedException();
+
+            public override object ExecuteScalar() => throw new NotSupportedException();
+
+            public override void Prepare()
+            {
+            }
+
+            protected override DbParameter CreateDbParameter() => throw new NotSupportedException();
+
+            protected override DbDataReader ExecuteDbDataReader(CommandBehavior behavior) => throw new NotSupportedException();
+
+            protected override async Task<DbDataReader> ExecuteDbDataReaderAsync(
+                CommandBehavior behavior,
+                CancellationToken cancellationToken)
+            {
+                ReceivedCancellationToken = cancellationToken;
+                ExecuteReaderStarted.SetResult();
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken).ConfigureAwait(false);
+                throw new InvalidOperationException("The cancellation token was not honored.");
+            }
+
+            protected override void Dispose(bool disposing)
+            {
+                if (disposing)
+                {
+                    IsDisposed = true;
+                }
+
+                base.Dispose(disposing);
+            }
+        }
+
+        private sealed class InstrumentedParameterCollection : DbParameterCollection
+        {
+            private readonly ArrayList items = new ArrayList();
+
+            public override int Count => items.Count;
+
+            public override object SyncRoot => items.SyncRoot;
+
+            public override int Add(object value) => items.Add(value);
+
+            public override void AddRange(Array values) => items.AddRange(values);
+
+            public override void Clear() => items.Clear();
+
+            public override bool Contains(object value) => items.Contains(value);
+
+            public override bool Contains(string value) => IndexOf(value) >= 0;
+
+            public override void CopyTo(Array array, int index) => items.CopyTo(array, index);
+
+            public override IEnumerator GetEnumerator() => items.GetEnumerator();
+
+            public override int IndexOf(object value) => items.IndexOf(value);
+
+            public override int IndexOf(string parameterName) => -1;
+
+            public override void Insert(int index, object value) => items.Insert(index, value);
+
+            public override void Remove(object value) => items.Remove(value);
+
+            public override void RemoveAt(int index) => items.RemoveAt(index);
+
+            public override void RemoveAt(string parameterName)
+            {
+            }
+
+            protected override DbParameter GetParameter(int index) => (DbParameter)items[index];
+
+            protected override DbParameter GetParameter(string parameterName) => throw new IndexOutOfRangeException(parameterName);
+
+            protected override void SetParameter(int index, DbParameter value) => items[index] = value;
+
+            protected override void SetParameter(string parameterName, DbParameter value) => items.Add(value);
         }
 
         private static void PreTest(params Type[] types)

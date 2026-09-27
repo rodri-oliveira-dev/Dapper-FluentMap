@@ -22,6 +22,8 @@ The historical archived package history is not reconstructed here. This changelo
 - Added FluentMap-controlled two-type `QueryMapped<TFirst,TSecond,TReturn>` multi-mapping with `splitOn`, per-segment profile overloads and an isolated `FluentMapRuntime` equivalent.
 - Added `QueryMultipleMappedAsync` and async `MappedGridReader.ReadMappedAsync*` APIs for ordered multiple-result-set materialization.
 - Added strict generated materialization through `UseStrictGeneratedMaterialization()` and `QueryGeneratedMapped*`, with deterministic diagnostics and a Native AOT CI smoke.
+- Fixed two-type multi-mapping validation so a `splitOn` in the first column is rejected as an empty first segment and duplicate split columns remain ambiguous across the full row shape.
+- Made mapped multiple-result read acquisition atomic; concurrent reads on one `MappedGridReader` now fail deterministically while sequential and cancellation/disposal behavior is preserved.
 - Generated materializers now support safe permutations of distinct result columns without entering the runtime materializer fallback.
 - MySQL 8.4.11 and MariaDB 11.8.9 provider compatibility now run in the mandatory real-database CI lane with `MySqlConnector` 2.6.2.
 - The new Dependency Injection, analyzer and generator NuGet PackageIds are now `FluentMap.DependencyInjection`, `FluentMap.Analyzers` and `FluentMap.Generators`. Project names, assemblies, namespaces and public APIs remain `Dapper.FluentMap.*`.

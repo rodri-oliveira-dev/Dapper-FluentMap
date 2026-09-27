@@ -156,6 +156,40 @@ namespace Dapper.FluentMap.Tests
 
         [Fact]
         [Trait("Category", "Integration")]
+        public void QueryMappedShouldRejectSplitOnInFirstColumn()
+        {
+            using (var connection = OpenConnection())
+            {
+                var exception = Assert.Throws<InvalidOperationException>(() =>
+                    connection.QueryMapped<JoinCustomer, JoinOrder, Tuple<JoinCustomer, JoinOrder>>(
+                        "SELECT 1 AS order_id, 2 AS customer_id;",
+                        (customer, order) => Tuple.Create(customer, order),
+                        splitOn: "order_id")
+                    .ToList());
+
+                Assert.Contains("empty row segment", exception.Message, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        [Fact]
+        [Trait("Category", "Integration")]
+        public void QueryMappedShouldRejectAmbiguousSplitOnIncludingFirstColumn()
+        {
+            using (var connection = OpenConnection())
+            {
+                var exception = Assert.Throws<InvalidOperationException>(() =>
+                    connection.QueryMapped<JoinCustomer, JoinOrder, Tuple<JoinCustomer, JoinOrder>>(
+                        "SELECT 1 AS order_id, 2 AS customer_id, 3 AS ORDER_ID;",
+                        (customer, order) => Tuple.Create(customer, order),
+                        splitOn: "Order_Id")
+                    .ToList());
+
+                Assert.Contains("ambiguous", exception.Message, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        [Fact]
+        [Trait("Category", "Integration")]
         public void QueryMappedShouldFailForAmbiguousSplitOn()
         {
             PreTest(typeof(JoinCustomer), typeof(JoinOrder));
