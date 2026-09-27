@@ -1,5 +1,7 @@
 using System;
+using System.Collections;
 using System.Data;
+using System.Data.Common;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -930,6 +932,235 @@ namespace Dapper.FluentMap.Tests
             }
         }
 
+        [Fact]
+        public async Task ReadMappedAsyncShouldUseDbDataReaderAsyncMethods()
+        {
+            PreTest(typeof(MappedCustomer), typeof(MappedOrder));
+
+            try
+            {
+                FluentMapper.Initialize(configuration =>
+                {
+                    configuration.AddMap(new MappedCustomerMap());
+                    configuration.AddMap(new MappedOrderMap());
+                });
+
+                var reader = new TrackingDbDataReader(CreateReader(
+                    CreateTable(
+                        new[] { "customer_id", "customer_name" },
+                        new object[] { 1, "Ada" }),
+                    CreateTable(
+                        new[] { "order_id", "total" },
+                        new object[] { 10, 12.5m })));
+
+                await using (var multi = new MappedGridReader(reader))
+                {
+                    var customer = await multi.ReadMappedSingleAsync<MappedCustomer>(TestContext.Current.CancellationToken);
+                    var order = await multi.ReadMappedSingleAsync<MappedOrder>(TestContext.Current.CancellationToken);
+
+                    Assert.Equal(1, customer.Id);
+                    Assert.Equal(10, order.Id);
+                }
+
+                Assert.Equal(4, reader.ReadAsyncCallCount);
+                Assert.Equal(2, reader.NextResultAsyncCallCount);
+                Assert.Equal(1, reader.DisposeAsyncCallCount);
+            }
+            finally
+            {
+                PreTest(typeof(MappedCustomer), typeof(MappedOrder));
+            }
+        }
+
+        [Fact]
+        public async Task ReadMappedAsyncShouldApplyProfileAndGeneratedFallbackEquivalently()
+        {
+            var generated = await MaterializeGeneratedCustomerAsync(registerGeneratedMaterializer: true);
+            var runtime = await MaterializeGeneratedCustomerAsync(registerGeneratedMaterializer: false);
+
+            Assert.Equal(runtime.Id, generated.Id);
+            Assert.Equal(runtime.Name, generated.Name);
+        }
+
+        [Fact]
+        public async Task DisposeAsyncShouldBeIdempotent()
+        {
+            var reader = new TrackingDbDataReader(CreateReader(CreateTable(new[] { "Id" }, new object[] { 1 })));
+            var multi = new MappedGridReader(reader);
+
+            await multi.DisposeAsync();
+            await multi.DisposeAsync();
+
+            Assert.Equal(1, reader.DisposeAsyncCallCount);
+            await Assert.ThrowsAsync<ObjectDisposedException>(
+                () => multi.ReadMappedAsync<DefaultEntity>(TestContext.Current.CancellationToken));
+        }
+
+        [Fact]
+        public async Task ReadMappedAsyncShouldRejectConcurrentReadsDeterministically()
+        {
+            PreTest(typeof(MappedCustomer), typeof(MappedOrder));
+
+            try
+            {
+                FluentMapper.Initialize(configuration =>
+                {
+                    configuration.AddMap(new MappedCustomerMap());
+                    configuration.AddMap(new MappedOrderMap());
+                });
+
+                var reader = new TrackingDbDataReader(CreateReader(
+                    CreateTable(
+                        new[] { "customer_id", "customer_name" },
+                        new object[] { 1, "Ada" }),
+                    CreateTable(
+                        new[] { "order_id", "total" },
+                        new object[] { 10, 12.5m })))
+                {
+                    HoldFirstReadAsync = true
+                };
+
+                await using (var multi = new MappedGridReader(reader))
+                {
+                    var firstRead = multi.ReadMappedAsync<MappedCustomer>(TestContext.Current.CancellationToken);
+                    await reader.FirstReadStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+
+                    var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+                        () => multi.ReadMappedAsync<MappedOrder>(TestContext.Current.CancellationToken));
+                    Assert.Contains("already in progress", exception.Message, StringComparison.OrdinalIgnoreCase);
+
+                    reader.ReleaseFirstRead.SetResult();
+                    var customers = await firstRead;
+
+                    Assert.Single(customers);
+                    Assert.False(multi.IsConsumed);
+                }
+            }
+            finally
+            {
+                PreTest(typeof(MappedCustomer), typeof(MappedOrder));
+            }
+        }
+
+        [Fact]
+        public async Task ReadMappedAsyncShouldDisposeReaderWhenNextResultAsyncIsCanceled()
+        {
+            PreTest(typeof(MappedCustomer));
+
+            try
+            {
+                FluentMapper.Initialize(configuration => configuration.AddMap(new MappedCustomerMap()));
+
+                var reader = new TrackingDbDataReader(CreateReader(CreateTable(
+                    new[] { "customer_id", "customer_name" },
+                    new object[] { 1, "Ada" })))
+                {
+                    CancelNextResultAsync = true
+                };
+
+                var multi = new MappedGridReader(reader);
+
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                    () => multi.ReadMappedAsync<MappedCustomer>(TestContext.Current.CancellationToken));
+
+                Assert.True(reader.IsClosed);
+                Assert.True(multi.IsConsumed);
+            }
+            finally
+            {
+                PreTest(typeof(MappedCustomer));
+            }
+        }
+
+        [Fact]
+        public async Task ReadMappedAsyncShouldDisposeReaderWhenMaterializationThrows()
+        {
+            PreTest(typeof(ThrowingCustomer));
+
+            try
+            {
+                FluentMapper.Initialize(configuration => configuration.AddMap(new ThrowingCustomerMap()));
+
+                var reader = new TrackingDbDataReader(CreateReader(CreateTable(
+                    new[] { "customer_id", "cpf" },
+                    new object[] { 1, string.Empty })));
+                var multi = new MappedGridReader(reader);
+
+                var exception = await Assert.ThrowsAsync<FluentMapConfigurationException>(
+                    () => multi.ReadMappedAsync<ThrowingCustomer>(TestContext.Current.CancellationToken));
+
+                Assert.IsType<ArgumentException>(exception.InnerException);
+                Assert.True(reader.IsClosed);
+                Assert.True(multi.IsConsumed);
+            }
+            finally
+            {
+                PreTest(typeof(ThrowingCustomer));
+            }
+        }
+
+        [Fact]
+        [Trait("Category", "Integration")]
+        public async Task QueryMultipleMappedAsyncShouldPropagateCommandDefinitionTransactionAndCancellation()
+        {
+            PreTest(typeof(MappedCustomer));
+
+            try
+            {
+                FluentMapper.Initialize(configuration => configuration.AddMap(new MappedCustomerMap()));
+
+                using (var connection = OpenConnection())
+                {
+                    connection.Execute("CREATE TABLE customers (customer_id INTEGER NOT NULL, customer_name TEXT NOT NULL);");
+
+                    using (var transaction = connection.BeginTransaction())
+                    {
+                        connection.Execute(
+                            "INSERT INTO customers (customer_id, customer_name) VALUES (9, 'Async Transaction');",
+                            transaction: transaction);
+
+                        var command = new CommandDefinition(
+                            "SELECT customer_id, customer_name FROM customers WHERE customer_id = @id;",
+                            new { id = 9 },
+                            transaction,
+                            commandTimeout: 30,
+                            cancellationToken: TestContext.Current.CancellationToken);
+
+                        await using (var multi = await connection.QueryMultipleMappedAsync(command))
+                        {
+                            var customer = await multi.ReadMappedSingleAsync<MappedCustomer>(TestContext.Current.CancellationToken);
+
+                            Assert.Equal(9, customer.Id);
+                            Assert.Equal("Async Transaction", customer.Name);
+                        }
+
+                        transaction.Rollback();
+                    }
+                }
+            }
+            finally
+            {
+                PreTest(typeof(MappedCustomer));
+            }
+        }
+
+        [Fact]
+        [Trait("Category", "Integration")]
+        public async Task QueryMultipleMappedAsyncShouldKeepOpenConnectionOpenAfterDispose()
+        {
+            using (var connection = OpenConnection())
+            {
+                await using (var multi = await connection.QueryMultipleMappedAsync(
+                    "SELECT 1 AS Id;",
+                    cancellationToken: TestContext.Current.CancellationToken))
+                {
+                    Assert.Equal(ConnectionState.Open, connection.State);
+                }
+
+                Assert.Equal(ConnectionState.Open, connection.State);
+            }
+        }
+
         private static DataTableReader CreateReader(params DataTable[] tables)
         {
             return new DataTableReader(tables);
@@ -997,6 +1228,186 @@ namespace Dapper.FluentMap.Tests
             finally
             {
                 PreTest(typeof(MappedCustomer));
+            }
+        }
+
+        private static async Task<MappedCustomer> MaterializeGeneratedCustomerAsync(bool registerGeneratedMaterializer)
+        {
+            PreTest(typeof(MappedCustomer));
+
+            try
+            {
+                FluentMapper.Initialize(configuration =>
+                {
+                    configuration.AddMap(new MappedCustomerMap());
+                    configuration.AddProfile<LegacyCustomerMap>();
+
+                    if (registerGeneratedMaterializer)
+                    {
+                        configuration.AddGeneratedMaterializer<MappedCustomer, LegacyProfile>(
+                            new[]
+                            {
+                                GeneratedMaterializerColumn.Map("legacy_id", nameof(MappedCustomer.Id)),
+                                GeneratedMaterializerColumn.Map("legal_name", nameof(MappedCustomer.Name))
+                            },
+                            record => new MappedCustomer
+                            {
+                                Id = Convert.ToInt32(record.GetValue(0)),
+                                Name = Convert.ToString(record.GetValue(1))
+                            });
+                    }
+                });
+
+                using (var reader = CreateReader(CreateTable(
+                    new[] { "legacy_id", "legal_name" },
+                    new object[] { 41, "Async Same Shape" })))
+                await using (var multi = new MappedGridReader(reader))
+                {
+                    var customer = await multi.ReadMappedSingleAsync<MappedCustomer, LegacyProfile>(TestContext.Current.CancellationToken);
+                    Assert.Equal(registerGeneratedMaterializer ? 0 : 1, FluentMapper.Registry.MaterializationPlanCacheEntryCount);
+                    return customer;
+                }
+            }
+            finally
+            {
+                PreTest(typeof(MappedCustomer));
+            }
+        }
+
+        private sealed class TrackingDbDataReader : DbDataReader
+        {
+            private readonly DbDataReader inner;
+            private bool heldFirstRead;
+
+            public TrackingDbDataReader(DbDataReader inner)
+            {
+                this.inner = inner;
+            }
+
+            public int ReadAsyncCallCount { get; private set; }
+
+            public int NextResultAsyncCallCount { get; private set; }
+
+            public int DisposeAsyncCallCount { get; private set; }
+
+            public bool HoldFirstReadAsync { get; set; }
+
+            public bool CancelNextResultAsync { get; set; }
+
+            public TaskCompletionSource FirstReadStarted { get; } = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public TaskCompletionSource ReleaseFirstRead { get; } = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public override object this[int ordinal] => inner[ordinal];
+
+            public override object this[string name] => inner[name];
+
+            public override int Depth => inner.Depth;
+
+            public override int FieldCount => inner.FieldCount;
+
+            public override bool HasRows => inner.HasRows;
+
+            public override bool IsClosed => inner.IsClosed;
+
+            public override int RecordsAffected => inner.RecordsAffected;
+
+            public override bool GetBoolean(int ordinal) => inner.GetBoolean(ordinal);
+
+            public override byte GetByte(int ordinal) => inner.GetByte(ordinal);
+
+            public override long GetBytes(int ordinal, long dataOffset, byte[] buffer, int bufferOffset, int length) =>
+                inner.GetBytes(ordinal, dataOffset, buffer, bufferOffset, length);
+
+            public override char GetChar(int ordinal) => inner.GetChar(ordinal);
+
+            public override long GetChars(int ordinal, long dataOffset, char[] buffer, int bufferOffset, int length) =>
+                inner.GetChars(ordinal, dataOffset, buffer, bufferOffset, length);
+
+            public override string GetDataTypeName(int ordinal) => inner.GetDataTypeName(ordinal);
+
+            public override DateTime GetDateTime(int ordinal) => inner.GetDateTime(ordinal);
+
+            public override decimal GetDecimal(int ordinal) => inner.GetDecimal(ordinal);
+
+            public override double GetDouble(int ordinal) => inner.GetDouble(ordinal);
+
+            public override IEnumerator GetEnumerator() => ((IEnumerable)inner).GetEnumerator();
+
+            public override Type GetFieldType(int ordinal) => inner.GetFieldType(ordinal);
+
+            public override float GetFloat(int ordinal) => inner.GetFloat(ordinal);
+
+            public override Guid GetGuid(int ordinal) => inner.GetGuid(ordinal);
+
+            public override short GetInt16(int ordinal) => inner.GetInt16(ordinal);
+
+            public override int GetInt32(int ordinal) => inner.GetInt32(ordinal);
+
+            public override long GetInt64(int ordinal) => inner.GetInt64(ordinal);
+
+            public override string GetName(int ordinal) => inner.GetName(ordinal);
+
+            public override int GetOrdinal(string name) => inner.GetOrdinal(name);
+
+            public override string GetString(int ordinal) => inner.GetString(ordinal);
+
+            public override object GetValue(int ordinal) => inner.GetValue(ordinal);
+
+            public override int GetValues(object[] values) => inner.GetValues(values);
+
+            public override bool IsDBNull(int ordinal) => inner.IsDBNull(ordinal);
+
+            public override bool NextResult() => inner.NextResult();
+
+            public override bool Read() => inner.Read();
+
+            public override void Close() => inner.Close();
+
+            public override Task<bool> ReadAsync(CancellationToken cancellationToken)
+            {
+                ReadAsyncCallCount++;
+                if (HoldFirstReadAsync && !heldFirstRead)
+                {
+                    heldFirstRead = true;
+                    FirstReadStarted.SetResult();
+                    return AwaitReleaseAndReadAsync(cancellationToken);
+                }
+
+                return inner.ReadAsync(cancellationToken);
+            }
+
+            public override Task<bool> NextResultAsync(CancellationToken cancellationToken)
+            {
+                NextResultAsyncCallCount++;
+                if (CancelNextResultAsync)
+                {
+                    return Task.FromCanceled<bool>(new CancellationToken(canceled: true));
+                }
+
+                return inner.NextResultAsync(cancellationToken);
+            }
+
+            public override ValueTask DisposeAsync()
+            {
+                DisposeAsyncCallCount++;
+                return inner.DisposeAsync();
+            }
+
+            protected override void Dispose(bool disposing)
+            {
+                if (disposing)
+                {
+                    inner.Dispose();
+                }
+
+                base.Dispose(disposing);
+            }
+
+            private async Task<bool> AwaitReleaseAndReadAsync(CancellationToken cancellationToken)
+            {
+                await ReleaseFirstRead.Task.WaitAsync(cancellationToken).ConfigureAwait(false);
+                return await inner.ReadAsync(cancellationToken).ConfigureAwait(false);
             }
         }
 

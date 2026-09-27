@@ -20,6 +20,7 @@ namespace Dapper.FluentMap
         private readonly FluentMapRuntime _runtime;
         private bool _disposed;
         private bool _isConsumed;
+        private bool _readInProgress;
 
         internal MappedGridReader(IDataReader reader)
             : this(reader, FluentMapper.Runtime)
@@ -215,6 +216,12 @@ namespace Dapper.FluentMap
                 throw new InvalidOperationException("There are no remaining result sets to read.");
             }
 
+            if (_readInProgress)
+            {
+                throw new InvalidOperationException("A mapped read is already in progress.");
+            }
+
+            _readInProgress = true;
             try
             {
                 var results = MappedRowMaterializer.Materialize<TEntity>(_reader, profileType, _runtime);
@@ -225,6 +232,10 @@ namespace Dapper.FluentMap
             {
                 Dispose();
                 throw;
+            }
+            finally
+            {
+                _readInProgress = false;
             }
         }
 
@@ -242,6 +253,12 @@ namespace Dapper.FluentMap
                 throw new InvalidOperationException("There are no remaining result sets to read.");
             }
 
+            if (_readInProgress)
+            {
+                throw new InvalidOperationException("A mapped read is already in progress.");
+            }
+
+            _readInProgress = true;
             try
             {
                 if (!(_reader is DbDataReader dbReader))
@@ -263,6 +280,10 @@ namespace Dapper.FluentMap
             {
                 await DisposeAsync().ConfigureAwait(false);
                 throw;
+            }
+            finally
+            {
+                _readInProgress = false;
             }
         }
 

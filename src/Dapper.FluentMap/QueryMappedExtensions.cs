@@ -680,6 +680,90 @@ namespace Dapper.FluentMap
         }
 
         /// <summary>
+        /// Executes a query, splits each row at <paramref name="splitOn"/>, materializes two profiled FluentMap-controlled segments and composes the return value.
+        /// </summary>
+        /// <typeparam name="TFirst">The entity type materialized from columns before the split boundary.</typeparam>
+        /// <typeparam name="TSecond">The entity type materialized from columns starting at the split boundary.</typeparam>
+        /// <typeparam name="TReturn">The projected return type.</typeparam>
+        /// <typeparam name="TFirstProfile">The mapping profile marker type used for the first segment.</typeparam>
+        /// <typeparam name="TSecondProfile">The mapping profile marker type used for the second segment.</typeparam>
+        /// <param name="connection">The database connection.</param>
+        /// <param name="sql">The SQL query to execute.</param>
+        /// <param name="map">The composition delegate called for each materialized row.</param>
+        /// <param name="param">Optional query parameters.</param>
+        /// <param name="transaction">Optional transaction.</param>
+        /// <param name="commandTimeout">Optional command timeout.</param>
+        /// <param name="commandType">Optional command type.</param>
+        /// <param name="splitOn">The column name where the second row segment begins. The default is <c>Id</c>.</param>
+        /// <returns>The composed rows.</returns>
+        [RequiresUnreferencedCode(QueryMappedApiAnnotations.RequiresUnreferencedCodeMessage)]
+        [RequiresDynamicCode(QueryMappedApiAnnotations.RequiresDynamicCodeMessage)]
+        public static IEnumerable<TReturn> QueryMapped<
+            [DynamicallyAccessedMembers(QueryMappedApiAnnotations.MaterializedEntityMemberTypes)]
+            TFirst,
+            [DynamicallyAccessedMembers(QueryMappedApiAnnotations.MaterializedEntityMemberTypes)]
+            TSecond,
+            TReturn,
+            TFirstProfile,
+            TSecondProfile>(
+            this IDbConnection connection,
+            string sql,
+            Func<TFirst, TSecond, TReturn> map,
+            object param = null,
+            IDbTransaction transaction = null,
+            int? commandTimeout = null,
+            CommandType? commandType = null,
+            string splitOn = "Id")
+            where TFirst : class
+            where TSecond : class
+            where TFirstProfile : IMappingProfile
+            where TSecondProfile : IMappingProfile
+        {
+            if (sql == null)
+            {
+                throw new ArgumentNullException(nameof(sql));
+            }
+
+            return QueryMapped<TFirst, TSecond, TReturn, TFirstProfile, TSecondProfile>(
+                connection,
+                new CommandDefinition(sql, param, transaction, commandTimeout, commandType),
+                map,
+                splitOn);
+        }
+
+        /// <summary>
+        /// Executes a command, splits each row at <paramref name="splitOn"/>, materializes two profiled FluentMap-controlled segments and composes the return value.
+        /// </summary>
+        [RequiresUnreferencedCode(QueryMappedApiAnnotations.RequiresUnreferencedCodeMessage)]
+        [RequiresDynamicCode(QueryMappedApiAnnotations.RequiresDynamicCodeMessage)]
+        public static IEnumerable<TReturn> QueryMapped<
+            [DynamicallyAccessedMembers(QueryMappedApiAnnotations.MaterializedEntityMemberTypes)]
+            TFirst,
+            [DynamicallyAccessedMembers(QueryMappedApiAnnotations.MaterializedEntityMemberTypes)]
+            TSecond,
+            TReturn,
+            TFirstProfile,
+            TSecondProfile>(
+            this IDbConnection connection,
+            CommandDefinition command,
+            Func<TFirst, TSecond, TReturn> map,
+            string splitOn = "Id")
+            where TFirst : class
+            where TSecond : class
+            where TFirstProfile : IMappingProfile
+            where TSecondProfile : IMappingProfile
+        {
+            return ExecuteMapped<TFirst, TSecond, TReturn>(
+                connection,
+                command,
+                map,
+                splitOn,
+                firstProfileType: typeof(TFirstProfile),
+                secondProfileType: typeof(TSecondProfile),
+                runtime: FluentMapper.Runtime);
+        }
+
+        /// <summary>
         /// Executes a query and returns a reader for sequential FluentMap-controlled materialization of multiple result sets.
         /// </summary>
         /// <param name="connection">The database connection.</param>

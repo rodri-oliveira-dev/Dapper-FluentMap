@@ -43,6 +43,14 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
             }
         }
 
+        public static IEnumerable<object[]> ExternalCertificationProviders()
+        {
+            yield return new object[] { ProviderCase.SqlServerName };
+            yield return new object[] { ProviderCase.PostgreSqlName };
+            yield return new object[] { ProviderCase.MySqlName };
+            yield return new object[] { ProviderCase.MariaDbName };
+        }
+
         [Fact]
         [Trait("Category", "ProviderCompatibility")]
         public void ProviderMatrixShouldNameAllCertificationProviders()
@@ -54,6 +62,33 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
             if (!string.IsNullOrWhiteSpace(filter))
             {
                 Assert.Equal(filter, Assert.Single(providers));
+            }
+        }
+
+        [Theory]
+        [MemberData(nameof(ExternalCertificationProviders))]
+        [Trait("Category", "ProviderCompatibility")]
+        public void StrictProviderCertificationShouldFailWhenRequiredConfigurationIsMissing(string providerName)
+        {
+            var provider = ProviderCase.Create(providerName);
+            var previousStrict = Environment.GetEnvironmentVariable("DFM_PROVIDER_COMPATIBILITY_STRICT");
+            var previousConnectionString = Environment.GetEnvironmentVariable(provider.ConnectionStringEnvironmentVariable);
+
+            try
+            {
+                Environment.SetEnvironmentVariable("DFM_PROVIDER_COMPATIBILITY_STRICT", "true");
+                Environment.SetEnvironmentVariable(provider.ConnectionStringEnvironmentVariable, null);
+
+                provider = ProviderCase.Create(providerName);
+
+                var exception = Assert.Throws<InvalidOperationException>(() => provider.SkipIfUnavailable());
+                Assert.Contains(provider.ConnectionStringEnvironmentVariable, exception.Message);
+                Assert.DoesNotContain("skip", exception.Message, StringComparison.OrdinalIgnoreCase);
+            }
+            finally
+            {
+                Environment.SetEnvironmentVariable("DFM_PROVIDER_COMPATIBILITY_STRICT", previousStrict);
+                Environment.SetEnvironmentVariable(provider.ConnectionStringEnvironmentVariable, previousConnectionString);
             }
         }
 
@@ -237,6 +272,82 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
                 {
                     var customer = multi.ReadMappedSingle<MultipleCustomer>();
                     var order = multi.ReadMappedSingle<MultipleOrder>();
+
+                    Assert.Equal(11, customer.Id);
+                    Assert.Equal("Multiple", customer.Name);
+                    Assert.Equal(99, order.Id);
+                    Assert.Equal(12.34m, order.Total);
+                    Assert.True(multi.IsConsumed);
+                }
+            }
+            finally
+            {
+                PreTest(typeof(MultipleCustomer), typeof(MultipleOrder));
+            }
+        }
+
+        [Theory]
+        [MemberData(nameof(Providers))]
+        [Trait("Category", "ProviderCompatibility")]
+        public void QueryMappedShouldComposeProviderJoinRows(string providerName)
+        {
+            var provider = ProviderCase.Create(providerName);
+            provider.SkipIfUnavailable();
+            PreTest(typeof(MultipleCustomer), typeof(MultipleOrder));
+
+            try
+            {
+                FluentMapper.Initialize(configuration =>
+                {
+                    configuration.AddMap(new MultipleCustomerMap());
+                    configuration.AddMap(new MultipleOrderMap());
+                });
+
+                using (var connection = provider.OpenConnection())
+                {
+                    var row = connection.QueryMapped<MultipleCustomer, MultipleOrder, Tuple<MultipleCustomer, MultipleOrder>>(
+                            provider.MultiMappingSql(),
+                            Tuple.Create,
+                            splitOn: "order_id")
+                        .Single();
+
+                    Assert.Equal(11, row.Item1.Id);
+                    Assert.Equal("Multiple", row.Item1.Name);
+                    Assert.Equal(99, row.Item2.Id);
+                    Assert.Equal(12.34m, row.Item2.Total);
+                }
+            }
+            finally
+            {
+                PreTest(typeof(MultipleCustomer), typeof(MultipleOrder));
+            }
+        }
+
+        [Theory]
+        [MemberData(nameof(Providers))]
+        [Trait("Category", "ProviderCompatibility")]
+        public async Task QueryMultipleMappedAsyncShouldReadSequentialProviderResultSets(string providerName)
+        {
+            var provider = ProviderCase.Create(providerName);
+            provider.SkipIfUnavailable();
+            provider.SkipIfMultipleResultsUnsupported();
+            PreTest(typeof(MultipleCustomer), typeof(MultipleOrder));
+
+            try
+            {
+                FluentMapper.Initialize(configuration =>
+                {
+                    configuration.AddMap(new MultipleCustomerMap());
+                    configuration.AddMap(new MultipleOrderMap());
+                });
+
+                using (var connection = provider.OpenConnection())
+                await using (var multi = await connection.QueryMultipleMappedAsync(
+                    provider.MultipleResultsSql(),
+                    cancellationToken: TestContext.Current.CancellationToken))
+                {
+                    var customer = await multi.ReadMappedSingleAsync<MultipleCustomer>(TestContext.Current.CancellationToken);
+                    var order = await multi.ReadMappedSingleAsync<MultipleOrder>(TestContext.Current.CancellationToken);
 
                     Assert.Equal(11, customer.Id);
                     Assert.Equal("Multiple", customer.Name);
@@ -747,6 +858,12 @@ FROM " + tableName + ";";
             {
                 return "SELECT 11 AS customer_id, " + TextLiteral("Multiple") + " AS customer_name; " +
                     "SELECT 99 AS order_id, " + DecimalLiteral(12.34m) + " AS total;";
+            }
+
+            public string MultiMappingSql()
+            {
+                return "SELECT 11 AS customer_id, " + TextLiteral("Multiple") + " AS customer_name, " +
+                    "99 AS order_id, " + DecimalLiteral(12.34m) + " AS total;";
             }
 
             public string SingleCustomerSql(int id, string name)

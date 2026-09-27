@@ -19,7 +19,7 @@ The historical archived package history is not reconstructed here. This changelo
 - Mainline CI, release/recovery branch guards and badges now target `main`.
 - The documented Dapper minimum, package range and CI minimum lane are aligned on `2.1.79`; the latest-stable lane is `2.1.89`.
 - SQL Server 2022 CU23 and PostgreSQL 18.6 provider compatibility now run as a mandatory real-database CI lane with strict no-skip certification semantics.
-- Added FluentMap-controlled two-type `QueryMapped<TFirst,TSecond,TReturn>` multi-mapping with `splitOn` and an isolated `FluentMapRuntime` equivalent.
+- Added FluentMap-controlled two-type `QueryMapped<TFirst,TSecond,TReturn>` multi-mapping with `splitOn`, per-segment profile overloads and an isolated `FluentMapRuntime` equivalent.
 - Added `QueryMultipleMappedAsync` and async `MappedGridReader.ReadMappedAsync*` APIs for ordered multiple-result-set materialization.
 - Added strict generated materialization through `UseStrictGeneratedMaterialization()` and `QueryGeneratedMapped*`, with deterministic diagnostics and a Native AOT CI smoke.
 - Generated materializers now support safe permutations of distinct result columns without entering the runtime materializer fallback.

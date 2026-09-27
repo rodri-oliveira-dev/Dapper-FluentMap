@@ -346,6 +346,47 @@ namespace Dapper.FluentMap
         }
 
         /// <summary>
+        /// Executes a query, splits each row at <paramref name="splitOn"/>, materializes two profiled segments using this runtime and composes the return value.
+        /// </summary>
+        [RequiresUnreferencedCode(QueryMappedApiAnnotations.RequiresUnreferencedCodeMessage)]
+        [RequiresDynamicCode(QueryMappedApiAnnotations.RequiresDynamicCodeMessage)]
+        public IEnumerable<TReturn> QueryMapped<
+            [DynamicallyAccessedMembers(QueryMappedApiAnnotations.MaterializedEntityMemberTypes)]
+            TFirst,
+            [DynamicallyAccessedMembers(QueryMappedApiAnnotations.MaterializedEntityMemberTypes)]
+            TSecond,
+            TReturn,
+            TFirstProfile,
+            TSecondProfile>(
+            IDbConnection connection,
+            string sql,
+            Func<TFirst, TSecond, TReturn> map,
+            object param = null,
+            IDbTransaction transaction = null,
+            int? commandTimeout = null,
+            CommandType? commandType = null,
+            string splitOn = "Id")
+            where TFirst : class
+            where TSecond : class
+            where TFirstProfile : IMappingProfile
+            where TSecondProfile : IMappingProfile
+        {
+            if (sql == null)
+            {
+                throw new ArgumentNullException(nameof(sql));
+            }
+
+            return QueryMappedExtensions.ExecuteMapped<TFirst, TSecond, TReturn>(
+                connection,
+                new CommandDefinition(sql, param, transaction, commandTimeout, commandType),
+                map,
+                splitOn,
+                firstProfileType: typeof(TFirstProfile),
+                secondProfileType: typeof(TSecondProfile),
+                runtime: this);
+        }
+
+        /// <summary>
         /// Creates a lazy unbuffered query that materializes rows using this runtime.
         /// </summary>
         [RequiresUnreferencedCode(QueryMappedApiAnnotations.RequiresUnreferencedCodeMessage)]

@@ -14,6 +14,7 @@ FluentMapper.Initialize(configuration =>
     configuration.AddMap<ValueObjectCustomerMap>();
     configuration.AddMap<ConvertedCustomerMap>();
     configuration.AddProfile<LegacyCustomerMap>();
+    configuration.AddProfile<ArchivedOrderMap>();
 });
 
 using var connection = new SqliteConnection("Data Source=:memory:");
@@ -49,6 +50,15 @@ var profiled = connection.QueryMappedSingle<CoreCustomer, LegacyProfile>(
     "SELECT 7 AS legacy_id, 'Legacy Ltd.' AS legal_name;");
 AssertEqual(7, profiled.Id, "profile id");
 AssertEqual("Legacy Ltd.", profiled.Name, "profile name");
+
+var joined = connection.QueryMapped<CoreCustomer, Order, Tuple<CoreCustomer, Order>, LegacyProfile, ArchiveProfile>(
+        "SELECT 9 AS legacy_id, 'Joined Ltd.' AS legal_name, 90 AS archived_order_id, 12.5 AS archived_total;",
+        Tuple.Create,
+        splitOn: "archived_order_id")
+    .Single();
+AssertEqual(9, joined.Item1.Id, "profiled multi-map customer id");
+AssertEqual(90, joined.Item2.Id, "profiled multi-map order id");
+AssertEqual(12.5m, joined.Item2.Total, "profiled multi-map order total");
 
 var converted = connection.QueryMappedSingle<ConvertedCustomer>(
     "SELECT 8 AS customer_id, 'A' AS status;");
@@ -199,6 +209,26 @@ public sealed class LegacyCustomerMap : EntityMap<CoreCustomer>, IProfileMap<Leg
     {
         Map(customer => customer.Id).ToColumn("legacy_id");
         Map(customer => customer.Name).ToColumn("legal_name");
+    }
+}
+
+public sealed class ArchiveProfile : IMappingProfile
+{
+}
+
+public sealed class Order
+{
+    public int Id { get; set; }
+
+    public decimal Total { get; set; }
+}
+
+public sealed class ArchivedOrderMap : EntityMap<Order>, IProfileMap<ArchiveProfile>
+{
+    public ArchivedOrderMap()
+    {
+        Map(order => order.Id).ToColumn("archived_order_id");
+        Map(order => order.Total).ToColumn("archived_total");
     }
 }
 

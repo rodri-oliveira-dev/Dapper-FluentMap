@@ -101,7 +101,7 @@ var runtime = new FluentMapConfigurationBuilder()
 var customer = runtime.QueryMappedSingle<Customer>(connection, sql);
 ```
 
-That isolation applies to `QueryMapped*`, `QueryGeneratedMapped*`, two-type `splitOn` multi-mapping, `ReadMapped*`, `QueryMultipleMapped`, streaming, profiles, converters, diagnostics and generated materializer lookup. It does not make normal Dapper queries or Dommel select a runtime per call.
+That isolation applies to `QueryMapped*`, `QueryGeneratedMapped*`, two-type `splitOn` multi-mapping including per-segment profile overloads, `ReadMapped*`, `QueryMultipleMapped`, streaming, profiles, converters, diagnostics and generated materializer lookup. It does not make normal Dapper queries or Dommel select a runtime per call.
 
 ## API Compatibility
 

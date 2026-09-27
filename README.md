@@ -334,7 +334,7 @@ var rows = connection.QueryMapped<Customer, Order, CustomerOrder>(
     splitOn: "order_id");
 ```
 
-Each segment is materialized with its own FluentMap mapping. If every column in the second segment is `NULL`, the second argument is `null`, which matches common `LEFT JOIN` child-absence semantics.
+Each segment is materialized with its own FluentMap mapping. When profiles differ per segment, use the profile overload, for example `QueryMapped<Customer, Order, CustomerOrder, CustomerProfile, OrderProfile>(...)`. If every column in the second segment is `NULL`, the second argument is `null`, which matches common `LEFT JOIN` child-absence semantics.
 
 For multiple result sets:
 
