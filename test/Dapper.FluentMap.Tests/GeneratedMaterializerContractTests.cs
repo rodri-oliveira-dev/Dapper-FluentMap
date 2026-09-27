@@ -414,6 +414,77 @@ namespace Dapper.FluentMap.Tests
         }
 
         [Fact]
+        public void StrictGeneratedLookupShouldChooseReorderedCandidateDeterministically()
+        {
+            PreTest(typeof(GeneratedContractShape));
+
+            try
+            {
+                FluentMapper.Initialize(configuration =>
+                {
+                    configuration.AddMap(new GeneratedContractShapeMap());
+                    configuration.AddGeneratedMaterializer(
+                        AlphabeticalShapeColumns(),
+                        record => new GeneratedContractShape { Source = "alphabetical" });
+                    configuration.AddGeneratedMaterializer(
+                        new[]
+                        {
+                            GeneratedMaterializerColumn.Map("beta", nameof(GeneratedContractShape.Second)),
+                            GeneratedMaterializerColumn.Map("gamma", nameof(GeneratedContractShape.Third)),
+                            GeneratedMaterializerColumn.Map("alpha", nameof(GeneratedContractShape.First))
+                        },
+                        record => new GeneratedContractShape { Source = "rotated" });
+                });
+
+                var found = FluentMapper.Registry.TryGetStrictGeneratedMaterializer(
+                    typeof(GeneratedContractShape),
+                    profileType: null,
+                    columnNames: new[] { "gamma", "alpha", "beta" },
+                    out var materializer);
+
+                using (var reader = CreateReader(
+                           new[] { "gamma", "alpha", "beta" },
+                           new object[] { 3, 1, 2 }))
+                {
+                    Assert.True(found);
+                    Assert.True(reader.Read());
+                    var shape = Assert.IsType<GeneratedContractShape>(materializer(reader));
+                    Assert.Equal("alphabetical", shape.Source);
+                }
+            }
+            finally
+            {
+                PreTest(typeof(GeneratedContractShape));
+            }
+        }
+
+        [Fact]
+        public void ResetShouldClearReorderedGeneratedMaterializerResolution()
+        {
+            PreTest(typeof(GeneratedContractCustomer));
+
+            FluentMapper.Initialize(configuration =>
+            {
+                configuration.AddMap(new GeneratedContractCustomerMap());
+                configuration.AddGeneratedMaterializer(DefaultColumns(), ReadDefaultGeneratedCustomer);
+            });
+
+            Assert.True(FluentMapper.Registry.TryGetGeneratedMaterializer(
+                typeof(GeneratedContractCustomer),
+                profileType: null,
+                columnNames: new[] { "full_name", "customer_id" },
+                out _));
+
+            PreTest(typeof(GeneratedContractCustomer));
+
+            Assert.False(FluentMapper.Registry.TryGetGeneratedMaterializer(
+                typeof(GeneratedContractCustomer),
+                profileType: null,
+                columnNames: new[] { "full_name", "customer_id" },
+                out _));
+        }
+
+        [Fact]
         [Trait("Category", "Integration")]
         public void StrictGeneratedRuntimeShouldRejectIncompatibleGeneratedContract()
         {
@@ -723,6 +794,16 @@ namespace Dapper.FluentMap.Tests
             };
         }
 
+        private static GeneratedMaterializerColumn[] AlphabeticalShapeColumns()
+        {
+            return new[]
+            {
+                GeneratedMaterializerColumn.Map("alpha", nameof(GeneratedContractShape.First)),
+                GeneratedMaterializerColumn.Map("beta", nameof(GeneratedContractShape.Second)),
+                GeneratedMaterializerColumn.Map("gamma", nameof(GeneratedContractShape.Third))
+            };
+        }
+
         private static GeneratedMaterializerColumn[] LegacyColumns()
         {
             return new[]
@@ -802,6 +883,27 @@ namespace Dapper.FluentMap.Tests
             {
                 Map(customer => customer.Id).ToColumn("customer_id");
                 Map(customer => customer.Name).ToColumn("full_name");
+            }
+        }
+
+        private sealed class GeneratedContractShape
+        {
+            public int First { get; set; }
+
+            public int Second { get; set; }
+
+            public int Third { get; set; }
+
+            public string Source { get; set; }
+        }
+
+        private sealed class GeneratedContractShapeMap : EntityMap<GeneratedContractShape>
+        {
+            public GeneratedContractShapeMap()
+            {
+                Map(shape => shape.First).ToColumn("alpha");
+                Map(shape => shape.Second).ToColumn("beta");
+                Map(shape => shape.Third).ToColumn("gamma");
             }
         }
 

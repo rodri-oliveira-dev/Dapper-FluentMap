@@ -393,7 +393,8 @@ namespace Dapper.FluentMap
             if (!HasDuplicateColumnNames(columnNames))
             {
                 foreach (var candidate in _generatedMaterializers
-                             .Where(pair => pair.Key.Type == type && pair.Key.ProfileType == profileType))
+                             .Where(pair => pair.Key.Type == type && pair.Key.ProfileType == profileType)
+                             .OrderBy(pair => FormatColumnShape(pair.Key.ColumnNames), StringComparer.Ordinal))
                 {
                     if (candidate.Key.ColumnNames.Count != columnNames.Length ||
                         HasDuplicateColumnNames(candidate.Key.ColumnNames) ||
@@ -664,6 +665,7 @@ namespace Dapper.FluentMap
             _propertyMapCache.Clear();
             _materializationPlanCache.Clear();
             _generatedMaterializers.Clear();
+            _generatedMaterializerResolutionCache.Clear();
 
             if (dapperTypes == null)
             {
