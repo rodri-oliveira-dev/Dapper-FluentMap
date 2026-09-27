@@ -374,6 +374,63 @@ namespace Dapper.FluentMap
             return false;
         }
 
+        internal bool TryGetStrictGeneratedMaterializer(
+            Type type,
+            Type profileType,
+            string[] columnNames,
+            out Func<IDataRecord, object> materializer)
+        {
+            EnsureProfileRegistered(type, profileType);
+            var cacheKey = new MaterializationPlanCacheKey(type, profileType, columnNames);
+
+            if (_generatedMaterializers.TryGetValue(cacheKey, out var entry) &&
+                GeneratedMaterializerMatchesExplicitMapping(type, profileType, entry.Columns))
+            {
+                materializer = entry.Materialize;
+                return true;
+            }
+
+            if (!HasDuplicateColumnNames(columnNames))
+            {
+                foreach (var candidate in _generatedMaterializers
+                             .Where(pair => pair.Key.Type == type && pair.Key.ProfileType == profileType))
+                {
+                    if (candidate.Key.ColumnNames.Count != columnNames.Length ||
+                        HasDuplicateColumnNames(candidate.Key.ColumnNames) ||
+                        !HaveSameColumnSet(candidate.Key.ColumnNames, columnNames) ||
+                        !GeneratedMaterializerMatchesExplicitMapping(type, profileType, candidate.Value.Columns))
+                    {
+                        continue;
+                    }
+
+                    var ordinalMap = CreateOrdinalMap(candidate.Key.ColumnNames, columnNames);
+                    var candidateMaterializer = candidate.Value.Materialize;
+                    materializer = record => candidateMaterializer(new OrdinalMappedDataRecord(record, ordinalMap));
+                    return true;
+                }
+            }
+
+            materializer = null;
+            return false;
+        }
+
+        private bool GeneratedMaterializerMatchesExplicitMapping(
+            Type type,
+            Type profileType,
+            IReadOnlyList<GeneratedMaterializerColumn> columns)
+        {
+            foreach (var column in columns)
+            {
+                var fluentMap = GetProfilePropertyMap(type, profileType, column.ColumnName);
+                if (fluentMap == null || !GeneratedMaterializerColumnMatchesFluentMap(fluentMap, column))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
         private bool TryCreateReorderedGeneratedMaterializer(
             Type type,
             Type profileType,

@@ -174,11 +174,11 @@ jobs:
         env:
           ACCEPT_EULA: "Y"
           MSSQL_PID: Developer
-          MSSQL_SA_PASSWORD: "SqlServer-Provider-2026!"
+          MSSQL_SA_PASSWORD: "SqlServer-${{ github.run_id }}!"
         ports:
           - 1433:1433
         options: >-
-          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'SqlServer-Provider-2026!' -C -Q 'SELECT 1' -b -o /dev/null"
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'SqlServer-${{ github.run_id }}!' -C -Q 'SELECT 1' -b -o /dev/null"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 30
@@ -187,7 +187,7 @@ jobs:
         image: postgres:18.6-bookworm
         env:
           POSTGRES_DB: fluentmap
-          POSTGRES_PASSWORD: "Postgres-Provider-2026!"
+          POSTGRES_PASSWORD: "Postgres-${{ github.run_id }}!"
           POSTGRES_USER: postgres
         ports:
           - 5432:5432
@@ -200,11 +200,11 @@ jobs:
         image: mysql:8.4.11-oraclelinux9
         env:
           MYSQL_DATABASE: fluentmap
-          MYSQL_ROOT_PASSWORD: "MySql-Provider-2026!"
+          MYSQL_ROOT_PASSWORD: "MySql-${{ github.run_id }}!"
         ports:
           - 3306:3306
         options: >-
-          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -pMySql-Provider-2026! --silent"
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -pMySql-${{ github.run_id }}! --silent"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 30
@@ -213,11 +213,11 @@ jobs:
         image: mariadb:11.8.9-ubi9
         env:
           MARIADB_DATABASE: fluentmap
-          MARIADB_ROOT_PASSWORD: "MariaDb-Provider-2026!"
+          MARIADB_ROOT_PASSWORD: "MariaDb-${{ github.run_id }}!"
         ports:
           - 3307:3306
         options: >-
-          --health-cmd "mariadb-admin ping -h 127.0.0.1 -uroot -pMariaDb-Provider-2026! --silent"
+          --health-cmd "mariadb-admin ping -h 127.0.0.1 -uroot -pMariaDb-${{ github.run_id }}! --silent"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 30
@@ -248,10 +248,10 @@ jobs:
       - name: Test provider compatibility
         env:
           DFM_PROVIDER_COMPATIBILITY_STRICT: "true"
-          DFM_SQLSERVER_CONNECTION_STRING: "Server=localhost,1433;Database=tempdb;User Id=sa;Password=SqlServer-Provider-2026!;Encrypt=True;TrustServerCertificate=True;"
-          DFM_POSTGRESQL_CONNECTION_STRING: "Host=localhost;Port=5432;Database=fluentmap;Username=postgres;Password=Postgres-Provider-2026!;"
-          DFM_MYSQL_CONNECTION_STRING: "Server=localhost;Port=3306;Database=fluentmap;User ID=root;Password=MySql-Provider-2026!;SslMode=None;Allow User Variables=True;"
-          DFM_MARIADB_CONNECTION_STRING: "Server=localhost;Port=3307;Database=fluentmap;User ID=root;Password=MariaDb-Provider-2026!;SslMode=None;Allow User Variables=True;"
+          DFM_SQLSERVER_CONNECTION_STRING: "Server=localhost,1433;Database=tempdb;User Id=sa;Password=SqlServer-${{ github.run_id }}!;Encrypt=True;TrustServerCertificate=True;"
+          DFM_POSTGRESQL_CONNECTION_STRING: "Host=localhost;Port=5432;Database=fluentmap;Username=postgres;Password=Postgres-${{ github.run_id }}!;"
+          DFM_MYSQL_CONNECTION_STRING: "Server=localhost;Port=3306;Database=fluentmap;User ID=root;Password=MySql-${{ github.run_id }}!;SslMode=None;Allow User Variables=True;"
+          DFM_MARIADB_CONNECTION_STRING: "Server=localhost;Port=3307;Database=fluentmap;User ID=root;Password=MariaDb-${{ github.run_id }}!;SslMode=None;Allow User Variables=True;"
         run: |
           mkdir -p ./artifacts/test-results/providers
           for provider in "SQLite" "SQL Server" "PostgreSQL" "MySQL" "MariaDB"; do

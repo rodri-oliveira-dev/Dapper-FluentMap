@@ -42,11 +42,12 @@ namespace Dapper.FluentMap.Materialization
             var columnNames = GetColumnNames(reader);
 
             Func<IDataRecord, object> generatedMaterializer;
-            if (runtime.Registry.TryGetGeneratedMaterializer(
-                typeof(TEntity),
-                profileType,
-                columnNames,
-                out generatedMaterializer))
+            var hasGeneratedMaterializer = runtime.StrictGeneratedMaterialization
+                ? runtime.Registry.TryGetStrictGeneratedMaterializer(
+                    typeof(TEntity), profileType, columnNames, out generatedMaterializer)
+                : runtime.Registry.TryGetGeneratedMaterializer(
+                    typeof(TEntity), profileType, columnNames, out generatedMaterializer);
+            if (hasGeneratedMaterializer)
             {
                 return record => (TEntity)generatedMaterializer(record);
             }
@@ -74,7 +75,7 @@ namespace Dapper.FluentMap.Materialization
             var columnNames = GetColumnNames(reader);
 
             Func<IDataRecord, object> generatedMaterializer;
-            if (runtime.Registry.TryGetGeneratedMaterializer(
+            if (runtime.Registry.TryGetStrictGeneratedMaterializer(
                 typeof(TEntity),
                 profileType,
                 columnNames,
