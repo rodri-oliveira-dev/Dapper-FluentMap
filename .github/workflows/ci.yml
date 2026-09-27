@@ -204,7 +204,7 @@ jobs:
         ports:
           - 3306:3306
         options: >-
-          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -pMySql-${{ github.run_id }}! --silent"
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot --silent"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 30
@@ -217,7 +217,7 @@ jobs:
         ports:
           - 3307:3306
         options: >-
-          --health-cmd "mariadb-admin ping -h 127.0.0.1 -uroot -pMariaDb-${{ github.run_id }}! --silent"
+          --health-cmd "mariadb-admin ping -h 127.0.0.1 -uroot --silent"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 30
