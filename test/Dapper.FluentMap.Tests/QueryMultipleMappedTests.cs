@@ -1053,6 +1053,8 @@ namespace Dapper.FluentMap.Tests
                 HoldFirstReadAsync = true
             };
             var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var allRejected = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var rejectedCount = 0;
 
             await using (var multi = new MappedGridReader(reader))
             {
@@ -1068,6 +1070,11 @@ namespace Dapper.FluentMap.Tests
                         catch (InvalidOperationException exception) when (
                             exception.Message.Contains("already in progress", StringComparison.OrdinalIgnoreCase))
                         {
+                            if (Interlocked.Increment(ref rejectedCount) == contenderCount - 1)
+                            {
+                                allRejected.SetResult();
+                            }
+
                             return false;
                         }
                     })
@@ -1075,6 +1082,7 @@ namespace Dapper.FluentMap.Tests
 
                 start.SetResult();
                 await reader.FirstReadStarted.Task.WaitAsync(TestContext.Current.CancellationToken);
+                await allRejected.Task.WaitAsync(TestContext.Current.CancellationToken);
                 Assert.Equal(1, reader.ReadAsyncCallCount);
 
                 reader.ReleaseFirstRead.SetResult();
