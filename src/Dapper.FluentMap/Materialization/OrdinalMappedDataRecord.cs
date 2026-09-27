@@ -18,7 +18,7 @@ namespace Dapper.FluentMap.Materialization
 
         public object this[int i] => _inner[MapOrdinal(i)];
 
-        public object this[string name] => _inner[name];
+        public object this[string name] => GetValue(GetOrdinal(name));
 
         public bool GetBoolean(int i) => _inner.GetBoolean(MapOrdinal(i));
 
@@ -56,7 +56,19 @@ namespace Dapper.FluentMap.Materialization
 
         public string GetName(int i) => _inner.GetName(MapOrdinal(i));
 
-        public int GetOrdinal(string name) => _inner.GetOrdinal(name);
+        public int GetOrdinal(string name)
+        {
+            var innerOrdinal = _inner.GetOrdinal(name);
+            for (var ordinal = 0; ordinal < _ordinalMap.Length; ordinal++)
+            {
+                if (_ordinalMap[ordinal] == innerOrdinal)
+                {
+                    return ordinal;
+                }
+            }
+
+            throw new IndexOutOfRangeException("Column '" + name + "' is not part of the mapped record.");
+        }
 
         public string GetString(int i) => _inner.GetString(MapOrdinal(i));
 

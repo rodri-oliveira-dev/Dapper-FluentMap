@@ -242,13 +242,13 @@ namespace Dapper.FluentMap
                 throw new InvalidOperationException("There are no remaining result sets to read.");
             }
 
-            if (!(_reader is DbDataReader dbReader))
-            {
-                throw new InvalidOperationException("Asynchronous mapped reads require a DbDataReader created by QueryMultipleMappedAsync.");
-            }
-
             try
             {
+                if (!(_reader is DbDataReader dbReader))
+                {
+                    throw new InvalidOperationException("Asynchronous mapped reads require a DbDataReader created by QueryMultipleMappedAsync.");
+                }
+
                 var results = new List<TEntity>();
                 var materializer = MappedRowMaterializer.CreateMaterializer<TEntity>(_reader, profileType, _runtime);
                 while (await dbReader.ReadAsync(cancellationToken).ConfigureAwait(false))

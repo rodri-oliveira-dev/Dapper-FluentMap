@@ -68,7 +68,7 @@ namespace Dapper.FluentMap.Tests
 
             Assert.Equal(2, record.FieldCount);
             Assert.Equal("value:3", record[0]);
-            Assert.Equal("value:2", record["column2"]);
+            Assert.Equal("value:1", record["column1"]);
             Assert.True(record.GetBoolean(0));
             Assert.Equal((byte)3, record.GetByte(0));
             Assert.Equal(3, record.GetBytes(0, 0, new byte[1], 0, 1));
@@ -86,7 +86,7 @@ namespace Dapper.FluentMap.Tests
             Assert.Equal(3, record.GetInt32(0));
             Assert.Equal(3L, record.GetInt64(0));
             Assert.Equal("column3", record.GetName(0));
-            Assert.Equal(2, record.GetOrdinal("column2"));
+            Assert.Equal(1, record.GetOrdinal("column1"));
             Assert.Equal("string:3", record.GetString(0));
             Assert.Equal("value:3", record.GetValue(0));
             Assert.False(record.IsDBNull(0));
@@ -107,6 +107,7 @@ namespace Dapper.FluentMap.Tests
             var record = new OrdinalMappedDataRecord(inner, new[] { 0 });
             Assert.Throws<IndexOutOfRangeException>(() => record.GetValue(-1));
             Assert.Throws<IndexOutOfRangeException>(() => record.GetValue(1));
+            Assert.Throws<IndexOutOfRangeException>(() => record.GetOrdinal("column2"));
             Assert.Throws<ArgumentNullException>(() => record.GetValues(null));
         }
 

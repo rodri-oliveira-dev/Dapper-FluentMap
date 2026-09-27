@@ -1,6 +1,7 @@
 using System;
 using System.Data;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
 using Dapper.FluentMap.Conventions;
@@ -905,6 +906,27 @@ namespace Dapper.FluentMap.Tests
 
                 Assert.Equal(ConnectionState.Closed, connection.State);
                 await Assert.ThrowsAsync<ObjectDisposedException>(() => multi.ReadMappedAsync<DefaultEntity>(cancellationToken));
+            }
+        }
+
+        [Fact]
+        [Trait("Category", "Integration")]
+        public async Task ReadMappedAsyncShouldDisposeReaderWhenCancellationWasAlreadyRequested()
+        {
+            var cancellationToken = TestContext.Current.CancellationToken;
+            using (var connection = new SqliteConnection("Data Source=:memory:"))
+            using (var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken))
+            {
+                var multi = await connection.QueryMultipleMappedAsync(
+                    "SELECT 1 AS Id;",
+                    cancellationToken: cancellationToken);
+                cancellation.Cancel();
+
+                await Assert.ThrowsAnyAsync<OperationCanceledException>(
+                    () => multi.ReadMappedAsync<DefaultEntity>(cancellation.Token));
+
+                Assert.True(multi.IsConsumed);
+                Assert.Equal(ConnectionState.Closed, connection.State);
             }
         }
 
