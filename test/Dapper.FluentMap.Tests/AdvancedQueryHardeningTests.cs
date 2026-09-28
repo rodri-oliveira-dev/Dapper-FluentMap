@@ -202,8 +202,8 @@ namespace Dapper.FluentMap.Tests
                                 new[] { "customer_id", "customer_name" },
                                 new object[] { index, "generated-" + index }),
                             CreateTable(
-                                new[] { "customer_name", "customer_id" },
-                                new object[] { "runtime-" + index, index })))
+                                new[] { "customer_name", "customer_id", "runtime_only" },
+                                new object[] { "runtime-" + index, index, true })))
                         using (var multi = new MappedGridReader(reader))
                         {
                             var generated = multi.ReadMappedSingle<ConcurrentCustomer>();

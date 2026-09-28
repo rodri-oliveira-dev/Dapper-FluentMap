@@ -39,7 +39,7 @@ Lead with findings. For each one include severity, file/line, problematic behavi
 - Are global static configuration and `SqlMapper.SetTypeMap` effects isolated in tests?
 - Are nested/value-object claims proven end to end, not just by metadata?
 - Do package changes account for all five NuGet packages and independent identities?
-- Do release/workflow changes preserve `master`, version validation, artifact checks, provenance, and recovery behavior?
+- Do release/workflow changes preserve `main`, version validation, artifact checks, provenance, and recovery behavior?
 
 # Restrictions
 

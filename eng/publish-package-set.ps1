@@ -369,6 +369,50 @@ function Invoke-DotNetNuGetPush {
   }
 }
 
+function Test-NuGetOrgPackageConverged {
+  param(
+    [object]$Package,
+    [hashtable]$PackagePaths,
+    [hashtable]$Validated,
+    [System.Collections.Generic.List[string]]$Missing
+  )
+
+  $packageId = [string]$Package.packageId
+  if ($Validated.ContainsKey($packageId)) {
+    return
+  }
+
+  $status = Get-HttpStatus -Uri (Get-NuGetFlatContainerUrl -PackageId $packageId -PackageVersion $Version)
+  switch ($status) {
+    '200' {
+      Assert-NuGetOrgPackageMatches -PackageId $packageId -LocalPackagePath $PackagePaths[$packageId]
+      $Validated[$packageId] = $true
+    }
+    '404' {
+      $Missing.Add($packageId)
+    }
+    default {
+      Fail "Unexpected NuGet.org response HTTP $status while verifying convergence for $packageId $Version."
+    }
+  }
+}
+
+function Get-NotConvergedPackageIds {
+  param(
+    [array]$ExpectedPackages,
+    [hashtable]$Validated
+  )
+
+  return @(
+    foreach ($package in $ExpectedPackages) {
+      $packageId = [string]$package.packageId
+      if (-not $Validated.ContainsKey($packageId)) {
+        $packageId
+      }
+    }
+  )
+}
+
 function Wait-NuGetOrgPackageSetConverged {
   param(
     [array]$ExpectedPackages,
@@ -378,27 +422,10 @@ function Wait-NuGetOrgPackageSetConverged {
   $validated = @{}
 
   for ($attempt = 1; $attempt -le $NuGetConvergenceMaxAttempts; $attempt++) {
-    $missing = @()
+    $missing = [System.Collections.Generic.List[string]]::new()
 
     foreach ($package in $ExpectedPackages) {
-      $packageId = [string]$package.packageId
-      if ($validated.ContainsKey($packageId)) {
-        continue
-      }
-
-      $status = Get-HttpStatus -Uri (Get-NuGetFlatContainerUrl -PackageId $packageId -PackageVersion $Version)
-      switch ($status) {
-        '200' {
-          Assert-NuGetOrgPackageMatches -PackageId $packageId -LocalPackagePath $PackagePaths[$packageId]
-          $validated[$packageId] = $true
-        }
-        '404' {
-          $missing += $packageId
-        }
-        default {
-          Fail "Unexpected NuGet.org response HTTP $status while verifying convergence for $packageId $Version."
-        }
-      }
+      Test-NuGetOrgPackageConverged -Package $package -PackagePaths $PackagePaths -Validated $validated -Missing $missing
     }
 
     if ($validated.Count -eq $ExpectedPackages.Count) {
@@ -406,21 +433,14 @@ function Wait-NuGetOrgPackageSetConverged {
       return
     }
 
-    $missingList = $missing -join ', '
+    $missingList = @($missing) -join ', '
     if ($attempt -lt $NuGetConvergenceMaxAttempts) {
       Write-Output "NuGet.org: indexing still pending for $missingList ($attempt/$NuGetConvergenceMaxAttempts); retrying in $NuGetConvergenceDelaySeconds seconds."
       Start-Sleep -Seconds $NuGetConvergenceDelaySeconds
     }
   }
 
-  $notConverged = @(
-    foreach ($package in $ExpectedPackages) {
-      $packageId = [string]$package.packageId
-      if (-not $validated.ContainsKey($packageId)) {
-        $packageId
-      }
-    }
-  )
+  $notConverged = Get-NotConvergedPackageIds -ExpectedPackages $ExpectedPackages -Validated $validated
 
   Fail "NuGet.org primary package convergence timed out for $Version. Still missing from the Flat Container: $($notConverged -join ', ')."
 }

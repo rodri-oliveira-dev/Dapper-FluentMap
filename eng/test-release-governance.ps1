@@ -86,6 +86,55 @@ function New-ZipPackage {
   }
 }
 
+function New-PublishScenarioArtifacts {
+  param(
+    [array]$Packages,
+    [string]$PackageDirectory,
+    [string]$RemoteDirectory,
+    [string]$Version,
+    [string[]]$DifferentRemotePackages
+  )
+
+  foreach ($package in $Packages) {
+    $packageId = [string]$package.packageId
+    $localPackage = Join-Path $PackageDirectory "$packageId.$Version.nupkg"
+    New-ZipPackage -Path $localPackage -EntryName 'content.txt' -Content "local $packageId"
+
+    $remotePackage = Join-Path $RemoteDirectory "$($packageId.ToLowerInvariant()).nupkg"
+    $remoteContent = if ($packageId -in $DifferentRemotePackages) { "different $packageId" } else { "local $packageId" }
+    New-ZipPackage -Path $remotePackage -EntryName 'content.txt' -Content $remoteContent
+
+    if ([bool]$package.symbols) {
+      New-ZipPackage -Path (Join-Path $PackageDirectory "$packageId.$Version.snupkg") -EntryName 'symbols.pdb' -Content "symbols $packageId"
+    }
+  }
+}
+
+function Write-PublishScenarioStatusSequences {
+  param(
+    [hashtable]$StatusSequences,
+    [string]$StatusDirectory
+  )
+
+  foreach ($packageId in $StatusSequences.Keys) {
+    [System.IO.File]::WriteAllLines(
+      (Join-Path $StatusDirectory "$($packageId.ToLowerInvariant()).status"),
+      [string[]]$StatusSequences[$packageId])
+  }
+}
+
+function Write-PublishScenarioCatalog {
+  param(
+    [array]$Packages,
+    [string]$CatalogPath
+  )
+
+  [ordered]@{
+    schemaVersion = '1.0'
+    packages = @($Packages)
+  } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $CatalogPath -Encoding UTF8
+}
+
 function Invoke-PublishScenario {
   param(
     [array]$Packages,
@@ -113,32 +162,15 @@ function Invoke-PublishScenario {
     New-Item -ItemType Directory -Force -Path $packageDir, $remoteDir, $statusDir | Out-Null
 
     $version = '9.9.9-test.1'
-    foreach ($package in $Packages) {
-      $packageId = [string]$package.packageId
-      $localPackage = Join-Path $packageDir "$packageId.$version.nupkg"
-      New-ZipPackage -Path $localPackage -EntryName 'content.txt' -Content "local $packageId"
-
-      $remotePackage = Join-Path $remoteDir "$($packageId.ToLowerInvariant()).nupkg"
-      $remoteContent = if ($packageId -in $DifferentRemotePackages) { "different $packageId" } else { "local $packageId" }
-      New-ZipPackage -Path $remotePackage -EntryName 'content.txt' -Content $remoteContent
-
-      if ([bool]$package.symbols) {
-        New-ZipPackage -Path (Join-Path $packageDir "$packageId.$version.snupkg") -EntryName 'symbols.pdb' -Content "symbols $packageId"
-      }
-    }
-
-    $catalog = [ordered]@{
-      schemaVersion = '1.0'
-      packages = @($Packages)
-    }
     $catalogPath = Join-Path $tempRoot 'package-catalog.json'
-    $catalog | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $catalogPath -Encoding UTF8
-
-    foreach ($packageId in $StatusSequences.Keys) {
-      [System.IO.File]::WriteAllLines(
-        (Join-Path $statusDir "$($packageId.ToLowerInvariant()).status"),
-        [string[]]$StatusSequences[$packageId])
-    }
+    New-PublishScenarioArtifacts `
+      -Packages $Packages `
+      -PackageDirectory $packageDir `
+      -RemoteDirectory $remoteDir `
+      -Version $version `
+      -DifferentRemotePackages $DifferentRemotePackages
+    Write-PublishScenarioCatalog -Packages $Packages -CatalogPath $catalogPath
+    Write-PublishScenarioStatusSequences -StatusSequences $StatusSequences -StatusDirectory $statusDir
 
     $pushLog = Join-Path $tempRoot 'push.log'
     $eventLog = Join-Path $tempRoot 'events.log'
@@ -439,6 +471,83 @@ function Invoke-GitTestCommand {
   return @($output)
 }
 
+function Initialize-ReleaseSourceTestRepository {
+  param(
+    [string]$WorkingDirectory,
+    [string]$Remote
+  )
+
+  & git init $WorkingDirectory *> $null
+  if ($LASTEXITCODE -ne 0) { throw 'Unable to initialize working repository.' }
+
+  Invoke-GitTestCommand -WorkingDirectory $WorkingDirectory -Arguments @('config', 'user.email', 'release-tests@example.invalid') | Out-Null
+  Invoke-GitTestCommand -WorkingDirectory $WorkingDirectory -Arguments @('config', 'user.name', 'Release Tests') | Out-Null
+  Set-Content -LiteralPath (Join-Path $WorkingDirectory 'README.md') -Value 'release source test' -Encoding utf8
+  Invoke-GitTestCommand -WorkingDirectory $WorkingDirectory -Arguments @('add', 'README.md') | Out-Null
+  Invoke-GitTestCommand -WorkingDirectory $WorkingDirectory -Arguments @('commit', '-m', 'initial') | Out-Null
+  Invoke-GitTestCommand -WorkingDirectory $WorkingDirectory -Arguments @('branch', '-M', 'main') | Out-Null
+  Invoke-GitTestCommand -WorkingDirectory $WorkingDirectory -Arguments @('remote', 'add', 'origin', $Remote) | Out-Null
+
+  return (Invoke-GitTestCommand -WorkingDirectory $WorkingDirectory -Arguments @('rev-parse', 'HEAD') | Select-Object -First 1).Trim()
+}
+
+function Add-ReleaseSourceDevelopBranch {
+  param([string]$WorkingDirectory)
+
+  Invoke-GitTestCommand -WorkingDirectory $WorkingDirectory -Arguments @('checkout', '-b', 'develop') | Out-Null
+  Set-Content -LiteralPath (Join-Path $WorkingDirectory 'develop.txt') -Value 'develop' -Encoding utf8
+  Invoke-GitTestCommand -WorkingDirectory $WorkingDirectory -Arguments @('add', 'develop.txt') | Out-Null
+  Invoke-GitTestCommand -WorkingDirectory $WorkingDirectory -Arguments @('commit', '-m', 'develop') | Out-Null
+  Invoke-GitTestCommand -WorkingDirectory $WorkingDirectory -Arguments @('push', '-u', 'origin', 'develop') | Out-Null
+  Invoke-GitTestCommand -WorkingDirectory $WorkingDirectory -Arguments @('checkout', 'main') | Out-Null
+}
+
+function Add-ReleaseSourceTags {
+  param(
+    [string]$WorkingDirectory,
+    [hashtable]$Tags,
+    [string]$Commit
+  )
+
+  foreach ($tagName in $Tags.Keys) {
+    if ($Tags[$tagName] -eq 'annotated') {
+      Invoke-GitTestCommand -WorkingDirectory $WorkingDirectory -Arguments @('tag', '-a', [string]$tagName, '-m', "Release $tagName", $Commit) | Out-Null
+    }
+    else {
+      Invoke-GitTestCommand -WorkingDirectory $WorkingDirectory -Arguments @('tag', [string]$tagName, $Commit) | Out-Null
+    }
+  }
+
+  if ($Tags.Count -gt 0) {
+    Invoke-GitTestCommand -WorkingDirectory $WorkingDirectory -Arguments @('push', 'origin', '--tags') | Out-Null
+  }
+}
+
+function Invoke-ReleaseSourceScript {
+  param(
+    [string]$WorkingDirectory,
+    [string]$ScriptPath,
+    [string]$OutputPath,
+    [string]$SourceType,
+    [string]$SourceRef,
+    [string]$Version,
+    [string]$CurrentWorkflowRef
+  )
+
+  Push-Location $WorkingDirectory
+  try {
+    & $ScriptPath `
+      -SourceType $SourceType `
+      -SourceRef $SourceRef `
+      -Version $Version `
+      -CurrentWorkflowRef $CurrentWorkflowRef `
+      -GitHubOutputPath $OutputPath 2>&1
+  }
+  finally {
+    Pop-Location
+  }
+}
+
 function Invoke-ResolveSourceScenario {
   param(
     [ValidateSet('branch', 'tag')]
@@ -447,8 +556,8 @@ function Invoke-ResolveSourceScenario {
     [string]$Version,
     [hashtable]$Tags = @{},
     [switch]$AddDevelopBranch,
-    [switch]$SkipPushMaster,
-    [string]$CurrentWorkflowRef = 'refs/heads/master'
+    [switch]$SkipPushMain,
+    [string]$CurrentWorkflowRef = 'refs/heads/main'
   )
 
   $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) "fluentmap-source-test-$([System.Guid]::NewGuid())"
@@ -460,61 +569,31 @@ function Invoke-ResolveSourceScenario {
     & git init --bare $remote *> $null
     if ($LASTEXITCODE -ne 0) { throw 'Unable to initialize bare remote repository.' }
 
-    & git init $work *> $null
-    if ($LASTEXITCODE -ne 0) { throw 'Unable to initialize working repository.' }
+    $mainCommit = Initialize-ReleaseSourceTestRepository -WorkingDirectory $work -Remote $remote
 
-    Invoke-GitTestCommand -WorkingDirectory $work -Arguments @('config', 'user.email', 'release-tests@example.invalid') | Out-Null
-    Invoke-GitTestCommand -WorkingDirectory $work -Arguments @('config', 'user.name', 'Release Tests') | Out-Null
-    Set-Content -LiteralPath (Join-Path $work 'README.md') -Value 'release source test' -Encoding utf8
-    Invoke-GitTestCommand -WorkingDirectory $work -Arguments @('add', 'README.md') | Out-Null
-    Invoke-GitTestCommand -WorkingDirectory $work -Arguments @('commit', '-m', 'initial') | Out-Null
-    Invoke-GitTestCommand -WorkingDirectory $work -Arguments @('branch', '-M', 'master') | Out-Null
-    Invoke-GitTestCommand -WorkingDirectory $work -Arguments @('remote', 'add', 'origin', $remote) | Out-Null
-    $masterCommit = (Invoke-GitTestCommand -WorkingDirectory $work -Arguments @('rev-parse', 'HEAD') | Select-Object -First 1).Trim()
-
-    if (-not $SkipPushMaster) {
-      Invoke-GitTestCommand -WorkingDirectory $work -Arguments @('push', '-u', 'origin', 'master') | Out-Null
+    if (-not $SkipPushMain) {
+      Invoke-GitTestCommand -WorkingDirectory $work -Arguments @('push', '-u', 'origin', 'main') | Out-Null
     }
 
     if ($AddDevelopBranch) {
-      Invoke-GitTestCommand -WorkingDirectory $work -Arguments @('checkout', '-b', 'develop') | Out-Null
-      Set-Content -LiteralPath (Join-Path $work 'develop.txt') -Value 'develop' -Encoding utf8
-      Invoke-GitTestCommand -WorkingDirectory $work -Arguments @('add', 'develop.txt') | Out-Null
-      Invoke-GitTestCommand -WorkingDirectory $work -Arguments @('commit', '-m', 'develop') | Out-Null
-      Invoke-GitTestCommand -WorkingDirectory $work -Arguments @('push', '-u', 'origin', 'develop') | Out-Null
-      Invoke-GitTestCommand -WorkingDirectory $work -Arguments @('checkout', 'master') | Out-Null
+      Add-ReleaseSourceDevelopBranch -WorkingDirectory $work
     }
 
-    foreach ($tagName in $Tags.Keys) {
-      if ($Tags[$tagName] -eq 'annotated') {
-        Invoke-GitTestCommand -WorkingDirectory $work -Arguments @('tag', '-a', [string]$tagName, '-m', "Release $tagName", $masterCommit) | Out-Null
-      }
-      else {
-        Invoke-GitTestCommand -WorkingDirectory $work -Arguments @('tag', [string]$tagName, $masterCommit) | Out-Null
-      }
-    }
-
-    if ($Tags.Count -gt 0) {
-      Invoke-GitTestCommand -WorkingDirectory $work -Arguments @('push', 'origin', '--tags') | Out-Null
-    }
+    Add-ReleaseSourceTags -WorkingDirectory $work -Tags $Tags -Commit $mainCommit
 
     $outputPath = Join-Path $tempRoot 'github-output.txt'
     $script = Join-Path $repoRoot 'eng/resolve-release-source.ps1'
     $exitCode = 0
     $output = @(
       try {
-        Push-Location $work
-        try {
-          & $script `
-            -SourceType $SourceType `
-            -SourceRef $SourceRef `
-            -Version $Version `
-            -CurrentWorkflowRef $CurrentWorkflowRef `
-            -GitHubOutputPath $outputPath 2>&1
-        }
-        finally {
-          Pop-Location
-        }
+        Invoke-ReleaseSourceScript `
+          -WorkingDirectory $work `
+          -ScriptPath $script `
+          -OutputPath $outputPath `
+          -SourceType $SourceType `
+          -SourceRef $SourceRef `
+          -Version $Version `
+          -CurrentWorkflowRef $CurrentWorkflowRef
       }
       catch {
         $exitCode = 1
@@ -536,7 +615,7 @@ function Invoke-ResolveSourceScenario {
       Succeeded = $exitCode -eq 0
       Output = ($output | Out-String)
       Outputs = $outputs
-      MasterCommit = $masterCommit
+      MainCommit = $mainCommit
     }
   }
   finally {
@@ -611,7 +690,7 @@ function Invoke-ReleaseArtifactValidationScenario {
     [string]$ArtifactVersion = '3.1.2',
     [string]$ExpectedCommit = '1111111111111111111111111111111111111111',
     [string]$ArtifactCommit = '1111111111111111111111111111111111111111',
-    [string]$Branch = 'refs/heads/master'
+    [string]$Branch = 'refs/heads/main'
   )
 
   $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) "fluentmap-artifact-test-$([System.Guid]::NewGuid())"
@@ -710,7 +789,7 @@ function Invoke-ReleaseSbomScenario {
     $version = '3.1.2'
     $commit = '1111111111111111111111111111111111111111'
     $packagePath = Join-Path $packageDir "A.$version.nupkg"
-    New-TestNuGetPackage -Path $packagePath -PackageId 'A' -Version $version -Commit $commit -Branch 'refs/heads/master'
+    New-TestNuGetPackage -Path $packagePath -PackageId 'A' -Version $version -Commit $commit -Branch 'refs/heads/main'
 
     $catalogPath = Join-Path $tempRoot 'package-catalog.json'
     [ordered]@{
@@ -849,38 +928,38 @@ Invoke-Test 'recovery workflow reconciles governed release state' {
   Assert-True ($recoveryWorkflow.IndexOf('validated_commit:', [System.StringComparison]::Ordinal) -lt 0) 'validated_commit must not remain an operator-facing workflow input.'
 }
 
-Invoke-Test 'branch source resolves valid master version' {
-  $result = Invoke-ResolveSourceScenario -SourceType branch -SourceRef master -Version '3.1.2'
+Invoke-Test 'branch source resolves valid main version' {
+  $result = Invoke-ResolveSourceScenario -SourceType branch -SourceRef main -Version '3.1.2'
   Assert-True $result.Succeeded "source resolution failed: $($result.Output)"
   Assert-True ($result.Outputs['source_type'] -eq 'branch') 'source_type output should be branch.'
   Assert-True ($result.Outputs['resolved_version'] -eq '3.1.2') 'branch mode should use the explicit version.'
-  Assert-True ($result.Outputs['resolved_commit'] -eq $result.MasterCommit) 'branch mode should resolve origin/master HEAD.'
-  Assert-True ($result.Outputs['resolved_ref'] -eq 'refs/heads/master') 'branch mode should normalize the branch ref.'
-  Assert-True ($result.Outputs['resolved_branch'] -eq 'master') 'branch mode should expose the resolved branch.'
+  Assert-True ($result.Outputs['resolved_commit'] -eq $result.MainCommit) 'branch mode should resolve origin/main HEAD.'
+  Assert-True ($result.Outputs['resolved_ref'] -eq 'refs/heads/main') 'branch mode should normalize the branch ref.'
+  Assert-True ($result.Outputs['resolved_branch'] -eq 'main') 'branch mode should expose the resolved branch.'
 }
 
 Invoke-Test 'branch source requires version' {
-  $result = Invoke-ResolveSourceScenario -SourceType branch -SourceRef master -Version ''
+  $result = Invoke-ResolveSourceScenario -SourceType branch -SourceRef main -Version ''
   Assert-True (-not $result.Succeeded) 'branch mode without version should fail.'
   Assert-Contains $result.Output 'Release source resolution failed' 'missing branch version diagnostic should come from source resolution.'
 }
 
 Invoke-Test 'branch source rejects invalid semantic version' {
-  $result = Invoke-ResolveSourceScenario -SourceType branch -SourceRef master -Version '3.1'
+  $result = Invoke-ResolveSourceScenario -SourceType branch -SourceRef main -Version '3.1'
   Assert-True (-not $result.Succeeded) 'invalid branch SemVer should fail.'
   Assert-Contains $result.Output 'Invalid semantic version' 'invalid SemVer diagnostic should be clear.'
 }
 
 Invoke-Test 'branch source rejects disallowed branch' {
   $result = Invoke-ResolveSourceScenario -SourceType branch -SourceRef develop -Version '3.1.2' -AddDevelopBranch
-  Assert-True (-not $result.Succeeded) 'non-master branch source should fail.'
+  Assert-True (-not $result.Succeeded) 'non-main branch source should fail.'
   Assert-Contains $result.Output 'Release source resolution failed' 'disallowed branch diagnostic should come from source resolution.'
 }
 
 Invoke-Test 'branch source rejects missing branch' {
-  $result = Invoke-ResolveSourceScenario -SourceType branch -SourceRef master -Version '3.1.2' -SkipPushMaster
-  Assert-True (-not $result.Succeeded) 'recovery started outside master should fail closed.'
-  Assert-Contains $result.Output "Branch 'master' does not exist" 'missing branch diagnostic should be clear.'
+  $result = Invoke-ResolveSourceScenario -SourceType branch -SourceRef main -Version '3.1.2' -SkipPushMain
+  Assert-True (-not $result.Succeeded) 'recovery started outside main should fail closed.'
+  Assert-Contains $result.Output "Branch 'main' does not exist" 'missing branch diagnostic should be clear.'
 }
 
 Invoke-Test 'tag source derives version from release tag' {
@@ -888,7 +967,7 @@ Invoke-Test 'tag source derives version from release tag' {
   Assert-True $result.Succeeded "tag source resolution failed: $($result.Output)"
   Assert-True ($result.Outputs['source_type'] -eq 'tag') 'source_type output should be tag.'
   Assert-True ($result.Outputs['resolved_version'] -eq '3.1.2') 'tag mode should derive the package version by removing only the leading v.'
-  Assert-True ($result.Outputs['resolved_commit'] -eq $result.MasterCommit) 'tag mode should peel the tag to the target commit.'
+  Assert-True ($result.Outputs['resolved_commit'] -eq $result.MainCommit) 'tag mode should peel the tag to the target commit.'
   Assert-True ($result.Outputs['resolved_ref'] -eq 'refs/tags/v3.1.2') 'tag mode should normalize the tag ref.'
   Assert-True ($result.Outputs['resolved_tag'] -eq 'v3.1.2') 'tag mode should expose the resolved tag.'
 }
@@ -902,13 +981,13 @@ Invoke-Test 'tag source supports prerelease tags' {
 Invoke-Test 'tag source peels annotated tag to commit' {
   $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.2.0-rc.1' -Tags @{ 'v3.2.0-rc.1' = 'annotated' }
   Assert-True $result.Succeeded "annotated tag source resolution failed: $($result.Output)"
-  Assert-True ($result.Outputs['resolved_commit'] -eq $result.MasterCommit) 'annotated tag should peel to the underlying commit, not the tag object.'
+  Assert-True ($result.Outputs['resolved_commit'] -eq $result.MainCommit) 'annotated tag should peel to the underlying commit, not the tag object.'
 }
 
 Invoke-Test 'tag source peels lightweight tag to commit' {
   $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.1.2' -Tags @{ 'v3.1.2' = 'lightweight' }
   Assert-True $result.Succeeded "lightweight tag source resolution failed: $($result.Output)"
-  Assert-True ($result.Outputs['resolved_commit'] -eq $result.MasterCommit) 'lightweight tag should resolve to its target commit.'
+  Assert-True ($result.Outputs['resolved_commit'] -eq $result.MainCommit) 'lightweight tag should resolve to its target commit.'
 }
 
 Invoke-Test 'tag source rejects missing tag' {

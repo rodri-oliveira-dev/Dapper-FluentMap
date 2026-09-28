@@ -8,7 +8,7 @@ license: MIT
 
 GitHub Actions workflow files are YAML, but valid YAML is not the same as a valid workflow. A file can parse as YAML yet still be rejected by GitHub Actions before any job starts.
 
-> **Repository integration:** `AGENTS.md` and the existing Dapper-FluentMap workflows are authoritative. Preserve the repository's SHA-pinned actions, least-privilege permissions, release/recovery semantics, `master` default branch, Sonar Quality Gate, and multi-package publishing rules. Use `ci-release-governance` for what a workflow should do; use this skill for whether the workflow is structurally valid and safely authored.
+> **Repository integration:** `AGENTS.md` and the existing Dapper-FluentMap workflows are authoritative. Preserve the repository's SHA-pinned actions, least-privilege permissions, release/recovery semantics, `main` default branch, Sonar Quality Gate, and multi-package publishing rules. Use `ci-release-governance` for what a workflow should do; use this skill for whether the workflow is structurally valid and safely authored.
 
 ## When to Use
 
@@ -36,7 +36,7 @@ Quote expression-bearing scalars whenever literal `#`, colon-space, leading spec
 ### 1. Identify changed workflows
 
 ```bash
-git diff --name-only origin/master... -- .github/workflows/
+git diff --name-only origin/main... -- .github/workflows/
 ```
 
 ### 2. Inspect repository semantics before editing

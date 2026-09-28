@@ -24,6 +24,7 @@ namespace Dapper.FluentMap.Tests
             Assert.Empty(configuration.ProfileMaps);
             Assert.Empty(configuration.TypeConventions);
             Assert.Empty(configuration.GeneratedMaterializers);
+            Assert.False(configuration.StrictGeneratedMaterialization);
             Assert.Same(configuration, builder.Build());
         }
 
@@ -152,6 +153,17 @@ namespace Dapper.FluentMap.Tests
             Assert.Null(materializer.ProfileType);
             Assert.Equal("generated_id", column.ColumnName);
             Assert.Equal(nameof(GeneratedSnapshotEntity.Id), column.MemberPath);
+        }
+
+        [Fact]
+        public void BuildShouldCaptureStrictGeneratedMaterialization()
+        {
+            var configuration = new FluentMapConfigurationBuilder()
+                .UseStrictGeneratedMaterialization()
+                .Build();
+
+            Assert.True(configuration.StrictGeneratedMaterialization);
+            Assert.True(configuration.CreateRuntime().StrictGeneratedMaterialization);
         }
 
         [Fact]

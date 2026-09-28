@@ -30,7 +30,7 @@ Implement a defined issue end to end without expanding scope, while preserving D
 
 # Dapper-FluentMap Constraints
 
-- The default branch is `master`; do not implement on `master`.
+- The default branch is `main`; do not implement on `main`.
 - Treat this as a public multi-package .NET library, not an application.
 - Do not assume project name, assembly name, namespace, path, and NuGet `PackageId` are the same identity.
 - Preserve `netstandard2.0` for public packages unless the issue explicitly changes compatibility.

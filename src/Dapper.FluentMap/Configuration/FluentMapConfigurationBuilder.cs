@@ -25,6 +25,7 @@ namespace Dapper.FluentMap.Configuration
         private readonly MappingRegistry _registry;
         private readonly FluentMapConfiguration _configuration;
         private ImmutableFluentMapConfiguration _builtConfiguration;
+        private bool _strictGeneratedMaterialization;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="FluentMapConfigurationBuilder"/> class.
@@ -148,6 +149,18 @@ namespace Dapper.FluentMap.Configuration
         }
 
         /// <summary>
+        /// Requires FluentMap-controlled query APIs on the created runtime to use registered generated
+        /// materializers and fail deterministically instead of falling back to runtime reflection.
+        /// </summary>
+        /// <returns>The current builder.</returns>
+        public FluentMapConfigurationBuilder UseStrictGeneratedMaterialization()
+        {
+            EnsureNotBuilt();
+            _strictGeneratedMaterialization = true;
+            return this;
+        }
+
+        /// <summary>
         /// Finds exported entity map types in the specified assembly and adds them to the configuration.
         /// </summary>
         /// <param name="assembly">The assembly to scan for entity maps.</param>
@@ -232,7 +245,7 @@ namespace Dapper.FluentMap.Configuration
             }
 
             _registry.ValidateConfiguration();
-            _builtConfiguration = ImmutableFluentMapConfiguration.Create(_registry);
+            _builtConfiguration = ImmutableFluentMapConfiguration.Create(_registry, _strictGeneratedMaterialization);
             return _builtConfiguration;
         }
 
