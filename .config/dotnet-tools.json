@@ -17,7 +17,7 @@
       "rollForward": false
     },
     "rodrioliveira.adrguard": {
-      "version": "0.1.11",
+      "version": "0.1.12",
       "commands": [
         "adr-guard"
       ],
