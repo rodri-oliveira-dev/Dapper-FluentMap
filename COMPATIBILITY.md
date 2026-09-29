@@ -120,7 +120,7 @@ The fork preserves the main historical source-compatible API surface where possi
 
 The fork also adds public APIs for profiles, naming policies, generated materializers, persistence metadata, property converters, query helpers, immutable configuration, isolated runtime and DI.
 
-The fork-owned 3.0 line has published stable packages through 3.0.3. Public compatibility remains governed by SemVer and the package/API boundaries listed above.
+The maintained 3.x line follows Semantic Versioning. See the GitHub releases page for the current stable version. Public compatibility remains governed by SemVer and the package/API boundaries listed above.
 
 ## Unsupported Environments Or Claims
 
