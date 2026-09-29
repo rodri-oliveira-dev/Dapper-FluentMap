@@ -29,7 +29,7 @@ Se você já usava FluentMap e está retornando ao projeto, os pontos mais impor
 - a maioria dos mappings raiz existentes não deve exigir mudanças de código;
 - a maior parte dos recursos da 3.0 é opt-in, então não é necessário reescrever mappings que já funcionam apenas porque existem APIs novas.
 
-Consulte [MIGRATION.md](MIGRATION.md) para o caminho recomendado de migração da 2.x para a 3.0 e para as diferenças de comportamento que merecem revisão.
+Consulte [MIGRATION.pt-BR.md](MIGRATION.pt-BR.md) para o caminho recomendado de migração da 2.x para a 3.x e para as diferenças de comportamento que merecem revisão.
 
 ## O que há de novo na 3.0
 
@@ -487,7 +487,7 @@ Resumo:
 - MySQL 8.4.11 e MariaDB 11.8.9 são certificados por lanes obrigatórias de CI com bancos reais usando `MySqlConnector` 2.6.2;
 - SQL Server CE permanece legado/limitado por upstream.
 
-Para migrar do FluentMap 2.x, consulte [MIGRATION.md](MIGRATION.md).
+Para migrar do FluentMap 2.x, consulte [MIGRATION.pt-BR.md](MIGRATION.pt-BR.md).
 
 ## Limitações Atuais
 
@@ -505,7 +505,7 @@ Para migrar do FluentMap 2.x, consulte [MIGRATION.md](MIGRATION.md).
 
 ## Mais Documentação
 
-- [Migração da 2.x](MIGRATION.md)
+- [Migração da 2.x para 3.x](MIGRATION.pt-BR.md)
 - [Compatibilidade](COMPATIBILITY.md)
 - [Suporte](SUPPORT.md)
 - [Changelog](CHANGELOG.md)
