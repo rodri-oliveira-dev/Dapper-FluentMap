@@ -44,7 +44,7 @@ jobs:
         run: dotnet tool restore
 
       - name: Install configuration validator
-        run: python3 -m pip install --disable-pip-version-check check-jsonschema==0.38.0
+        run: 'python3 -m pip install --disable-pip-version-check --only-binary=:all: check-jsonschema==0.38.0'
 
       - name: Validate GitHub workflows
         run: check-jsonschema --builtin-schema vendor.github-workflows .github/workflows/*.yml
@@ -513,8 +513,8 @@ jobs:
           /d:sonar.host.url="https://sonarcloud.io"
           /d:sonar.projectBaseDir="${GITHUB_WORKSPACE}"
           /d:sonar.cs.vscoveragexml.reportsPaths="artifacts/coverage/sonar/coverage.xml"
-          /d:sonar.exclusions="test/**,benchmarks/**,eng/consumer-smoke/**,**/bin/**,**/obj/**,**/*.g.cs,**/*.generated.cs"
-          /d:sonar.coverage.exclusions="test/**,benchmarks/**,eng/consumer-smoke/**,**/*.g.cs,**/*.generated.cs"
+          /d:sonar.exclusions="test/**,benchmarks/**,eng/**,**/bin/**,**/obj/**,**/*.g.cs,**/*.generated.cs"
+          /d:sonar.coverage.exclusions="test/**,benchmarks/**,eng/**,**/*.g.cs,**/*.generated.cs"
           /d:sonar.qualitygate.wait="${SONAR_QUALITY_GATE_WAIT}"
           /d:sonar.qualitygate.timeout=300
 
