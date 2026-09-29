@@ -462,6 +462,7 @@ jobs:
     if: ${{ vars.SONAR_CI_ENABLED == 'true' && ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch') }}
     permissions:
       contents: read
+      id-token: write
       issues: write
       pull-requests: write
 
@@ -568,6 +569,14 @@ jobs:
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: dotnet sonarscanner end /d:sonar.token="${SONAR_TOKEN}"
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
+        with:
+          files: ./artifacts/coverage/sonar/coverage.xml
+          disable_search: true
+          fail_ci_if_error: true
+          use_oidc: true
 
       - name: Report Sonar quality gate conditions
         id: sonar_quality_gate
