@@ -1,9 +1,12 @@
 # FluentMap
 
 [![CI](https://github.com/rodri-oliveira-dev/Dapper-FluentMap/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rodri-oliveira-dev/Dapper-FluentMap/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/rodri-oliveira-dev/Dapper-FluentMap/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/rodri-oliveira-dev/Dapper-FluentMap/actions/workflows/codeql.yml)
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=rodri-oliveira-dev_Dapper-FluentMap&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=rodri-oliveira-dev_Dapper-FluentMap)
-[![.NET Standard 2.0](https://img.shields.io/badge/.NET%20Standard-2.0-512BD4?logo=dotnet&logoColor=white)](https://learn.microsoft.com/dotnet/standard/net-standard)
 [![Coverage](https://sonarcloud.io/api/project_badges/measure?project=rodri-oliveira-dev_Dapper-FluentMap&metric=coverage)](https://sonarcloud.io/summary/new_code?id=rodri-oliveira-dev_Dapper-FluentMap)
+[![codecov](https://codecov.io/github/rodri-oliveira-dev/Dapper-FluentMap/branch/main/graph/badge.svg)](https://codecov.io/github/rodri-oliveira-dev/Dapper-FluentMap)
+[![NuGet](https://img.shields.io/nuget/v/Dapper.FluentMap?logo=nuget)](https://www.nuget.org/packages/Dapper.FluentMap)
+[![.NET Standard 2.0](https://img.shields.io/badge/.NET%20Standard-2.0-512BD4?logo=dotnet&logoColor=white)](https://learn.microsoft.com/dotnet/standard/net-standard)
 [![License: MIT](https://img.shields.io/github/license/rodri-oliveira-dev/Dapper-FluentMap)](LICENSE)
 [![GitHub stars](https://img.shields.io/github/stars/rodri-oliveira-dev/Dapper-FluentMap?style=flat&logo=github)](https://github.com/rodri-oliveira-dev/Dapper-FluentMap/stargazers)
 
@@ -11,65 +14,43 @@
 
 FluentMap é uma camada avançada de mapeamento para Dapper. Ela permite descrever, com uma API fluente e fortemente tipada, como propriedades .NET se conectam a colunas de banco de dados, mantendo atributos de persistência fora dos POCOs.
 
-FluentMap não é um ORM. Ele não faz tracking de entidades, não gera SQL arbitrário, não gerencia conexões, não executa migrations, não oferece LINQ e não substitui o Dapper. Use FluentMap quando o mapeamento padrão por nome do Dapper não for suficiente e as regras de mapeamento precisarem ficar fora do modelo.
+FluentMap não é um ORM. Ele não faz tracking de entidades, não gera SQL arbitrário, não gerencia conexões, não executa migrations, não oferece LINQ e não substitui o Dapper.
 
 ## Estado do Projeto
 
-Dapper.FluentMap está sendo modernizado e mantido ativamente novamente. A versão 3.0 continua a história do projeto original, preservando o modelo central de mapeamento do FluentMap e seu caminho de compatibilidade.
+Dapper.FluentMap é mantido ativamente. A linha 3.x atual continua a história do projeto original, preservando o modelo histórico de mapping e adicionando recursos mais novos de forma opt-in.
 
-A linha 3.0 moderniza a biblioteca e adiciona novos recursos opt-in sem transformar FluentMap em um ORM e sem exigir que aplicações existentes adotem as novas APIs.
+Mappings existentes com `EntityMap<T>` e `FluentMapper.Initialize(...)` continuam sendo a base de compatibilidade. Aplicações que usam mappings raiz normais do Dapper geralmente não precisam reescrever maps que já funcionam ao migrar da 2.x.
 
-## Voltando do FluentMap 2.x?
+Consulte [MIGRATION.pt-BR.md](MIGRATION.pt-BR.md) ao migrar do FluentMap 2.x.
 
-Se você já usava FluentMap e está retornando ao projeto, os pontos mais importantes de compatibilidade são:
+## Principais Recursos
 
-- mappings existentes com `EntityMap<T>` continuam suportados;
-- `FluentMapper.Initialize(...)` continua suportado;
-- chamadas normais de `Dapper.Query<T>()` continuam funcionando com mappings raiz instalados pela API estática histórica;
-- a maioria dos mappings raiz existentes não deve exigir mudanças de código;
-- a maior parte dos recursos da 3.0 é opt-in, então não é necessário reescrever mappings que já funcionam apenas porque existem APIs novas.
+| Recurso | API principal |
+| --- | --- |
+| Mapping explícito de propriedade para coluna | `EntityMap<T>`, `Map(...).ToColumn(...)` |
+| Convenções e naming policies | `AddConvention(...)`, `UseNamingPolicy(...)` |
+| Constructor mapping imutável | bridge histórico de type map do Dapper |
+| Objetos aninhados e value objects por componentes | `QueryMapped*` |
+| Formatos SQL alternativos | mapping profiles |
+| Multi-mapping de dois tipos | `QueryMapped<TFirst,TSecond,TReturn>(...)` |
+| Múltiplos result sets | `QueryMultipleMapped*`, `ReadMapped*` |
+| Streaming síncrono/assíncrono | `QueryMappedUnbuffered*` |
+| Conversão por propriedade | property converters |
+| Registro/materialização gerados | `AddGeneratedMappings()` |
+| Caminho gerado estrito | `UseStrictGeneratedMaterialization()`, `QueryGeneratedMapped*` |
+| Configuração isolada | `FluentMapRuntime` |
+| Dependency Injection | `AddFluentMap(...)` |
+| Metadata de persistência Dommel | `Dapper.FluentMap.Dommel` |
+| Diagnósticos em compilação | `FluentMap.Analyzers` |
 
-Consulte [MIGRATION.md](MIGRATION.md) para o caminho recomendado de migração da 2.x para a 3.0 e para as diferenças de comportamento que merecem revisão.
-
-## O que há de novo na 3.0
-
-FluentMap 3.0 moderniza o projeto original sem mudar sua finalidade principal. Além da API fluente histórica, a linha 3.0 adiciona suporte opt-in para:
-
-- melhorias no constructor mapping de tipos imutáveis;
-- materialização de objetos aninhados e value objects;
-- mapping profiles para formatos SQL alternativos;
-- `QueryMultiple` mapeado, leituras unbuffered e streaming assíncrono;
-- metadata de conversão de propriedades e diagnósticos;
-- registro gerado de mappings e materializadores suportados;
-- analyzers Roslyn para diagnósticos de mapping;
-- configuração imutável isolada e dependency injection;
-- metadata de persistência mais rica consumida pela integração Dommel;
-- registro e diagnósticos conscientes de trimming/AOT;
-- testes modernos de compatibilidade, harnesses de providers, benchmarks, CI e validação de pacotes.
-
-Mappings existentes continuam sendo a base de compatibilidade. Adote as APIs novas apenas quando elas resolverem um problema concreto.
-
-## Posicionamento
-
-Use FluentMap para:
-
-- mappings explícitos entre propriedades e colunas;
-- convenções e políticas de nomenclatura;
-- propriedades ignoradas;
-- constructor mapping para tipos imutáveis;
-- materialização opt-in de objetos aninhados e value objects;
-- profiles para formatos SQL alternativos;
-- registro e materialização gerados quando suportados;
-- metadata de persistência consumida por integrações como Dommel;
-- configuração isolada e DI para materialização controlada pelo FluentMap.
-
-Não use FluentMap como ORM, framework CRUD, query builder, unit of work ou abstração de banco.
+Exemplos detalhados estão em [USAGE.pt-BR.md](USAGE.pt-BR.md).
 
 ## Instalação
 
-Instale o pacote que corresponde ao recurso necessário:
+Instale somente os pacotes necessários para a aplicação:
 
-| Finalidade do pacote | NuGet PackageId |
+| Finalidade | NuGet PackageId |
 | --- | --- |
 | Core | `Dapper.FluentMap` |
 | Integração Dommel | `Dapper.FluentMap.Dommel` |
@@ -77,17 +58,15 @@ Instale o pacote que corresponde ao recurso necessário:
 | Analyzers Roslyn | `FluentMap.Analyzers` |
 | Source generators | `FluentMap.Generators` |
 
+Pacote principal:
+
 ```bash
 dotnet add package Dapper.FluentMap
-dotnet add package Dapper.FluentMap.Dommel
-dotnet add package FluentMap.DependencyInjection
-dotnet add package FluentMap.Analyzers
-dotnet add package FluentMap.Generators
 ```
 
-Os PackageIds `FluentMap.*` são apenas identidades de distribuição. Eles não renomeiam assemblies, namespaces C# ou APIs públicas existentes.
+Os PackageIds `FluentMap.*` são apenas identidades de distribuição. Assemblies, namespaces e APIs públicas continuam sob `Dapper.FluentMap.*`.
 
-Os pacotes públicos targetam `netstandard2.0`. Consulte [COMPATIBILITY.md](COMPATIBILITY.md) antes de adotar uma nova release.
+Os pacotes públicos targetam `netstandard2.0`. Faixas suportadas de dependências e providers certificados estão documentados em [COMPATIBILITY.md](COMPATIBILITY.md).
 
 ## Início Rápido
 
@@ -107,6 +86,7 @@ public sealed class CustomerMap : EntityMap<Customer>
     public CustomerMap()
     {
         Map(customer => customer.Id).ToColumn("customer_id");
+        Map(customer => customer.Name).ToColumn("customer_name");
     }
 }
 
@@ -116,412 +96,83 @@ FluentMapper.Initialize(config =>
 });
 
 var customer = connection.QuerySingle<Customer>(
-    "SELECT 7 AS customer_id, 'Ada' AS Name;");
+    "SELECT 7 AS customer_id, 'Ada' AS customer_name;");
 ```
 
-Chame `FluentMapper.Initialize(...)` no startup e trate a configuração global efetiva como somente leitura depois que as queries começarem.
+Chame `FluentMapper.Initialize(...)` durante o startup da aplicação e trate a configuração global efetiva como somente leitura depois que as queries começarem.
 
-## Mapeamento
-
-Crie maps herdando de `EntityMap<TEntity>`:
+Para validar a configuração:
 
 ```csharp
-public sealed class ProductMap : EntityMap<Product>
-{
-    public ProductMap()
-    {
-        Map(product => product.Id).ToColumn("product_id");
-        Map(product => product.Name).ToColumn("product_name", caseSensitive: false);
-        Map(product => product.TransientValue).Ignore();
-    }
-}
+FluentMapper.Validate();
 ```
 
-Mappings explícitos têm precedência sobre convenções. Membros raiz não mapeados usam o comportamento normal do Dapper.
+## Uso Avançado
 
-Convenções e políticas de nomenclatura cobrem padrões repetidos:
+Use as APIs de query controladas pelo FluentMap quando o mapping precisar de comportamento além do type map histórico no nível raiz do Dapper.
 
-```csharp
-using Dapper.FluentMap.Conventions;
-using Dapper.FluentMap.Naming;
+Isso inclui:
 
-public sealed class PrefixConvention : Convention
-{
-    public PrefixConvention()
-    {
-        Properties().Configure(property => property.HasPrefix("col"));
-    }
-}
+- objetos aninhados e value objects por componentes;
+- profiles;
+- multi-mapping de dois tipos com `splitOn`;
+- múltiplos result sets mapeados;
+- streaming síncrono/assíncrono;
+- property converters;
+- materialização gerada e gerada estrita;
+- runtimes isolados e DI;
+- metadata de persistência Dommel.
 
-FluentMapper.Initialize(config =>
-{
-    config.AddConvention<PrefixConvention>().ForEntity<Customer>();
-    config.UseNamingPolicy(NamingPolicy.SnakeCase, caseSensitive: false)
-        .ForEntity<Order>();
-});
-```
+Consulte [USAGE.pt-BR.md](USAGE.pt-BR.md) para exemplos completos e orientação de API.
 
-As políticas disponíveis incluem `Identity`, `SnakeCase`, `Prefix(...)`, `Suffix(...)`, `Custom(...)`, `Then(...)`, `WithPrefix(...)` e `WithSuffix(...)`.
+## Migrando da 2.x
 
-## Tipos Imutáveis
+A linha 3.x preserva o principal caminho histórico de mapping compatível em código-fonte.
 
-FluentMap participa do constructor mapping do Dapper para mappings explícitos no nível raiz:
+Se a aplicação usa `EntityMap<T>`, `FluentMapper.Initialize(...)` e chamadas normais de `Dapper.Query<T>()` para mappings raiz, a migração normalmente consiste em atualizar os pacotes, validar a configuração e executar os testes da aplicação.
 
-```csharp
-public sealed class Customer
-{
-    public Customer(int id, string fullName)
-    {
-        Id = id;
-        FullName = fullName;
-    }
+Consulte [MIGRATION.pt-BR.md](MIGRATION.pt-BR.md) para:
 
-    public int Id { get; }
-    public string FullName { get; }
-}
-
-public sealed class CustomerMap : EntityMap<Customer>
-{
-    public CustomerMap()
-    {
-        Map(customer => customer.Id).ToColumn("customer_id");
-        Map(customer => customer.FullName).ToColumn("full_name");
-    }
-}
-```
-
-Use `QueryMapped*` quando o FluentMap precisar construir objetos aninhados imutáveis ou value objects.
-
-## Objetos Aninhados
-
-Caminhos aninhados usam a mesma API `Map(...)`:
-
-```csharp
-public sealed class CustomerMap : EntityMap<Customer>
-{
-    public CustomerMap()
-    {
-        Map(customer => customer.Id).ToColumn("customer_id");
-        Map(customer => customer.Address.City).ToColumn("city");
-    }
-}
-
-var customer = connection.QueryMappedSingle<Customer>(
-    "SELECT 7 AS customer_id, 'Sao Paulo' AS city;");
-```
-
-Materialização aninhada é opt-in via `QueryMapped*`, `ReadMapped*`, `QueryMultipleMapped` e helpers de streaming. `Dapper.Query<T>()` normal continua usando materialização raiz do Dapper.
-
-## Value Objects
-
-Para value objects escalares mapeados como um único valor de banco, prefira um `TypeHandler<T>` do Dapper:
-
-```csharp
-Map(customer => customer.Cpf).ToColumn("cpf");
-```
-
-Para value objects mapeados por componentes, a materialização controlada pelo FluentMap pode chamar construtores públicos compatíveis:
-
-```csharp
-public sealed class CustomerMap : EntityMap<Customer>
-{
-    public CustomerMap()
-    {
-        Map(customer => customer.Id).ToColumn("customer_id");
-        Map(customer => customer.Cpf.Number).ToColumn("cpf");
-    }
-}
-
-var customer = connection.QueryMappedSingle<Customer>(
-    "SELECT 1 AS customer_id, '12345678909' AS cpf;");
-```
-
-Factory methods não são usadas pelo materializador atual.
-
-## Profiles
-
-Profiles são mappings opt-in para a mesma entidade em formatos SQL diferentes:
-
-```csharp
-using Dapper.FluentMap.Mapping;
-
-public sealed class LegacyProfile : IMappingProfile
-{
-}
-
-public sealed class LegacyCustomerMap :
-    EntityMap<Customer>,
-    IProfileMap<LegacyProfile>
-{
-    public LegacyCustomerMap()
-    {
-        Map(customer => customer.Id).ToColumn("id");
-        Map(customer => customer.Name).ToColumn("legal_name");
-    }
-}
-
-FluentMapper.Initialize(config =>
-{
-    config.AddMap<CustomerMap>();
-    config.AddProfile<LegacyCustomerMap>();
-});
-
-var legacy = connection.QueryMappedSingle<Customer, LegacyProfile>(
-    "SELECT 7 AS id, 'Legacy Ltd.' AS legal_name;");
-```
-
-Profiles são selecionados por query controlada pelo FluentMap. Eles não substituem o type map global do Dapper para a entidade.
-
-## Materialização Gerada
-
-Instale `FluentMap.Generators` para registro gerado de maps da compilação atual:
-
-```bash
-dotnet add package FluentMap.Generators
-```
-
-Depois chame a extensão gerada:
-
-```csharp
-FluentMapper.Initialize(config =>
-{
-    config.AddGeneratedMappings();
-});
-```
-
-O generator emite chamadas `AddMap<TMap>()` e `AddProfile<TMap>()` para maps elegíveis. Para mappings explícitos suportados, ele também pode registrar materializadores de linha gerados para o shape ordenado de colunas, incluindo propriedades simples, caminhos aninhados, value objects construídos por construtor e read converters suportados estaticamente.
-
-Materialização gerada é otimização. Maps não suportados, shapes dinâmicos, divergências de shape, converters por instância/delegate e alguns padrões avançados usam fallback runtime.
-
-## Semântica de Persistência
-
-Metadata de persistência descreve participação em escrita sem mudar materialização de leitura:
-
-```csharp
-Map(product => product.CreatedAt)
-    .ToColumn("created_at")
-    .DatabaseDefaultOnInsert();
-
-Map(product => product.UpdatedAt)
-    .ToColumn("updated_at")
-    .ReadOnly();
-
-Map(product => product.Total)
-    .ToColumn("total")
-    .Computed();
-```
-
-`Ignore()` mantém o significado histórico: a propriedade não é materializada pelo FluentMap e não participa da metadata de persistência gerada. Para valores de banco que ainda devem ser selecionados, mas não escritos, use `ReadOnly()`, `Computed()`, `DatabaseDefaultOnInsert()`, `ExcludeFromInsert()` ou `ExcludeFromUpdate()`.
-
-O pacote core armazena metadata. Dommel é o pacote atual que a consome para comportamento de `INSERT` e `UPDATE` gerados.
-
-## QueryMultiple / Streaming
-
-Use os helpers de query do FluentMap quando a materialização precisa honrar nested mappings, value objects, profiles, converters ou materializers gerados:
-
-```csharp
-var customers = connection.QueryMapped<Customer>(sql);
-var customer = connection.QueryMappedSingle<Customer>(sql);
-var legacy = connection.QueryMappedSingle<Customer, LegacyProfile>(legacySql);
-```
-
-Para linhas de JOIN com duas entidades, use `splitOn` explícito e um delegate de composição:
-
-```csharp
-var rows = connection.QueryMapped<Customer, Order, CustomerOrder>(
-    sql,
-    (customer, order) => new CustomerOrder(customer, order),
-    splitOn: "order_id");
-```
-
-Cada segmento é materializado com seu próprio mapping FluentMap. Quando os perfis diferirem por segmento, use a sobrecarga de profiles, por exemplo `QueryMapped<Customer, Order, CustomerOrder, CustomerProfile, OrderProfile>(...)`. Se todas as colunas do segundo segmento forem `NULL`, o segundo argumento será `null`, cobrindo a semântica comum de ausência de filho em `LEFT JOIN`.
-
-Para múltiplos result sets:
-
-```csharp
-using var multi = connection.QueryMultipleMapped(sql);
-
-var customers = multi.ReadMapped<Customer>();
-var orders = multi.ReadMapped<Order>();
-```
-
-`ReadMapped*` consome result sets em sequência e bufferiza o result set atual. Leituras concorrentes no mesmo `MappedGridReader` não são suportadas; uma leitura concorrente falha deterministicamente com `InvalidOperationException`. Chamadores assíncronos podem usar as APIs async correspondentes:
-
-```csharp
-await using var multi = await connection.QueryMultipleMappedAsync(
-    sql,
-    cancellationToken: cancellationToken);
-
-var customers = await multi.ReadMappedAsync<Customer>(cancellationToken);
-var orders = await multi.ReadMappedAsync<Order>(cancellationToken);
-```
-
-Para processamento incremental:
-
-```csharp
-foreach (var customer in connection.QueryMappedUnbuffered<Customer>(sql))
-{
-    Process(customer);
-}
-```
-
-Streaming assíncrono está disponível em `DbConnection`:
-
-```csharp
-await foreach (var customer in connection.QueryMappedUnbufferedAsync<Customer>(
-    sql,
-    cancellationToken))
-{
-    await ProcessAsync(customer, cancellationToken);
-}
-```
-
-Streaming mantém o reader subjacente aberto até a enumeração terminar ou o enumerator ser descartado.
-
-## Conversores de Propriedade
-
-Conversores de propriedade são configurados por propriedade mapeada e executam somente na materialização controlada pelo FluentMap:
-
-```csharp
-public sealed class ProductMap : EntityMap<Product>
-{
-    public ProductMap()
-    {
-        Map(product => product.Status)
-            .ToColumn("status_code")
-            .ConvertFromDatabaseUsing<ProductStatusConverter, string>();
-    }
-}
-
-public sealed class ProductStatusConverter :
-    IReadPropertyConverter<string, ProductStatus>
-{
-    public ProductStatus ConvertFromDatabase(string value)
-    {
-        return value == "A" ? ProductStatus.Active : ProductStatus.Inactive;
-    }
-}
-```
-
-A precedência de conversão de leitura na materialização controlada pelo FluentMap é:
-
-```text
-tratamento de null/DBNull
-    -> read converter da propriedade
-    -> Dapper TypeHandler<TProperty>
-    -> conversão default do FluentMap
-```
-
-Metadata de write converter pode ser configurada, mas não é executada atualmente por escritas Dapper ou Dommel.
-
-## Configuração Isolada / DI
-
-A API estática histórica continua suportada:
-
-```csharp
-FluentMapper.Initialize(config =>
-{
-    config.AddMap<CustomerMap>();
-});
-```
-
-Para múltiplas configurações controladas pelo FluentMap no mesmo processo, crie configurações imutáveis e use seus runtimes:
-
-```csharp
-using Dapper.FluentMap.Configuration;
-
-var runtime = new FluentMapConfigurationBuilder()
-    .AddMap<CustomerMap>()
-    .Build()
-    .CreateRuntime();
-
-var customer = runtime.QueryMappedSingle<Customer>(
-    connection,
-    "SELECT 7 AS customer_id, 'Ada' AS Name;");
-```
-
-Instale `FluentMap.DependencyInjection` para registro em DI:
-
-```bash
-dotnet add package FluentMap.DependencyInjection
-```
-
-```csharp
-using Microsoft.Extensions.DependencyInjection;
-
-services.AddFluentMap(builder =>
-{
-    builder.AddMap<CustomerMap>();
-    builder.Configure(config => config.AddGeneratedMappings());
-});
-```
-
-O pacote de DI registra `ImmutableFluentMapConfiguration` e `FluentMapRuntime` como singletons. Ele não registra conexões de banco, repositories, bridges Dommel ou type maps globais do Dapper.
-
-## AOT / Trimming
-
-FluentMap tem prontidão parcial para trimming/AOT, não compatibilidade Native AOT completa:
-
-| Área | Status |
-| --- | --- |
-| Registro explícito com `AddMap<TMap>()` | Preferencial para cenários com trimming e Native AOT. |
-| Registro gerado com `AddGeneratedMappings()` | Alternativa preferencial ao assembly scanning para maps da compilação atual. |
-| `UseStrictGeneratedMaterialization()` com `QueryGeneratedMapped*` | Caminho exclusivamente gerado, para comandos sem parâmetros, validado pelo smoke Native AOT; shapes não suportados falham deterministicamente em vez de usar fallback runtime. |
-| Assembly scanning | Baseado em reflection e anotado como sensível a trimming. |
-| `QueryMapped*`, `ReadMapped*`, `QueryMultipleMapped`, streaming | Anotados como sensíveis a trimming/dynamic code porque fallback runtime pode ocorrer. |
-
-Não trate o pacote como totalmente seguro para Native AOT sem validar o caminho de query e o modo de publicação exatos da sua aplicação.
+- o caminho mínimo de migração;
+- os pré-requisitos de Dapper e Dommel;
+- a revisão de persistência envolvendo `Ignore()`/Dommel;
+- decisões de migração por cenário;
+- o checklist final.
 
 ## Compatibilidade
 
-A documentação atual de compatibilidade está em [COMPATIBILITY.md](COMPATIBILITY.md).
+As afirmações de compatibilidade ficam intencionalmente fora do README para poderem evoluir sem duplicar informações sensíveis a cada release.
 
-Resumo:
+Consulte [COMPATIBILITY.md](COMPATIBILITY.md) para:
 
-- pacotes públicos targetam `netstandard2.0`;
-- testes rodam atualmente em `net10.0`;
-- a faixa de Dapper é `[2.1.79,3.0.0)`, com `2.1.79` validado na matriz atual;
-- a faixa de Dommel é `[3.5.3,4.0.0)` no pacote opcional Dommel;
-- SQLite é validado por testes automatizados de provider;
-- SQL Server 2022 CU23 e PostgreSQL 18.6 são certificados por lanes obrigatórias de CI com bancos reais usando `Microsoft.Data.SqlClient` 7.1.0 e `Npgsql` 10.0.3;
-- MySQL 8.4.11 e MariaDB 11.8.9 são certificados por lanes obrigatórias de CI com bancos reais usando `MySqlConnector` 2.6.2;
-- SQL Server CE permanece legado/limitado por upstream.
+- faixas suportadas de Dapper e Dommel;
+- certificação de providers;
+- limites de trimming e Native AOT;
+- limitações de estado global;
+- ambientes não suportados e fronteiras de API.
 
-Para migrar do FluentMap 2.x, consulte [MIGRATION.md](MIGRATION.md).
+## Documentação
 
-## Limitações Atuais
-
-- `FluentMapper.Initialize(...)`, `Dapper.Query<T>()` normal e integrações Dommel usam estado global process-wide.
-- Runtimes isolados se aplicam à materialização controlada pelo FluentMap, não a queries Dapper normais nem Dommel.
-- Dommel usa resolvers/builders globais do `DommelMapper`.
-- `QueryMultipleMapped` e `QueryMultipleMappedAsync` são sequenciais e bufferizados por result set.
-- `QueryMapped<TFirst,TSecond,TReturn>` suporta split de uma linha em dois tipos com `splitOn`; ele não agrega linhas em grafos um-para-muitos.
-- FluentMap não agrega linhas de joins em grafos e não mantém identity map.
-- Write converters são apenas metadata no caminho atual de escrita Dapper/Dommel.
-- Materializers gerados suportam shapes exatos e permutações seguras de colunas distintas; shapes com colunas ausentes, adicionais ou duplicadas usam fallback, exceto no modo gerado estrito.
-- O subconjunto `QueryGeneratedMapped*` certificado em Native AOT aceita comandos sem parâmetros; objetos de parâmetros dinâmicos permanecem fora desse contrato estrito.
-- Assembly scanning e fallback runtime são sensíveis a trimming/AOT.
-- Construção de value objects usa construtores públicos compatíveis, não factory methods.
-
-## Mais Documentação
-
-- [Migração da 2.x](MIGRATION.md)
+- [Guia de uso](USAGE.pt-BR.md)
+- [Migração da 2.x](MIGRATION.pt-BR.md)
 - [Compatibilidade](COMPATIBILITY.md)
-- [Suporte](SUPPORT.md)
 - [Changelog](CHANGELOG.md)
+- [Suporte](SUPPORT.md)
 - [English](README.md)
 
 ## Contribuição
 
-Mantenha mudanças pequenas, compatíveis com a API pública e cobertas por testes focados. `Dapper.FluentMap.slnx` é a solução preferencial para SDKs .NET atuais; `Dapper.FluentMap.sln` permanece disponível como fallback de compatibilidade. Validação local típica:
+Mantenha mudanças pequenas, compatíveis com a API pública e cobertas por testes focados. `Dapper.FluentMap.slnx` é a solução preferencial para SDKs .NET atuais; `Dapper.FluentMap.sln` permanece disponível como fallback de compatibilidade.
 
-Quando habilitado, SonarQube Cloud faz parte do quality gate da CI, com resultados publicados no [dashboard do projeto](https://sonarcloud.io/summary/new_code?id=rodri-oliveira-dev_Dapper-FluentMap). A análise autorizada do SonarQube exige a variável de repositório `SONAR_CI_ENABLED=true`, o secret de repositório `SONAR_TOKEN` e o projeto configurado para análise via CI.
+Validação local típica:
 
 ```bash
 dotnet restore ./Dapper.FluentMap.slnx
 dotnet build ./Dapper.FluentMap.slnx --configuration Release --no-restore
 dotnet test ./Dapper.FluentMap.slnx --configuration Release --no-build
 ```
+
+Quando habilitado, SonarQube Cloud participa do quality gate da CI. A configuração específica do repositório fica intencionalmente fora deste README.
 
 ## Licença
 
