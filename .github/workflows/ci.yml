@@ -44,7 +44,7 @@ jobs:
         run: dotnet tool restore
 
       - name: Install configuration validator
-        run: python3 -m pip install --disable-pip-version-check --only-binary=:all: check-jsonschema==0.38.0
+        run: 'python3 -m pip install --disable-pip-version-check --only-binary=:all: check-jsonschema==0.38.0'
 
       - name: Validate GitHub workflows
         run: check-jsonschema --builtin-schema vendor.github-workflows .github/workflows/*.yml
