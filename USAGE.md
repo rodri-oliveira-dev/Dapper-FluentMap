@@ -186,7 +186,6 @@ Use `QueryMapped*` when materialization must honor nested mappings, value object
 ```csharp
 var customers = connection.QueryMapped<Customer>(sql);
 var customer = connection.QueryMappedSingle<Customer>(sql);
-var optional = connection.QueryMappedSingleOrDefault<Customer>(sql);
 var legacy = connection.QueryMappedSingle<Customer, LegacyProfile>(legacySql);
 ```
 
