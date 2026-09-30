@@ -185,7 +185,7 @@ The repository currently publishes multiple NuGet packages:
 - `FluentMap.Analyzers`
 - `FluentMap.Generators`
 
-`eng/package-catalog.json` is the package identity catalog and separates project identity from NuGet `PackageId`. `Directory.Build.props` defines shared package metadata and `FluentMapPackageVersionPrefix` (currently `3.4.0`) with a local/dev suffix when no explicit version is supplied. The repository currently uses explicit `PackageReference` versions rather than Central Package Management. `Directory.Build.targets` blocks unsafe historical package versions. Release behavior lives in the actual workflows under `.github/workflows/`; inspect them before changing or documenting release behavior.
+`eng/package-catalog.json` is the package identity catalog and separates project identity from NuGet `PackageId`. `Directory.Build.props` defines shared package metadata and `FluentMapPackageVersionPrefix` (currently `3.5.0`) with a local/dev suffix when no explicit version is supplied. The repository currently uses explicit `PackageReference` versions rather than Central Package Management. `Directory.Build.targets` blocks unsafe historical package versions. Release behavior lives in the actual workflows under `.github/workflows/`; inspect them before changing or documenting release behavior.
 
 NuGet.org publishing uses OIDC Trusted Publishing through `NuGet/login`, a protected `release` environment, and job-scoped `id-token: write`. Preserve this model; do not introduce a long-lived NuGet API key as a shortcut.
 
