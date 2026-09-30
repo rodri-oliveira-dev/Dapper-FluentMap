@@ -9,11 +9,11 @@ namespace Dapper.FluentMap.Materialization
     {
         private GeneratedMaterializerColumn(
             string columnName,
-            string memberPath,
+            string? memberPath,
             bool ignored,
-            Type readConverterType,
-            Type readConverterDatabaseType,
-            Type readConverterPropertyType)
+            Type? readConverterType,
+            Type? readConverterDatabaseType,
+            Type? readConverterPropertyType)
         {
             if (string.IsNullOrWhiteSpace(columnName))
             {

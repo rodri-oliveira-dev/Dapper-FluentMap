@@ -34,7 +34,7 @@ namespace Dapper.FluentMap.Materialization
         /// <param name="columns">The ordered column shape and member bindings expected by the materializer.</param>
         /// <param name="materializer">The generated row materializer.</param>
         public GeneratedMaterializerDescriptor(
-            Type profileType,
+            Type? profileType,
             IEnumerable<GeneratedMaterializerColumn> columns,
             GeneratedRowMaterializer<TEntity> materializer)
         {
