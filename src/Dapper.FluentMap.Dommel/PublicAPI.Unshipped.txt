@@ -1,6 +1,1 @@
 #nullable enable
-Dapper.FluentMap.Dommel.DommelWriteExtensions
-static Dapper.FluentMap.Dommel.DommelWriteExtensions.InsertMapped<TEntity>(this System.Data.IDbConnection! connection, TEntity! entity, System.Data.IDbTransaction? transaction = null) -> object?
-static Dapper.FluentMap.Dommel.DommelWriteExtensions.InsertMappedAsync<TEntity>(this System.Data.IDbConnection! connection, TEntity! entity, System.Data.IDbTransaction? transaction = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<object?>!
-static Dapper.FluentMap.Dommel.DommelWriteExtensions.UpdateMapped<TEntity>(this System.Data.IDbConnection! connection, TEntity! entity, System.Data.IDbTransaction? transaction = null) -> bool
-static Dapper.FluentMap.Dommel.DommelWriteExtensions.UpdateMappedAsync<TEntity>(this System.Data.IDbConnection! connection, TEntity! entity, System.Data.IDbTransaction? transaction = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!

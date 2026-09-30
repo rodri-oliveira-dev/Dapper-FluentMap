@@ -6,6 +6,8 @@ The historical archived package history is not reconstructed here. This changelo
 
 ## [Unreleased]
 
+## [3.5.0] - 2026-10-01
+
 ### Added
 
 - Added reflection-free `GeneratedParameters` for parameterized strict-generated queries, including provider-matrix and Native AOT smoke coverage.

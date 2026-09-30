@@ -1,5 +1,6 @@
 #nullable enable
 
+Dapper.FluentMap.Dommel.DommelWriteExtensions
 Dapper.FluentMap.Dommel.FluentMapConfigurationExtensions
 Dapper.FluentMap.Dommel.Mapping.DommelEntityMap<TEntity>
 Dapper.FluentMap.Dommel.Mapping.DommelEntityMap<TEntity>.DommelEntityMap() -> void
@@ -32,4 +33,8 @@ Dapper.FluentMap.Dommel.Resolvers.DommelTableNameResolver.ResolveTableName(Syste
 override Dapper.FluentMap.Dommel.Mapping.DommelEntityMap<TEntity>.GetPropertyMap(System.Reflection.PropertyInfo! info) -> Dapper.FluentMap.Dommel.Mapping.DommelPropertyMap!
 override Dapper.FluentMap.Dommel.Resolvers.DommelPropertyResolver.FilterComplexTypes(System.Collections.Generic.IEnumerable<System.Reflection.PropertyInfo!>! properties) -> System.Collections.Generic.IEnumerable<System.Reflection.PropertyInfo!>!
 override Dapper.FluentMap.Dommel.Resolvers.DommelPropertyResolver.ResolveProperties(System.Type! type) -> System.Collections.Generic.IEnumerable<Dommel.ColumnPropertyInfo!>!
+static Dapper.FluentMap.Dommel.DommelWriteExtensions.InsertMapped<TEntity>(this System.Data.IDbConnection! connection, TEntity! entity, System.Data.IDbTransaction? transaction = null) -> object?
+static Dapper.FluentMap.Dommel.DommelWriteExtensions.InsertMappedAsync<TEntity>(this System.Data.IDbConnection! connection, TEntity! entity, System.Data.IDbTransaction? transaction = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<object?>!
+static Dapper.FluentMap.Dommel.DommelWriteExtensions.UpdateMapped<TEntity>(this System.Data.IDbConnection! connection, TEntity! entity, System.Data.IDbTransaction? transaction = null) -> bool
+static Dapper.FluentMap.Dommel.DommelWriteExtensions.UpdateMappedAsync<TEntity>(this System.Data.IDbConnection! connection, TEntity! entity, System.Data.IDbTransaction? transaction = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<bool>!
 static Dapper.FluentMap.Dommel.FluentMapConfigurationExtensions.ForDommel(this Dapper.FluentMap.Configuration.FluentMapConfiguration! config) -> Dapper.FluentMap.Configuration.FluentMapConfiguration!

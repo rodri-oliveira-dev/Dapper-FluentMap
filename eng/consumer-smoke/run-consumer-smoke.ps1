@@ -13,7 +13,7 @@ $ErrorActionPreference = 'Stop'
 
 Import-Module (Join-Path $PSScriptRoot '../PackageCatalog.psm1') -Force
 
-$packageVersion = if ([string]::IsNullOrWhiteSpace($PackageVersion)) { '3.4.0' } else { $PackageVersion }
+$packageVersion = if ([string]::IsNullOrWhiteSpace($PackageVersion)) { '3.5.0' } else { $PackageVersion }
 $catalogPackages = @(Get-FluentMapPackages -CatalogPath $CatalogPath)
 $expectedPackageIds = @($catalogPackages | ForEach-Object { [string]$_.packageId })
 

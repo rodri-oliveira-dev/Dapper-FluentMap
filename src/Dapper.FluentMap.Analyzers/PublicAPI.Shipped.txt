@@ -1,6 +1,9 @@
 #nullable enable
 
+Dapper.FluentMap.Analyzers.FluentMapConfigurationAnalyzer
+Dapper.FluentMap.Analyzers.FluentMapConfigurationAnalyzer.FluentMapConfigurationAnalyzer() -> void
 const Dapper.FluentMap.Analyzers.FluentMapConfigurationAnalyzer.DuplicateColumnDiagnosticId = "DFM003" -> string!
+const Dapper.FluentMap.Analyzers.FluentMapConfigurationAnalyzer.DuplicateConstructionStrategyDiagnosticId = "DFM016" -> string!
 const Dapper.FluentMap.Analyzers.FluentMapConfigurationAnalyzer.DuplicateMemberPathDiagnosticId = "DFM002" -> string!
 const Dapper.FluentMap.Analyzers.FluentMapConfigurationAnalyzer.DuplicateProfileRegistrationDiagnosticId = "DFM010" -> string!
 const Dapper.FluentMap.Analyzers.FluentMapConfigurationAnalyzer.DuplicatePropertyConverterDiagnosticId = "DFM015" -> string!
@@ -10,7 +13,5 @@ const Dapper.FluentMap.Analyzers.FluentMapConfigurationAnalyzer.InvalidIncludeBa
 const Dapper.FluentMap.Analyzers.FluentMapConfigurationAnalyzer.InvalidMapExpressionDiagnosticId = "DFM001" -> string!
 const Dapper.FluentMap.Analyzers.FluentMapConfigurationAnalyzer.InvalidPersistenceBehaviorDiagnosticId = "DFM013" -> string!
 const Dapper.FluentMap.Analyzers.FluentMapConfigurationAnalyzer.InvalidPropertyConverterDiagnosticId = "DFM014" -> string!
-Dapper.FluentMap.Analyzers.FluentMapConfigurationAnalyzer
-Dapper.FluentMap.Analyzers.FluentMapConfigurationAnalyzer.FluentMapConfigurationAnalyzer() -> void
 override Dapper.FluentMap.Analyzers.FluentMapConfigurationAnalyzer.Initialize(Microsoft.CodeAnalysis.Diagnostics.AnalysisContext! context) -> void
 override Dapper.FluentMap.Analyzers.FluentMapConfigurationAnalyzer.SupportedDiagnostics.get -> System.Collections.Immutable.ImmutableArray<Microsoft.CodeAnalysis.DiagnosticDescriptor!>
