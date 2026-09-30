@@ -156,7 +156,7 @@ public CustomerMap()
 }
 ```
 
-`ConstructUsing` supports one to four explicitly mapped root-property values, validates every binding, and is preserved by isolated runtimes. Nested property paths are rejected during configuration because explicit factories currently bind only the root materialization node. Delegate factories are runtime-materialization strategies: the source generator registers the map but reports `DFM011` and does not emit a generated materializer. Strict generated mode therefore rejects that shape instead of silently using the factory through reflection.
+`ConstructUsing` supports one to four explicitly mapped root-property values, validates every binding, and is preserved by isolated runtimes. Nested property paths are rejected during configuration because explicit factories currently bind only the root materialization node. Call `ConstructUsing` directly from the map constructor: the source generator analyzes constructor invocations and does not follow helper-method calls. Delegate factories are runtime-materialization strategies: the source generator registers the map but reports `DFM011` and does not emit a generated materializer. Strict generated mode therefore rejects that shape instead of silently using the factory through reflection.
 
 ## Mapping Profiles
 

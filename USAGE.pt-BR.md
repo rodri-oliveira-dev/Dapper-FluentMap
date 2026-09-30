@@ -156,7 +156,7 @@ public CustomerMap()
 }
 ```
 
-`ConstructUsing` aceita de um a quatro valores de propriedades raiz explicitamente mapeadas, valida cada binding e é preservado por runtimes isolados. Caminhos de propriedades aninhadas são rejeitados durante a configuração porque factories explícitas atualmente vinculam apenas o nó raiz de materialização. Factories delegate são estratégias de materialização em runtime: o source generator registra o map, mas reporta `DFM011` e não emite materializador gerado. Portanto, o modo strict generated rejeita esse shape sem fallback silencioso.
+`ConstructUsing` aceita de um a quatro valores de propriedades raiz explicitamente mapeadas, valida cada binding e é preservado por runtimes isolados. Caminhos de propriedades aninhadas são rejeitados durante a configuração porque factories explícitas atualmente vinculam apenas o nó raiz de materialização. Chame `ConstructUsing` diretamente no construtor do map: o source generator analisa as invocações do construtor e não segue chamadas a métodos auxiliares. Factories delegate são estratégias de materialização em runtime: o source generator registra o map, mas reporta `DFM011` e não emite materializador gerado. Portanto, o modo strict generated rejeita esse shape sem fallback silencioso.
 
 ## Mapping Profiles
 
