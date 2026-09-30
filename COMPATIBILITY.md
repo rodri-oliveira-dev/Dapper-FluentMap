@@ -18,6 +18,8 @@ The `FluentMap.*` PackageIds are NuGet distribution identities. Assemblies and n
 
 ## Dapper
 
+The machine-readable source of truth is `eng/compatibility-contract.json`. CI verifies this document, package properties, compatibility lanes, migration guidance and produced NuGet dependency metadata against that contract.
+
 Current package range:
 
 ```text
@@ -67,6 +69,10 @@ Provider support is split into certification levels:
 
 Provider certification requires real integration tests against that provider and database. A Dommel SQL builder being registered is not the same as provider certification.
 
+## Experimental Compatibility Canaries
+
+The scheduled/manual `Compatibility Canary` workflow checks the supported Dapper minimum/current lanes, resolves a newer Dapper stable or prerelease when one exists, and compiles/runs SQLite evidence against the latest resolvable stable provider clients. These lanes are early-warning experiments only: they neither expand nor reduce the certified matrix above. A canary result becomes a support claim only after the pinned required matrix, documentation and package contract are intentionally updated and reviewed.
+
 ## AOT And Trimming
 
 Current status:
@@ -75,14 +81,16 @@ Current status:
 | --- | --- |
 | Explicit map registration | Preferred for trimmed and Native AOT applications. |
 | Generated registration | Preferred alternative to assembly scanning for maps in the current compilation. |
-| Strict generated runtime | `UseStrictGeneratedMaterialization()` and `QueryGeneratedMapped*` provide a generated-only path for parameterless commands; unsupported shapes and dynamic parameter objects fail deterministically. |
+| Strict generated runtime | `UseStrictGeneratedMaterialization()` and `QueryGeneratedMapped*` provide a generated-only path for parameterless commands and explicitly typed `GeneratedParameters`; unsupported shapes and arbitrary parameter objects fail deterministically. |
 | Assembly scanning | Reflection-based and annotated as trimming-sensitive. |
 | `QueryMapped*`, `ReadMapped*`, `QueryMultipleMapped`, streaming | Annotated with trimming/dynamic-code warnings because runtime fallback can occur. |
 | Full Native AOT compatibility | Not claimed. |
 
 Trimmed smoke tests cover explicit, generated and DI scenarios. The CI Native AOT lane publishes and runs the strict generated SQLite smoke on `windows-latest`/`win-x64`, treating relevant trimming and AOT warnings as errors. Local Native AOT publishing still requires the Visual C++ linker toolchain and full Native AOT compatibility is not claimed.
 
-Generated materializers accept their exact registered shape and safe permutations when column names are distinct. Missing, additional or duplicate-column shapes remain unsupported and use runtime fallback unless strict generated materialization is enabled. Resolution is based on reader metadata, not SQL parsing.
+Generated materializers accept their exact registered shape, safe permutations and additional reader columns that do not resolve to explicitly configured FluentMap members. Missing required columns, duplicate/ambiguous names and additional columns that would resolve to an explicit FluentMap member remain unsupported and use runtime fallback unless strict generated materialization is enabled. The strict path deliberately does not reflect over convention-only entity members; callers that need Dapper's default-member discovery must use the non-strict API. Resolution is based on reader metadata, not SQL parsing.
+
+`GeneratedParameters` uses only public ADO.NET parameter contracts and requires an explicit `DbType` for every input. It does not inspect parameter-object members or invoke Dapper's anonymous-object parameter generation. The Native AOT smoke covers generated startup registration, parameter binding, reordered columns, a safe additional column and deterministic strict rejection. This is bounded evidence for the strict path, not a claim of full FluentMap Native AOT compatibility.
 
 ## Global State Limitations
 
@@ -103,7 +111,7 @@ var runtime = new FluentMapConfigurationBuilder()
 var customer = runtime.QueryMappedSingle<Customer>(connection, sql);
 ```
 
-That isolation applies to `QueryMapped*`, `QueryGeneratedMapped*`, two-type `splitOn` multi-mapping including per-segment profile overloads, `ReadMapped*`, `QueryMultipleMapped`, streaming, profiles, converters, diagnostics and generated materializer lookup. It does not make normal Dapper queries or Dommel select a runtime per call.
+That isolation applies to `QueryMapped*`, `QueryGeneratedMapped*`, two/three-type `splitOn` multi-mapping including per-segment profile overloads, explicit `ConstructUsing(...)` factories, `ReadMapped*`, `QueryMultipleMapped`, streaming, profiles, converters, diagnostics and generated materializer lookup. It does not make normal Dapper queries or Dommel select a runtime per call.
 
 ## API Compatibility
 
@@ -122,6 +130,8 @@ The fork also adds public APIs for profiles, naming policies, generated material
 
 The maintained 3.x line follows Semantic Versioning. See the GitHub releases page for the current stable version. Public compatibility remains governed by SemVer and the package/API boundaries listed above.
 
+Checked-in `PublicAPI.Shipped.txt`/`PublicAPI.Unshipped.txt` files govern every shipped assembly and include nullable annotations. See [MAINTAINING.md](MAINTAINING.md) for the approval and release process.
+
 ## Unsupported Environments Or Claims
 
 - Dapper major versions outside `[2.1.79,3.0.0)` are not currently supported.
@@ -129,5 +139,7 @@ The maintained 3.x line follows Semantic Versioning. See the GitHub releases pag
 - Full Native AOT support is not claimed.
 - Provider behavior outside the exact tested server/client versions listed above is not certified.
 - Dommel configuration isolation per `FluentMapRuntime` is not supported.
-- Three-or-more-type multi-mapping, graph aggregation and CRUD generation are not implemented.
+- Multi-mapping is supported for two or three input types. Four-or-more input types, automatic graph aggregation and generic core CRUD generation are not implemented.
+- Explicit delegate construction strategies are supported by runtime materialization. The generator reports `DFM011` and strict generated mode rejects those shapes; no full Native AOT claim is made for delegate factories.
+- Property write conversion is supported only by the Dommel adapter's opt-in `InsertMapped*` and `UpdateMapped*` APIs. Historical Dommel `Insert`/`Update` do not execute property converters.
 - `MappedGridReader` result sets must be consumed sequentially; concurrent reads are rejected deterministically.

@@ -31,6 +31,7 @@ public class MaterializationSteadyStateBenchmarks
 
     private SqliteConnection _connection = null!;
     private FluentMapRuntime _runtime = null!;
+    private FluentMapRuntime _strictRuntime = null!;
 
     [GlobalSetup]
     public async Task GlobalSetup()
@@ -47,6 +48,11 @@ public class MaterializationSteadyStateBenchmarks
         _runtime = new FluentMapRuntime(new FluentMapConfigurationBuilder()
             .Configure(configuration => configuration.AddGeneratedMappings())
             .Build());
+        _strictRuntime = new FluentMapConfigurationBuilder()
+            .Configure(configuration => configuration.AddGeneratedMappings())
+            .UseStrictGeneratedMaterialization()
+            .Build()
+            .CreateRuntime();
         _connection = OpenPopulatedConnection();
 
         DapperPure();
@@ -61,6 +67,7 @@ public class MaterializationSteadyStateBenchmarks
         await RuntimeQueryMappedSimpleUnbufferedAsync();
         QueryMappedSimpleReorderedGenerated();
         RuntimeQueryMappedSimpleReorderedGenerated();
+        RuntimeQueryGeneratedSimpleExtraColumn();
         QueryMappedSimpleUnbufferedReorderedGenerated();
         await QueryMappedSimpleUnbufferedAsyncReorderedGenerated();
         QueryMappedImmutableConstructor();
@@ -78,6 +85,8 @@ public class MaterializationSteadyStateBenchmarks
         QueryMappedRuntimeTypeHandler();
         QueryMappedGeneratedPropertyConverter();
         QueryMappedRuntimePropertyConverter();
+        QueryMappedTwoSegments();
+        QueryMappedThreeSegments();
     }
 
     [GlobalCleanup]
@@ -184,6 +193,15 @@ public class MaterializationSteadyStateBenchmarks
         return _runtime.QueryMapped<QueryMappedSimpleCustomer>(
                 _connection,
                 "SELECT Name AS full_name, Id AS customer_id, Age AS customer_age, Balance AS account_balance, CreatedAt AS created_at FROM BenchmarkRows;")
+            .Count();
+    }
+
+    [Benchmark]
+    public int RuntimeQueryGeneratedSimpleExtraColumn()
+    {
+        return _strictRuntime.QueryGeneratedMapped<QueryMappedSimpleCustomer>(
+                _connection,
+                "SELECT 'trace' AS trace_id, Name AS full_name, Id AS customer_id, Age AS customer_age, Balance AS account_balance, CreatedAt AS created_at FROM BenchmarkRows;")
             .Count();
     }
 
@@ -332,6 +350,26 @@ public class MaterializationSteadyStateBenchmarks
     {
         return _connection.QueryMapped<RuntimePropertyConverterCustomer>(
                 "SELECT Cpf AS code, Id AS customer_id FROM BenchmarkRows;")
+            .Count();
+    }
+
+    [Benchmark]
+    public int QueryMappedTwoSegments()
+    {
+        return _connection.QueryMapped<BenchmarkJoinCustomer, BenchmarkJoinOrder, int>(
+                "SELECT Id AS customer_id, Name AS customer_name, Id AS order_id, Balance AS order_total FROM BenchmarkRows;",
+                (customer, order) => customer.Id + (order?.Id ?? 0),
+                splitOn: "order_id")
+            .Count();
+    }
+
+    [Benchmark]
+    public int QueryMappedThreeSegments()
+    {
+        return _connection.QueryMapped<BenchmarkJoinCustomer, BenchmarkJoinOrder, BenchmarkJoinShipment, int>(
+                "SELECT Id AS customer_id, Name AS customer_name, Id AS order_id, Balance AS order_total, Id AS shipment_id, City AS shipment_status FROM BenchmarkRows;",
+                (customer, order, shipment) => customer.Id + (order?.Id ?? 0) + (shipment?.Id ?? 0),
+                splitOn: "order_id,shipment_id")
             .Count();
     }
 
@@ -975,5 +1013,53 @@ public sealed class ColdValueObjectCustomerMap : EntityMap<ColdValueObjectCustom
         Map(customer => customer.Cpf.Number).ToColumn("cpf");
         Map(customer => customer.Balance.Amount).ToColumn("amount");
         Map(customer => customer.Balance.Currency).ToColumn("currency");
+    }
+}
+
+public sealed class BenchmarkJoinCustomer
+{
+    public int Id { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+}
+
+public sealed class BenchmarkJoinCustomerMap : EntityMap<BenchmarkJoinCustomer>
+{
+    public BenchmarkJoinCustomerMap()
+    {
+        Map(customer => customer.Id).ToColumn("customer_id");
+        Map(customer => customer.Name).ToColumn("customer_name");
+    }
+}
+
+public sealed class BenchmarkJoinOrder
+{
+    public int Id { get; set; }
+
+    public decimal Total { get; set; }
+}
+
+public sealed class BenchmarkJoinOrderMap : EntityMap<BenchmarkJoinOrder>
+{
+    public BenchmarkJoinOrderMap()
+    {
+        Map(order => order.Id).ToColumn("order_id");
+        Map(order => order.Total).ToColumn("order_total");
+    }
+}
+
+public sealed class BenchmarkJoinShipment
+{
+    public int Id { get; set; }
+
+    public string Status { get; set; } = string.Empty;
+}
+
+public sealed class BenchmarkJoinShipmentMap : EntityMap<BenchmarkJoinShipment>
+{
+    public BenchmarkJoinShipmentMap()
+    {
+        Map(shipment => shipment.Id).ToColumn("shipment_id");
+        Map(shipment => shipment.Status).ToColumn("shipment_status");
     }
 }

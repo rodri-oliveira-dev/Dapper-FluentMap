@@ -6,6 +6,23 @@ The historical archived package history is not reconstructed here. This changelo
 
 ## [Unreleased]
 
+### Added
+
+- Added reflection-free `GeneratedParameters` for parameterized strict-generated queries, including provider-matrix and Native AOT smoke coverage.
+- Added Dommel `InsertMapped*`/`UpdateMapped*` operations that execute per-property write converters while preserving persistence exclusions and Dapper type-handler precedence.
+- Added three-input FluentMap-controlled multi-mapping with multiple validated `splitOn` boundaries, per-segment profiles, async execution, null-child semantics and isolated-runtime APIs.
+- Added explicit `ConstructUsing(...)` factory strategies for one to four mapped values, with configuration validation and deterministic generated/strict boundaries.
+- Added analyzer diagnostic `DFM016` for duplicate explicit construction strategies.
+- Added checked-in nullable public API baselines for every shipped assembly, enforced by CI.
+- Added report-only scheduled/manual compatibility canaries and materialization benchmark regression reporting with machine-readable artifacts.
+
+### Changed
+
+- Generated materializers now accept safe additional reader columns that do not resolve to explicit FluentMap members and provide specific strict diagnostics for missing, duplicate/ambiguous and explicitly mapped additional columns; Dapper convention-only discovery remains a non-strict behavior.
+- Two- and three-input multi-mapping now share a single segment materialization pipeline.
+- Public projects now emit deliberate nullable reference annotations using staged `Nullable=annotations`; optional query inputs, metadata and multi-mapping null-child delegates reflect actual behavior without changing CLR signatures.
+- Generated value-conversion failures now surface as contextual `FluentMapConfigurationException` instances instead of leaking provider-dependent `FormatException` or `InvalidCastException` exceptions.
+
 ## [3.4.0] - 2026-09-27
 
 ### Added

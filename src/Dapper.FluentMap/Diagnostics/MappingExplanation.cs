@@ -43,12 +43,12 @@ namespace Dapper.FluentMap.Diagnostics
         /// <summary>
         /// Gets the mapping profile marker type, when this explanation targets a profile.
         /// </summary>
-        public Type ProfileType { get; }
+        public Type? ProfileType { get; }
 
         /// <summary>
         /// Gets the registered entity map type, when one exists.
         /// </summary>
-        public Type EntityMapType { get; }
+        public Type? EntityMapType { get; }
 
         /// <summary>
         /// Gets the registered convention types for the entity.

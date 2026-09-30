@@ -326,8 +326,101 @@ namespace Dapper.FluentMap.Tests
                         "SELECT @Id AS customer_id, 'GeneratedOnly' AS full_name;",
                         new { Id = 86 }));
 
-                Assert.Contains("dynamic parameter objects", exception.Message, StringComparison.Ordinal);
+                Assert.Contains("unsupported", exception.Message, StringComparison.Ordinal);
+                Assert.Contains(typeof(GeneratedContractCustomer).FullName, exception.Message);
+                Assert.Contains(typeof(GeneratedParameters).FullName, exception.Message);
+                Assert.Contains("QueryMapped", exception.Message);
             }
+        }
+
+        [Fact]
+        [Trait("Category", "Integration")]
+        public void QueryGeneratedMappedShouldBindExplicitGeneratedParametersWithoutRuntimeFallback()
+        {
+            var runtime = CreateRuntime(builder =>
+            {
+                builder
+                    .AddMap(new GeneratedContractCustomerMap())
+                    .AddGeneratedMaterializer(DefaultColumns(), ReadDefaultGeneratedCustomer)
+                    .UseStrictGeneratedMaterialization();
+            });
+            var parameters = new GeneratedParameters()
+                .Add("Id", 87, DbType.Int32)
+                .Add("Name", "Parameterized", DbType.String, size: 64);
+
+            using (var connection = OpenConnection())
+            {
+                var customer = runtime.QueryGeneratedMappedSingle<GeneratedContractCustomer>(
+                    connection,
+                    "SELECT @Id AS customer_id, @Name AS full_name;",
+                    parameters);
+
+                Assert.Equal(87, customer.Id);
+                Assert.Equal("generated:Parameterized", customer.Name);
+                Assert.Equal(0, runtime.MaterializationPlanCacheEntryCount);
+            }
+        }
+
+        [Fact]
+        [Trait("Category", "Integration")]
+        public void ProfiledQueryGeneratedMappedShouldBindExplicitGeneratedParameters()
+        {
+            var runtime = CreateRuntime(builder =>
+            {
+                builder
+                    .AddProfile<GeneratedContractCustomerLegacyMap>()
+                    .AddGeneratedMaterializer<GeneratedContractCustomer, GeneratedLegacyProfile>(
+                        LegacyColumns(),
+                        ReadLegacyGeneratedCustomer)
+                    .UseStrictGeneratedMaterialization();
+            });
+
+            using (var connection = OpenConnection())
+            {
+                var customer = runtime.QueryGeneratedMappedSingle<GeneratedContractCustomer, GeneratedLegacyProfile>(
+                    connection,
+                    "SELECT @Id AS legacy_id, @Name AS legal_name;",
+                    new GeneratedParameters()
+                        .Add("Id", 88, DbType.Int32)
+                        .Add("Name", "Profile", DbType.String, size: 64));
+
+                Assert.Equal(88, customer.Id);
+                Assert.Equal("legacy:Profile", customer.Name);
+            }
+        }
+
+        [Fact]
+        public void QueryGeneratedMappedShouldRejectUnsupportedParametersBeforeOpeningConnection()
+        {
+            var runtime = CreateRuntime(builder =>
+            {
+                builder
+                    .AddMap(new GeneratedContractCustomerMap())
+                    .AddGeneratedMaterializer(DefaultColumns(), ReadDefaultGeneratedCustomer);
+            });
+
+            using (var connection = new SqliteConnection("Data Source=:memory:"))
+            {
+                Assert.Throws<NotSupportedException>(() =>
+                    runtime.QueryGeneratedMappedSingle<GeneratedContractCustomer>(
+                        connection,
+                        "not executable",
+                        new { Id = 1 }));
+
+                Assert.Equal(ConnectionState.Closed, connection.State);
+            }
+        }
+
+        [Fact]
+        public void GeneratedParametersShouldRejectEmptyAndEquivalentDuplicateNames()
+        {
+            var parameters = new GeneratedParameters().Add("@Id", 1, DbType.Int32);
+
+            Assert.Throws<ArgumentException>(() => parameters.Add(" ", 2, DbType.Int32));
+            Assert.Throws<ArgumentException>(() => parameters.Add("@", 2, DbType.Int32));
+            Assert.Throws<ArgumentException>(() => parameters.Add("Other", 2, DbType.Int32, size: -1));
+            var duplicate = Assert.Throws<ArgumentException>(() => parameters.Add("id", 2, DbType.Int32));
+            Assert.Contains("already registered", duplicate.Message);
         }
 
         [Fact]
@@ -379,9 +472,9 @@ namespace Dapper.FluentMap.Tests
                         connection,
                         "SELECT 92 AS customer_id;"));
 
-                Assert.Contains("none match requested result columns", exception.Message);
+                Assert.Contains("missing required generated columns", exception.Message);
                 Assert.Contains("['customer_id']", exception.Message);
-                Assert.Contains("['customer_id', 'full_name']", exception.Message);
+                Assert.Contains("['full_name']", exception.Message);
                 Assert.DoesNotContain("SELECT", exception.Message);
                 Assert.Equal(0, runtime.MaterializationPlanCacheEntryCount);
             }
@@ -410,6 +503,82 @@ namespace Dapper.FluentMap.Tests
                 Assert.Equal(94, customer.Id);
                 Assert.Equal("generated:Reordered", customer.Name);
                 Assert.Equal(0, runtime.MaterializationPlanCacheEntryCount);
+            }
+        }
+
+        [Fact]
+        [Trait("Category", "Integration")]
+        public void GeneratedAndRuntimeMaterializationShouldBeEquivalentWithSafeAdditionalColumn()
+        {
+            var generatedRuntime = CreateRuntime(builder =>
+            {
+                builder
+                    .AddMap(new GeneratedContractCustomerMap())
+                    .AddGeneratedMaterializer(DefaultColumns(), ReadEquivalentGeneratedCustomer)
+                    .UseStrictGeneratedMaterialization();
+            });
+            var runtime = CreateRuntime(builder => builder.AddMap(new GeneratedContractCustomerMap()));
+            const string sql = "SELECT 'trace' AS trace_id, 'Extra' AS full_name, 95 AS customer_id;";
+
+            using (var connection = OpenConnection())
+            {
+                var generated = generatedRuntime.QueryGeneratedMappedSingle<GeneratedContractCustomer>(connection, sql);
+                var reflected = runtime.QueryMappedSingle<GeneratedContractCustomer>(connection, sql);
+
+                Assert.Equal(reflected.Id, generated.Id);
+                Assert.Equal(reflected.Name, generated.Name);
+                Assert.Equal(0, generatedRuntime.MaterializationPlanCacheEntryCount);
+                Assert.Equal(1, runtime.MaterializationPlanCacheEntryCount);
+            }
+        }
+
+        [Fact]
+        [Trait("Category", "Integration")]
+        public void StrictGeneratedRuntimeShouldRejectDuplicateMappedColumnNames()
+        {
+            var runtime = CreateRuntime(builder =>
+            {
+                builder
+                    .AddMap(new GeneratedContractCustomerMap())
+                    .AddGeneratedMaterializer(DefaultColumns(), ReadDefaultGeneratedCustomer)
+                    .UseStrictGeneratedMaterialization();
+            });
+
+            using (var connection = OpenConnection())
+            {
+                var exception = Assert.Throws<FluentMapConfigurationException>(() =>
+                    runtime.QueryGeneratedMappedSingle<GeneratedContractCustomer>(
+                        connection,
+                        "SELECT 96 AS customer_id, 97 AS customer_id, 'Duplicate' AS full_name;"));
+
+                Assert.Contains("duplicate/ambiguous", exception.Message);
+                Assert.Contains("customer_id", exception.Message);
+                Assert.Contains(typeof(GeneratedContractCustomer).FullName, exception.Message);
+            }
+        }
+
+        [Fact]
+        [Trait("Category", "Integration")]
+        public void StrictGeneratedRuntimeShouldRejectAdditionalColumnThatMapsToEntityMember()
+        {
+            var runtime = CreateRuntime(builder =>
+            {
+                builder
+                    .AddMap(new GeneratedContractCustomerMap())
+                    .AddGeneratedMaterializer(DefaultColumns(), ReadDefaultGeneratedCustomer)
+                    .UseStrictGeneratedMaterialization();
+            });
+
+            using (var connection = OpenConnection())
+            {
+                var exception = Assert.Throws<FluentMapConfigurationException>(() =>
+                    runtime.QueryGeneratedMappedSingle<GeneratedContractCustomer>(
+                        connection,
+                        "SELECT 98 AS customer_id, 'Mapped' AS full_name, 'Ambiguous' AS Name;"));
+
+                Assert.Contains("additional columns", exception.Message);
+                Assert.Contains("['Name']", exception.Message);
+                Assert.Contains("cannot be ignored safely", exception.Message);
             }
         }
 
@@ -450,6 +619,49 @@ namespace Dapper.FluentMap.Tests
                     Assert.True(reader.Read());
                     var shape = Assert.IsType<GeneratedContractShape>(materializer(reader));
                     Assert.Equal("alphabetical", shape.Source);
+                }
+            }
+            finally
+            {
+                PreTest(typeof(GeneratedContractShape));
+            }
+        }
+
+        [Fact]
+        public void StrictGeneratedLookupShouldPreferMostSpecificCompatibleShape()
+        {
+            PreTest(typeof(GeneratedContractShape));
+
+            try
+            {
+                FluentMapper.Initialize(configuration =>
+                {
+                    configuration.AddMap(new GeneratedContractShapeMap());
+                    configuration.AddGeneratedMaterializer(
+                        new[]
+                        {
+                            GeneratedMaterializerColumn.Map("alpha", nameof(GeneratedContractShape.First)),
+                            GeneratedMaterializerColumn.Map("beta", nameof(GeneratedContractShape.Second))
+                        },
+                        record => new GeneratedContractShape { Source = "two-columns" });
+                    configuration.AddGeneratedMaterializer(
+                        AlphabeticalShapeColumns(),
+                        record => new GeneratedContractShape { Source = "three-columns" });
+                });
+
+                var found = FluentMapper.Registry.TryGetStrictGeneratedMaterializer(
+                    typeof(GeneratedContractShape),
+                    profileType: null,
+                    columnNames: new[] { "trace_id", "gamma", "alpha", "beta" },
+                    out var materializer);
+
+                using (var reader = CreateReader(
+                           new[] { "trace_id", "gamma", "alpha", "beta" },
+                           new object[] { "trace", 3, 1, 2 }))
+                {
+                    Assert.True(found);
+                    Assert.True(reader.Read());
+                    Assert.Equal("three-columns", Assert.IsType<GeneratedContractShape>(materializer(reader)).Source);
                 }
             }
             finally
@@ -819,6 +1031,15 @@ namespace Dapper.FluentMap.Tests
             {
                 Id = Convert.ToInt32(record.GetValue(0)),
                 Name = "generated:" + Convert.ToString(record.GetValue(1))
+            };
+        }
+
+        private static GeneratedContractCustomer ReadEquivalentGeneratedCustomer(IDataRecord record)
+        {
+            return new GeneratedContractCustomer
+            {
+                Id = Convert.ToInt32(record.GetValue(0)),
+                Name = Convert.ToString(record.GetValue(1))
             };
         }
 

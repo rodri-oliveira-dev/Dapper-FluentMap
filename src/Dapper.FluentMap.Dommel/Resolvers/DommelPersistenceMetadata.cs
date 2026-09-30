@@ -26,9 +26,16 @@ namespace Dapper.FluentMap.Dommel.Resolvers
             }
 
             var mapWithPersistence = propertyMap as IPropertyMapWithPersistenceMetadata;
-            persistence = mapWithPersistence == null
-                ? (propertyMap.Ignored ? PropertyPersistenceMetadata.Ignored : PropertyPersistenceMetadata.Default)
-                : mapWithPersistence.Persistence;
+            if (mapWithPersistence != null)
+            {
+                persistence = mapWithPersistence.Persistence;
+            }
+            else
+            {
+                persistence = propertyMap.Ignored
+                    ? PropertyPersistenceMetadata.Ignored
+                    : PropertyPersistenceMetadata.Default;
+            }
             return true;
         }
 
@@ -45,11 +52,26 @@ namespace Dapper.FluentMap.Dommel.Resolvers
                 .ResolveProperties(type)
                 .Where(property =>
                 {
-                    PropertyPersistenceMetadata persistence;
-                    return !TryGetPersistence(property.Property, out persistence) ||
-                        persistence.ParticipatesInInsert;
+                    var propertyMap = ResolvePropertyMap(type, entityMap, property.Property.Name);
+                    if (propertyMap == null)
+                    {
+                        return true;
+                    }
+
+                    var mapWithPersistence = propertyMap as IPropertyMapWithPersistenceMetadata;
+                    var persistence = mapWithPersistence != null
+                        ? mapWithPersistence.Persistence
+                        : ResolveDefaultPersistence(propertyMap);
+                    return persistence.ParticipatesInInsert;
                 })
                 .Select(property => property.Property);
+        }
+
+        private static PropertyPersistenceMetadata ResolveDefaultPersistence(IPropertyMap propertyMap)
+        {
+            return propertyMap.Ignored
+                ? PropertyPersistenceMetadata.Ignored
+                : PropertyPersistenceMetadata.Default;
         }
 
         internal static IPropertyMap ResolvePropertyMap(Type type, IEntityMap entityMap, string propertyName)

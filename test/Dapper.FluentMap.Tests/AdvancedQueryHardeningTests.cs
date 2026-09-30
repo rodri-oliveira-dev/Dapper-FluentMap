@@ -165,7 +165,7 @@ namespace Dapper.FluentMap.Tests
         }
 
         [Fact]
-        public void QueryMultipleMappedShouldUseGeneratedAndRuntimeMaterializersOnIndependentParallelReaders()
+        public void QueryMultipleMappedShouldUseGeneratedMaterializersForSafeExtraColumnsOnIndependentParallelReaders()
         {
             PreTest(typeof(ConcurrentCustomer));
 
@@ -219,8 +219,8 @@ namespace Dapper.FluentMap.Tests
                     .ToList();
 
                 Assert.All(results, Assert.True);
-                Assert.Equal(30, generatedRows);
-                Assert.Equal(1, FluentMapper.Registry.MaterializationPlanCacheEntryCount);
+                Assert.Equal(60, generatedRows);
+                Assert.Equal(0, FluentMapper.Registry.MaterializationPlanCacheEntryCount);
             }
             finally
             {

@@ -122,7 +122,7 @@ namespace Dapper.FluentMap.Tests
         }
 
         [Fact]
-        public void PropertyMapShouldMapInheritedProperies()
+        public void InheritedPropertyShouldKeepDeclaringIdentityAndDerivedMapContext()
         {
             // Arrange
             PreTest();
@@ -132,10 +132,19 @@ namespace Dapper.FluentMap.Tests
             var idMap = map.PropertyMaps.First();
             var nameMap = map.PropertyMaps.Skip(1).First();
 
-            // Assert
-            // todo: should be ReflectedType so the type is DerivedTestEntity
+            // Assert: expression metadata identifies the member declared by the base type.
+            // The EntityMap<TEntity> supplies the derived mapping context; reflection does not
+            // rewrite either DeclaringType or ReflectedType to the expression parameter type.
             Assert.Equal(typeof(TestEntity), idMap.PropertyInfo.DeclaringType);
+            Assert.Equal(typeof(TestEntity), idMap.PropertyInfo.ReflectedType);
             Assert.Equal(typeof(DerivedTestEntity), nameMap.PropertyInfo.DeclaringType);
+            Assert.Equal(typeof(DerivedTestEntity), nameMap.PropertyInfo.ReflectedType);
+
+            FluentMapper.Initialize(c => c.AddMap(map));
+            var inheritedMember = SqlMapper.GetTypeMap(typeof(DerivedTestEntity)).GetMember("intId");
+
+            Assert.NotNull(inheritedMember);
+            Assert.Equal(typeof(TestEntity).GetProperty(nameof(TestEntity.Id)), inheritedMember.Property);
         }
 
         [Fact]
@@ -156,6 +165,22 @@ namespace Dapper.FluentMap.Tests
             var map = new NestedLevelMap();
 
             Assert.Equal(2, map.PropertyMaps.Count);
+        }
+
+        [Fact]
+        public void InheritedAndNestedMemberPathsWithSameTerminalNameShouldNotCollide()
+        {
+            FluentMapper.Reset(typeof(InheritedPathEntity));
+
+            var map = new InheritedPathMap();
+
+            Assert.Equal(2, map.PropertyMaps.Count);
+
+            FluentMapper.Initialize(configuration => configuration.AddMap(map));
+            var explanation = FluentMapper.Explain<InheritedPathEntity>();
+
+            Assert.Contains(explanation.Members, member => member.MemberPath == "Id" && member.ColumnName == "entity_id");
+            Assert.Contains(explanation.Members, member => member.MemberPath == "Details.Id" && member.ColumnName == "details_id");
         }
 
         [Fact]
@@ -241,6 +266,30 @@ namespace Dapper.FluentMap.Tests
             {
                 Map(x => x.Rank.Level).ToColumn("rank_level");
                 Map(x => x.Rank.Level).ToColumn("rank_level_again");
+            }
+        }
+
+        private class InheritedPathBase
+        {
+            public int Id { get; set; }
+        }
+
+        private class InheritedPathEntity : InheritedPathBase
+        {
+            public InheritedPathDetails Details { get; set; }
+        }
+
+        private class InheritedPathDetails
+        {
+            public int Id { get; set; }
+        }
+
+        private class InheritedPathMap : EntityMap<InheritedPathEntity>
+        {
+            public InheritedPathMap()
+            {
+                Map(entity => entity.Id).ToColumn("entity_id");
+                Map(entity => entity.Details.Id).ToColumn("details_id");
             }
         }
 

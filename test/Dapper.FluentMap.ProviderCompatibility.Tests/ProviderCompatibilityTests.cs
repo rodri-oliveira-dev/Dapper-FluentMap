@@ -7,6 +7,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
+using Dapper.FluentMap.Configuration;
 using Dapper.FluentMap.Dommel;
 using Dapper.FluentMap.Dommel.Mapping;
 using Dapper.FluentMap.Mapping;
@@ -268,6 +269,46 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
         [Theory]
         [MemberData(nameof(Providers))]
         [Trait("Category", "ProviderCompatibility")]
+        public void StrictGeneratedParameterizedQueryShouldSupportSafeAdditionalProviderColumn(string providerName)
+        {
+            var provider = ProviderCase.Create(providerName);
+            provider.SkipIfUnavailable();
+
+            var runtime = new FluentMapConfigurationBuilder()
+                .AddMap(new MultipleCustomerMap())
+                .AddGeneratedMaterializer(
+                    new[]
+                    {
+                        GeneratedMaterializerColumn.Map("customer_id", nameof(MultipleCustomer.Id)),
+                        GeneratedMaterializerColumn.Map("customer_name", nameof(MultipleCustomer.Name))
+                    },
+                    record => new MultipleCustomer
+                    {
+                        Id = Convert.ToInt32(record.GetValue(0)),
+                        Name = Convert.ToString(record.GetValue(1))
+                    })
+                .UseStrictGeneratedMaterialization()
+                .Build()
+                .CreateRuntime();
+            var parameters = new GeneratedParameters()
+                .Add("Id", 22, DbType.Int32)
+                .Add("Name", "Strict Provider", DbType.String, size: 100);
+
+            using (var connection = provider.OpenConnection())
+            {
+                var customer = runtime.QueryGeneratedMappedSingle<MultipleCustomer>(
+                    connection,
+                    "SELECT @Id AS customer_id, @Name AS customer_name, 1 AS provider_trace;",
+                    parameters);
+
+                Assert.Equal(22, customer.Id);
+                Assert.Equal("Strict Provider", customer.Name);
+            }
+        }
+
+        [Theory]
+        [MemberData(nameof(Providers))]
+        [Trait("Category", "ProviderCompatibility")]
         public void QueryMultipleMappedShouldReadSequentialProviderResultSets(string providerName)
         {
             var provider = ProviderCase.Create(providerName);
@@ -336,6 +377,44 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
             finally
             {
                 PreTest(typeof(MultipleCustomer), typeof(MultipleOrder));
+            }
+        }
+
+        [Theory]
+        [MemberData(nameof(Providers))]
+        [Trait("Category", "ProviderCompatibility")]
+        public void QueryMappedShouldComposeThreeProviderSegments(string providerName)
+        {
+            var provider = ProviderCase.Create(providerName);
+            provider.SkipIfUnavailable();
+            PreTest(typeof(MultipleCustomer), typeof(MultipleOrder), typeof(MultipleShipment));
+
+            try
+            {
+                FluentMapper.Initialize(configuration =>
+                {
+                    configuration.AddMap(new MultipleCustomerMap());
+                    configuration.AddMap(new MultipleOrderMap());
+                    configuration.AddMap(new MultipleShipmentMap());
+                });
+
+                using (var connection = provider.OpenConnection())
+                {
+                    var row = connection.QueryMapped<MultipleCustomer, MultipleOrder, MultipleShipment, Tuple<MultipleCustomer, MultipleOrder, MultipleShipment>>(
+                            provider.ThreeSegmentMultiMappingSql(),
+                            (customer, order, shipment) => Tuple.Create(customer, order, shipment),
+                            splitOn: "order_id,shipment_id")
+                        .Single();
+
+                    Assert.Equal(11, row.Item1.Id);
+                    Assert.Equal(99, row.Item2.Id);
+                    Assert.Equal(501, row.Item3.Id);
+                    Assert.Equal("sent", row.Item3.Status);
+                }
+            }
+            finally
+            {
+                PreTest(typeof(MultipleCustomer), typeof(MultipleOrder), typeof(MultipleShipment));
             }
         }
 
@@ -483,13 +562,13 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
                         Computed = "client-computed"
                     };
 
-                    var id = Convert.ToInt32(connection.Insert(entity));
+                    var id = Convert.ToInt32(connection.InsertMapped(entity));
                     var inserted = connection.Get<ProviderPersistenceEntity>(id);
 
-                    Assert.Equal("inserted", inserted.Normal);
+                    Assert.Equal("db:inserted", inserted.Normal);
                     Assert.Equal("read-only-default", inserted.ReadOnly);
                     Assert.Equal("default-value-default", inserted.DefaultValue);
-                    Assert.Equal("inserted-computed", inserted.Computed);
+                    Assert.Equal("db:inserted-computed", inserted.Computed);
 
                     entity.Id = id;
                     entity.Normal = "updated";
@@ -497,13 +576,13 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
                     entity.DefaultValue = "updated-default";
                     entity.Computed = "updated-computed";
 
-                    Assert.True(connection.Update(entity));
+                    Assert.True(connection.UpdateMapped(entity));
 
                     var updated = connection.Get<ProviderPersistenceEntity>(id);
-                    Assert.Equal("updated", updated.Normal);
+                    Assert.Equal("db:updated", updated.Normal);
                     Assert.Equal("read-only-default", updated.ReadOnly);
                     Assert.Equal("updated-default", updated.DefaultValue);
-                    Assert.Equal("updated-computed", updated.Computed);
+                    Assert.Equal("db:updated-computed", updated.Computed);
                 }
             }
             finally
@@ -882,6 +961,13 @@ FROM " + tableName + ";";
                     "99 AS order_id, " + DecimalLiteral(12.34m) + " AS total;";
             }
 
+            public string ThreeSegmentMultiMappingSql()
+            {
+                return "SELECT 11 AS customer_id, " + TextLiteral("Multiple") + " AS customer_name, " +
+                    "99 AS order_id, " + DecimalLiteral(12.34m) + " AS total, " +
+                    "501 AS shipment_id, " + TextLiteral("sent") + " AS shipment_status;";
+            }
+
             public string SingleCustomerSql(int id, string name)
             {
                 return "SELECT " + Literal(id) + " AS customer_id, " + TextLiteral(name) + " AS customer_name;";
@@ -1135,6 +1221,22 @@ WHERE code = @Code;";
             }
         }
 
+        private sealed class MultipleShipment
+        {
+            public int Id { get; set; }
+
+            public string Status { get; set; }
+        }
+
+        private sealed class MultipleShipmentMap : EntityMap<MultipleShipment>
+        {
+            public MultipleShipmentMap()
+            {
+                Map(shipment => shipment.Id).ToColumn("shipment_id");
+                Map(shipment => shipment.Status).ToColumn("shipment_status");
+            }
+        }
+
         private sealed class StreamCustomer
         {
             public int Id { get; set; }
@@ -1172,7 +1274,9 @@ WHERE code = @Code;";
             {
                 ToTable(MappedTableName);
                 Map(entity => entity.Id).ToColumn("id").IsIdentity();
-                Map(entity => entity.Normal).ToColumn("normal");
+                Map(entity => entity.Normal)
+                    .ToColumn("normal")
+                    .ConvertToDatabaseUsing<string, string>(value => "db:" + value);
                 Map(entity => entity.ReadOnly).ToColumn("read_only").ReadOnly();
                 Map(entity => entity.DefaultValue).ToColumn("default_value").DatabaseDefaultOnInsert();
                 Map(entity => entity.Computed).ToColumn("computed").Computed();

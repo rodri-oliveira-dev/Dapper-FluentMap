@@ -53,6 +53,10 @@ jobs:
         shell: pwsh
         run: ./eng/test-release-governance.ps1
 
+      - name: Validate compatibility contract consistency
+        shell: pwsh
+        run: ./eng/test-compatibility-consistency.ps1
+
       - name: Validate Dependabot configuration
         run: check-jsonschema --builtin-schema vendor.dependabot .github/dependabot.yml
 
@@ -127,6 +131,35 @@ jobs:
       - name: Test provider compatibility
         run: >-
           dotnet ./test/Dapper.FluentMap.ProviderCompatibility.Tests/bin/Release/net10.0/Dapper.FluentMap.ProviderCompatibility.Tests.dll
+
+  public-api:
+    name: Public API and nullable contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          show-progress: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore ./Dapper.FluentMap.slnx
+
+      - name: Validate checked-in API baselines and nullable annotations
+        run: |
+          dotnet build ./src/Dapper.FluentMap/Dapper.FluentMap.csproj --configuration Release --no-restore
+          dotnet build ./src/Dapper.FluentMap.Dommel/Dapper.FluentMap.Dommel.csproj --configuration Release --no-restore
+          dotnet build ./src/Dapper.FluentMap.DependencyInjection/Dapper.FluentMap.DependencyInjection.csproj --configuration Release --no-restore
+          dotnet build ./src/Dapper.FluentMap.Analyzers/Dapper.FluentMap.Analyzers.csproj --configuration Release --no-restore
+          dotnet build ./src/Dapper.FluentMap.Generators/Dapper.FluentMap.Generators.csproj --configuration Release --no-restore
 
   roslyn-components:
     name: Analyzer and generator compatibility
@@ -376,6 +409,12 @@ jobs:
           $ErrorActionPreference = 'Stop'
           ./eng/validate-package-metadata.ps1 -PackageDirectory './artifacts/packages'
 
+      - name: Validate packaged compatibility contract
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./eng/validate-compatibility-consistency.ps1 -PackageDirectory './artifacts/packages'
+
       - name: Validate package artifact set
         shell: pwsh
         run: |
@@ -457,6 +496,7 @@ jobs:
     needs:
       - repository-configuration
       - compatibility
+      - public-api
       - roslyn-components
       - provider-compatibility
     if: ${{ vars.SONAR_CI_ENABLED == 'true' && ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch') }}
@@ -763,6 +803,7 @@ jobs:
     needs:
       - repository-configuration
       - compatibility
+      - public-api
       - roslyn-components
       - provider-compatibility
       - native-aot
@@ -775,6 +816,7 @@ jobs:
         run: |
           echo "repository-configuration=${{ needs.repository-configuration.result }}"
           echo "compatibility=${{ needs.compatibility.result }}"
+          echo "public-api=${{ needs.public-api.result }}"
           echo "roslyn-components=${{ needs.roslyn-components.result }}"
           echo "provider-compatibility=${{ needs.provider-compatibility.result }}"
           echo "native-aot=${{ needs.native-aot.result }}"
@@ -783,6 +825,7 @@ jobs:
 
           if [[ "${{ needs.repository-configuration.result }}" != "success" || \
                 "${{ needs.compatibility.result }}" != "success" || \
+                "${{ needs.public-api.result }}" != "success" || \
                 "${{ needs.provider-compatibility.result }}" != "success" || \
                 "${{ needs.native-aot.result }}" != "success" || \
                 "${{ needs.roslyn-components.result }}" != "success" || \

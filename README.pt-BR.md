@@ -30,10 +30,10 @@ Consulte [MIGRATION.pt-BR.md](MIGRATION.pt-BR.md) ao migrar do FluentMap 2.x.
 | --- | --- |
 | Mapping explícito de propriedade para coluna | `EntityMap<T>`, `Map(...).ToColumn(...)` |
 | Convenções e naming policies | `AddConvention(...)`, `UseNamingPolicy(...)` |
-| Constructor mapping imutável | bridge histórico de type map do Dapper |
+| Construção imutável/factory | mapping de construtor, `ConstructUsing(...)` |
 | Objetos aninhados e value objects por componentes | `QueryMapped*` |
 | Formatos SQL alternativos | mapping profiles |
-| Multi-mapping de dois tipos | `QueryMapped<TFirst,TSecond,TReturn>(...)` |
+| Multi-mapping de dois/três tipos | `QueryMapped<...>(..., splitOn: ...)` |
 | Múltiplos result sets | `QueryMultipleMapped*`, `ReadMapped*` |
 | Streaming síncrono/assíncrono | `QueryMappedUnbuffered*` |
 | Conversão por propriedade | property converters |
@@ -41,7 +41,7 @@ Consulte [MIGRATION.pt-BR.md](MIGRATION.pt-BR.md) ao migrar do FluentMap 2.x.
 | Caminho gerado estrito | `UseStrictGeneratedMaterialization()`, `QueryGeneratedMapped*` |
 | Configuração isolada | `FluentMapRuntime` |
 | Dependency Injection | `AddFluentMap(...)` |
-| Metadata de persistência Dommel | `Dapper.FluentMap.Dommel` |
+| Persistência/conversão de escrita Dommel | `InsertMapped*`, `UpdateMapped*` |
 | Diagnósticos em compilação | `FluentMap.Analyzers` |
 
 Exemplos detalhados estão em [USAGE.pt-BR.md](USAGE.pt-BR.md).
@@ -115,7 +115,7 @@ Isso inclui:
 
 - objetos aninhados e value objects por componentes;
 - profiles;
-- multi-mapping de dois tipos com `splitOn`;
+- multi-mapping de dois/três tipos com `splitOn`;
 - múltiplos result sets mapeados;
 - streaming síncrono/assíncrono;
 - property converters;
@@ -158,6 +158,7 @@ Consulte [COMPATIBILITY.md](COMPATIBILITY.md) para:
 - [Compatibilidade](COMPATIBILITY.md)
 - [Changelog](CHANGELOG.md)
 - [Suporte](SUPPORT.md)
+- [Governança para mantenedores](MAINTAINING.md)
 - [English](README.md)
 
 ## Contribuição

@@ -546,6 +546,74 @@ public sealed class CustomerMap : EntityMap<Customer>
         }
 
         [Fact]
+        public async Task DuplicateConstructionStrategyShouldReportDfm016()
+        {
+            var source = @"
+using Dapper.FluentMap.Mapping;
+
+public sealed class Customer
+{
+    public Customer(int id) { Id = id; }
+    public int Id { get; }
+}
+
+public sealed class CustomerMap : EntityMap<Customer>
+{
+    public CustomerMap()
+    {
+        Map(c => c.Id).ToColumn(""customer_id"");
+        ConstructUsing(c => c.Id, id => new Customer(id));
+        ConstructUsing(c => c.Id, id => new Customer(id));
+    }
+}";
+
+            var diagnostic = await GetSingleDiagnosticAsync(
+                source,
+                FluentMapConfigurationAnalyzer.DuplicateConstructionStrategyDiagnosticId);
+
+            AssertDiagnostic(diagnostic, DiagnosticSeverity.Error, "more than one ConstructUsing");
+            AssertDiagnosticLineContains(source, diagnostic, "ConstructUsing(c => c.Id, id => new Customer(id))");
+        }
+
+        [Fact]
+        public async Task InheritedConstructionStrategyShouldReportDfm016OnDerivedMap()
+        {
+            var source = @"
+using Dapper.FluentMap.Mapping;
+
+public sealed class Customer
+{
+    public Customer(int id) { Id = id; }
+    public int Id { get; }
+}
+
+public class CustomerMap : EntityMap<Customer>
+{
+    public CustomerMap()
+    {
+        Map(c => c.Id).ToColumn(""customer_id"");
+        ConstructUsing(c => c.Id, id => new Customer(id));
+    }
+}
+
+public sealed class DerivedCustomerMap : CustomerMap
+{
+    public DerivedCustomerMap()
+    {
+        ConstructUsing(c => c.Id, id => new Customer(id));
+    }
+}";
+
+            var diagnostic = await GetSingleDiagnosticAsync(
+                source,
+                FluentMapConfigurationAnalyzer.DuplicateConstructionStrategyDiagnosticId);
+
+            AssertDiagnostic(diagnostic, DiagnosticSeverity.Error, "more than one ConstructUsing");
+            AssertDiagnosticLineContains(source, diagnostic, "ConstructUsing(c => c.Id, id => new Customer(id))");
+            Assert.Equal(23, diagnostic.Location.GetLineSpan().StartLinePosition.Line + 1);
+        }
+
+        [Fact]
         public async Task ValidMappingConfigurationShouldNotReportDiagnostics()
         {
             var source = @"

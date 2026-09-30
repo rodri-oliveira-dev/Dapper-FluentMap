@@ -59,7 +59,7 @@ namespace Dapper.FluentMap.Mapping
     public abstract class EntityMapBase<
         [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.PublicProperties)]
         TEntity,
-        TPropertyMap> : IEntityMap<TEntity>, IEntityMapWithIncludedBaseTypes
+        TPropertyMap> : IEntityMap<TEntity>, IEntityMapWithIncludedBaseTypes, IEntityMapWithConstructionStrategy
         where TPropertyMap : IPropertyMap
     {
         /// <summary>
@@ -78,7 +78,11 @@ namespace Dapper.FluentMap.Mapping
 
         IList<Type> IEntityMapWithIncludedBaseTypes.IncludedBaseTypes => IncludedBaseTypes;
 
+        EntityConstructionStrategy IEntityMapWithConstructionStrategy.ConstructionStrategy => ConstructionStrategy;
+
         private IList<Type> IncludedBaseTypes { get; }
+
+        private EntityConstructionStrategy ConstructionStrategy { get; set; }
 
         /// <summary>
         /// Returns an instance of <typeparamref name="TPropertyMap"/> which can perform custom mapping
@@ -127,11 +131,143 @@ namespace Dapper.FluentMap.Mapping
         }
 
         /// <summary>
+        /// Configures an explicit factory that constructs the entity from one explicitly mapped property value.
+        /// </summary>
+        /// <typeparam name="TValue1">The first mapped value type.</typeparam>
+        /// <param name="value1">The mapped property path supplied as the first factory argument.</param>
+        /// <param name="factory">The factory invoked for each materialized row.</param>
+        protected void ConstructUsing<TValue1>(
+            Expression<Func<TEntity, TValue1>> value1,
+            Func<TValue1, TEntity> factory)
+        {
+            if (factory == null)
+            {
+                throw new ArgumentNullException(nameof(factory));
+            }
+
+            SetConstructionStrategy(
+                new[] { CreateConstructionBinding(value1) },
+                values => factory((TValue1)values[0]));
+        }
+
+        /// <summary>
+        /// Configures an explicit factory that constructs the entity from two explicitly mapped property values.
+        /// </summary>
+        /// <typeparam name="TValue1">The first mapped value type.</typeparam>
+        /// <typeparam name="TValue2">The second mapped value type.</typeparam>
+        /// <param name="value1">The mapped property path supplied as the first factory argument.</param>
+        /// <param name="value2">The mapped property path supplied as the second factory argument.</param>
+        /// <param name="factory">The factory invoked for each materialized row.</param>
+        protected void ConstructUsing<TValue1, TValue2>(
+            Expression<Func<TEntity, TValue1>> value1,
+            Expression<Func<TEntity, TValue2>> value2,
+            Func<TValue1, TValue2, TEntity> factory)
+        {
+            if (factory == null)
+            {
+                throw new ArgumentNullException(nameof(factory));
+            }
+
+            SetConstructionStrategy(
+                new[] { CreateConstructionBinding(value1), CreateConstructionBinding(value2) },
+                values => factory((TValue1)values[0], (TValue2)values[1]));
+        }
+
+        /// <summary>
+        /// Configures an explicit factory that constructs the entity from three explicitly mapped property values.
+        /// </summary>
+        /// <typeparam name="TValue1">The first mapped value type.</typeparam>
+        /// <typeparam name="TValue2">The second mapped value type.</typeparam>
+        /// <typeparam name="TValue3">The third mapped value type.</typeparam>
+        /// <param name="value1">The mapped property path supplied as the first factory argument.</param>
+        /// <param name="value2">The mapped property path supplied as the second factory argument.</param>
+        /// <param name="value3">The mapped property path supplied as the third factory argument.</param>
+        /// <param name="factory">The factory invoked for each materialized row.</param>
+        protected void ConstructUsing<TValue1, TValue2, TValue3>(
+            Expression<Func<TEntity, TValue1>> value1,
+            Expression<Func<TEntity, TValue2>> value2,
+            Expression<Func<TEntity, TValue3>> value3,
+            Func<TValue1, TValue2, TValue3, TEntity> factory)
+        {
+            if (factory == null)
+            {
+                throw new ArgumentNullException(nameof(factory));
+            }
+
+            SetConstructionStrategy(
+                new[]
+                {
+                    CreateConstructionBinding(value1),
+                    CreateConstructionBinding(value2),
+                    CreateConstructionBinding(value3)
+                },
+                values => factory((TValue1)values[0], (TValue2)values[1], (TValue3)values[2]));
+        }
+
+        /// <summary>
+        /// Configures an explicit factory that constructs the entity from four explicitly mapped property values.
+        /// </summary>
+        /// <typeparam name="TValue1">The first mapped value type.</typeparam>
+        /// <typeparam name="TValue2">The second mapped value type.</typeparam>
+        /// <typeparam name="TValue3">The third mapped value type.</typeparam>
+        /// <typeparam name="TValue4">The fourth mapped value type.</typeparam>
+        /// <param name="value1">The mapped property path supplied as the first factory argument.</param>
+        /// <param name="value2">The mapped property path supplied as the second factory argument.</param>
+        /// <param name="value3">The mapped property path supplied as the third factory argument.</param>
+        /// <param name="value4">The mapped property path supplied as the fourth factory argument.</param>
+        /// <param name="factory">The factory invoked for each materialized row.</param>
+        protected void ConstructUsing<TValue1, TValue2, TValue3, TValue4>(
+            Expression<Func<TEntity, TValue1>> value1,
+            Expression<Func<TEntity, TValue2>> value2,
+            Expression<Func<TEntity, TValue3>> value3,
+            Expression<Func<TEntity, TValue4>> value4,
+            Func<TValue1, TValue2, TValue3, TValue4, TEntity> factory)
+        {
+            if (factory == null)
+            {
+                throw new ArgumentNullException(nameof(factory));
+            }
+
+            SetConstructionStrategy(
+                new[]
+                {
+                    CreateConstructionBinding(value1),
+                    CreateConstructionBinding(value2),
+                    CreateConstructionBinding(value3),
+                    CreateConstructionBinding(value4)
+                },
+                values => factory(
+                    (TValue1)values[0],
+                    (TValue2)values[1],
+                    (TValue3)values[2],
+                    (TValue4)values[3]));
+        }
+
+        /// <summary>
         /// When overridden in a derived class, gets the property mapping for the specified property.
         /// </summary>
         /// <param name="info">The <see cref="PropertyInfo"/> for the property.</param>
         /// <returns>An instance of <typeparamref name="TPropertyMap"/>.</returns>
         protected abstract TPropertyMap GetPropertyMap(PropertyInfo info);
+
+        private static ConstructionValueBinding CreateConstructionBinding<TValue>(
+            Expression<Func<TEntity, TValue>> expression)
+        {
+            return new ConstructionValueBinding(ReflectionHelper.GetMemberPath(expression), typeof(TValue));
+        }
+
+        private void SetConstructionStrategy(
+            IEnumerable<ConstructionValueBinding> bindings,
+            Func<object[], object> factory)
+        {
+            if (ConstructionStrategy != null)
+            {
+                throw new FluentMapConfigurationException(
+                    $"Entity '{typeof(TEntity).FullName}' already has an explicit construction strategy.");
+            }
+
+            ConstructionStrategy = new EntityConstructionStrategy(typeof(TEntity), bindings, factory);
+        }
 
         private void ThrowIfDuplicateMapping(IPropertyMap map)
         {

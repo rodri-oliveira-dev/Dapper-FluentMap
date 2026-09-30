@@ -145,7 +145,18 @@ var customer = connection.QueryMappedSingle<Customer>(
     "SELECT 1 AS customer_id, '12345678909' AS cpf;");
 ```
 
-The current materializer uses compatible public constructors. Factory methods are not used.
+The runtime materializer uses compatible public constructors by default. A map can opt into an explicit factory when construction cannot follow that rule:
+
+```csharp
+public CustomerMap()
+{
+    Map(customer => customer.Id).ToColumn("customer_id");
+    Map(customer => customer.Name).ToColumn("customer_name");
+    ConstructUsing(customer => customer.Id, customer => customer.Name, Customer.Restore);
+}
+```
+
+`ConstructUsing` supports one to four explicitly mapped root-property values, validates every binding, and is preserved by isolated runtimes. Nested property paths are rejected during configuration because explicit factories currently bind only the root materialization node. Call `ConstructUsing` directly from the map constructor: the source generator analyzes constructor invocations and does not follow helper-method calls. Delegate factories are runtime-materialization strategies: the source generator registers the map but reports `DFM011` and does not emit a generated materializer. Strict generated mode therefore rejects that shape instead of silently using the factory through reflection.
 
 ## Mapping Profiles
 
@@ -191,7 +202,7 @@ var legacy = connection.QueryMappedSingle<Customer, LegacyProfile>(legacySql);
 
 These APIs complement normal Dapper queries; they do not replace them for simple root-level mappings.
 
-## Two-Type Multi-Mapping
+## Multi-Mapping
 
 For rows that contain two mapped entities, use explicit `splitOn` and a composition delegate:
 
@@ -207,6 +218,17 @@ Each segment is materialized through FluentMap. Per-segment profile overloads ar
 For common `LEFT JOIN` scenarios, if all columns in the second segment are `NULL`, the second argument can represent an absent child instead of forcing an invalid object.
 
 This API performs row splitting; it does not aggregate repeated rows into one-to-many object graphs.
+
+Three input segments are also supported through the same segment pipeline, including async and isolated-runtime variants:
+
+```csharp
+var rows = connection.QueryMapped<Customer, Order, Shipment, CustomerOrderShipment>(
+    sql,
+    (customer, order, shipment) => new CustomerOrderShipment(customer, order, shipment),
+    splitOn: "order_id,shipment_id");
+```
+
+Three-type calls require two comma-separated, unique boundaries in result order. Empty, missing, duplicated, ambiguous or out-of-order boundaries fail deterministically. Any all-`NULL` child segment is passed as `null`. The supported public arity is deliberately capped at three input types; compose rows manually for wider shapes.
 
 ## Multiple Result Sets
 
@@ -294,7 +316,15 @@ null/DBNull handling
 
 Normal `Dapper.Query<T>()` does not execute property converters. Use Dapper `TypeHandler<T>` for type-wide conversion.
 
-Write-converter metadata exists, but the current Dapper/Dommel write path does not execute it.
+Dommel write conversion is opt-in through `InsertMapped*` and `UpdateMapped*` from `Dapper.FluentMap.Dommel`:
+
+```csharp
+var id = connection.InsertMapped(product);
+product.Id = Convert.ToInt32(id);
+connection.UpdateMapped(product);
+```
+
+Only properties participating in the selected operation are converted. Converter output is then passed to Dapper, so a registered Dapper type handler for the converter output type runs after the property converter. Converter failures include entity, property, column and operation context and never retry with the original value. Historical Dommel `Insert`/`Update` remain unchanged because Dommel exposes no per-property parameter hook.
 
 ## Persistence Metadata And Dommel
 
@@ -374,10 +404,15 @@ var runtime = new FluentMapConfigurationBuilder()
 
 var customer = runtime.QueryGeneratedMappedSingle<Customer>(
     connection,
-    "SELECT 7 AS customer_id, 'Ada' AS customer_name;");
+    "SELECT @Id AS customer_id, @Name AS customer_name, 'trace' AS trace_id;",
+    new GeneratedParameters()
+        .Add("Id", 7, System.Data.DbType.Int32)
+        .Add("Name", "Ada", System.Data.DbType.String, size: 100));
 ```
 
-Unsupported shapes fail deterministically instead of silently using runtime materialization.
+`GeneratedParameters` binds only explicitly named input values with an explicit `DbType`; it does not inspect anonymous objects. Parameterless commands remain supported. Arbitrary parameter objects fail before the connection is opened, with `QueryMapped*` identified as the non-strict alternative.
+
+Generated materializers accept reordered required columns and additional columns only when the additional names do not resolve to explicitly configured FluentMap members. Missing required columns, duplicate names, explicitly mapped additional columns, incompatible provider values and unsupported nested shapes fail deterministically instead of silently using runtime materialization. Strict generated resolution does not reflect over convention-only entity members; use the non-strict API when Dapper default-member discovery is required.
 
 The strict generated path has a narrower supported contract than normal FluentMap-controlled materialization. Review [COMPATIBILITY.md](COMPATIBILITY.md) before using it for trimming or Native AOT deployments.
 

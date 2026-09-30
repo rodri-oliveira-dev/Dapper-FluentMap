@@ -84,12 +84,12 @@ namespace Dapper.FluentMap.Diagnostics
         /// <summary>
         /// Gets the base entity type that declared an inherited mapping, when applicable.
         /// </summary>
-        public Type InheritedFrom { get; }
+        public Type? InheritedFrom { get; }
 
         /// <summary>
         /// Gets the convention type that produced the mapping, when applicable.
         /// </summary>
-        public Type ConventionType { get; }
+        public Type? ConventionType { get; }
 
         /// <summary>
         /// Gets constructor parameters that can receive this mapped column.

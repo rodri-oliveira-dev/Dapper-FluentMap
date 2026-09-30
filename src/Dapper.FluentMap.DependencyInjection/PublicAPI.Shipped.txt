@@ -1,0 +1,4 @@
+#nullable enable
+
+Microsoft.Extensions.DependencyInjection.FluentMapServiceCollectionExtensions
+static Microsoft.Extensions.DependencyInjection.FluentMapServiceCollectionExtensions.AddFluentMap(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services, System.Action<Dapper.FluentMap.Configuration.FluentMapConfigurationBuilder!>! configure) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!

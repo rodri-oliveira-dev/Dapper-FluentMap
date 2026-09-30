@@ -53,7 +53,7 @@ Antes de alterar as versões dos pacotes FluentMap:
 - execute a suíte de testes existente antes e depois da atualização;
 - identifique se a aplicação usa Dommel, `Ignore()` para colunas geradas pelo banco, assembly scanning, implementações customizadas de `TypeHandler<T>` do Dapper, trimming ou Native AOT.
 
-As faixas suportadas atualmente ficam documentadas em [COMPATIBILITY.md](COMPATIBILITY.md). No momento deste guia:
+As faixas suportadas atualmente ficam documentadas em [COMPATIBILITY.md](COMPATIBILITY.md). Os valores do Dapper são governados por `eng/compatibility-contract.json` e validados contra metadata de pacote e CI. No momento deste guia:
 
 ```text
 Dapper [2.1.79,3.0.0)
@@ -298,7 +298,7 @@ Para value objects armazenados por componentes mapeados, use materialização co
 Map(customer => customer.Cpf.Number).ToColumn("cpf");
 ```
 
-O materializador atual usa construtores públicos compatíveis. Factory methods não são utilizados.
+O materializador de runtime continua selecionando construtores públicos compatíveis por padrão. Maps que antes não podiam ser materializados agora podem optar por `ConstructUsing(...)`, com um a quatro valores de propriedades raiz explicitamente mapeadas; caminhos aninhados são rejeitados durante a configuração. Esse caminho de factory é suportado pela materialização em runtime e por runtimes isolados; materializadores gerados reportam `DFM011`, e o modo strict generated rejeita o shape sem fallback.
 
 ## Profiles
 
@@ -338,7 +338,13 @@ Map(product => product.Status)
 
 `Dapper.Query<T>()` normal não executa property converters. Use `TypeHandler<T>` do Dapper para conversões globais por tipo.
 
-Existe metadata de write converter, mas escritas Dapper/Dommel ainda não a executam.
+Write converters configurados são executados apenas pelos métodos opt-in `InsertMapped*` e `UpdateMapped*` do adapter Dommel. O comportamento histórico de `Insert`/`Update` do Dommel permanece inalterado. O conversor da propriedade executa primeiro; depois, o Dapper aplica eventual type handler registrado para o tipo de saída do conversor.
+
+Overloads `QueryMapped<TFirst,TSecond,TThird,TReturn>` com três entradas agora complementam a API histórica de duas entradas. Informe duas fronteiras `splitOn` únicas, separadas por vírgula. Essas APIs apenas compõem linhas individuais e não agregam grafos um-para-muitos.
+
+## Anotações Nullable
+
+Os assemblies públicos agora carregam anotações de nullable reference types. As assinaturas CLR e a compatibilidade binária não mudam, mas consumidores com nullable habilitado podem receber warnings mais precisos: parâmetros/transações opcionais e metadados opcionais são nullable, e argumentos filhos de multi-mapping são nullable porque um segmento contendo apenas `NULL` é entregue como `null`. Trate os novos warnings como orientação de contrato; não desabilite a análise nullable globalmente para ocultá-los.
 
 ## Registro Gerado
 
@@ -351,6 +357,10 @@ config.AddGeneratedMappings();
 Isso pode substituir registro manual para maps elegíveis da compilação atual. Não faz scan de assemblies referenciados e não elimina a necessidade de validação em runtime.
 
 Materializadores gerados são uma otimização. Casos não suportados usam materialização runtime como fallback, exceto quando o modo estrito de materialização gerada é habilitado explicitamente.
+
+Queries strict generated podem usar `GeneratedParameters` para comandos parametrizados. Cada valor possui um `DbType` explícito; objetos anônimos e outros bags de parâmetros arbitrários continuam não suportados, para que o modo estrito não introduza descoberta de parâmetros por reflection. Colunas reordenadas e colunas adicionais que não resolvem para membros configurados explicitamente no FluentMap podem permanecer no caminho gerado; colunas obrigatórias ausentes, nomes duplicados/ambíguos ou colunas adicionais explicitamente mapeadas falham deterministicamente. A descoberta de membros apenas por convenção do Dapper permanece exclusiva do caminho não estrito.
+
+Falhas de conversão de valores gerados agora lançam `FluentMapConfigurationException` com contexto da entidade, membro, coluna, tipo do provider e tipo de destino. Código que antes capturava `FormatException` ou `InvalidCastException`, dependentes do provider, deve capturar `FluentMapConfigurationException` e inspecionar a exceção interna.
 
 ## Isolamento de Configuração
 

@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "1.0",
+  "runtime": ".NET 10",
+  "operatingSystem": "Windows",
+  "job": "ShortRun",
+  "calibrationRuns": 2,
+  "calibrationNote": "Initial Windows ShortRun measurements showed material timing variance while allocations remained stable; thresholds are report-only pending scheduled hosted-runner history.",
+  "timeRegressionThresholdPercent": 35,
+  "allocationRegressionThresholdPercent": 15,
+  "reportOnly": true,
+  "scenarios": [
+    { "method": "DapperWithFluentMapRootMapping", "meanNanoseconds": 3066174, "allocatedBytes": 290096 },
+    { "method": "QueryMappedSimple", "meanNanoseconds": 4179233, "allocatedBytes": 267784 },
+    { "method": "RuntimeQueryMappedSimple", "meanNanoseconds": 3238907, "allocatedBytes": 267784 },
+    { "method": "RuntimeQueryGeneratedSimpleExtraColumn", "meanNanoseconds": 3220158, "allocatedBytes": 304867 },
+    { "method": "QueryMappedGeneratedPropertyConverter", "meanNanoseconds": 1207906, "allocatedBytes": 146608 },
+    { "method": "QueryMappedTwoSegments", "meanNanoseconds": 1795108, "allocatedBytes": 269200 },
+    { "method": "QueryMappedThreeSegments", "meanNanoseconds": 5463660, "allocatedBytes": 398976 }
+  ]
+}

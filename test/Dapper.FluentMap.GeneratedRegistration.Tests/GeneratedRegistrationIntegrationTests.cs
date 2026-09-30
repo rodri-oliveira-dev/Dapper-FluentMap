@@ -66,6 +66,10 @@ namespace Dapper.FluentMap.GeneratedRegistration.Tests
                     Assert.Equal(8, internalCustomer.Id);
                     Assert.Equal(9, derived.Id);
                     Assert.Equal("Lovelace", derived.Name);
+                    var inheritedId = FluentMapper.Explain<GeneratedDerivedCustomer>()
+                        .Members.Single(member => member.MemberPath == nameof(GeneratedBaseCustomer.Id));
+                    Assert.Equal(typeof(GeneratedBaseCustomer), inheritedId.PropertyInfo.DeclaringType);
+                    Assert.Equal(typeof(GeneratedBaseCustomer), inheritedId.PropertyInfo.ReflectedType);
                     Assert.Equal(10, immutable.Id);
                     Assert.Equal("Grace", immutable.Name);
                     Assert.Equal(12, queryMappedImmutable.Id);
@@ -129,13 +133,33 @@ namespace Dapper.FluentMap.GeneratedRegistration.Tests
                         "SELECT 'Reordered' AS note, 44 AS age;");
                     var converted = connection.QueryMappedSingle<GeneratedConvertedCustomer>(
                         "SELECT '42' AS optional_score, 'A' AS status, 45 AS customer_id;");
+                    var strictExtra = FluentMapper.Runtime.QueryGeneratedMappedSingle<GeneratedNullableCustomer>(
+                        connection,
+                        "SELECT 'trace' AS trace_id, 'Additional' AS note, 46 AS age;");
+                    var strictParameterized = FluentMapper.Runtime.QueryGeneratedMappedSingle<GeneratedNullableCustomer>(
+                        connection,
+                        "SELECT @Age AS age, @Note AS note;",
+                        new GeneratedParameters()
+                            .Add("Age", 47, System.Data.DbType.Int32)
+                            .Add("Note", "Parameterized", System.Data.DbType.String, size: 64));
 
                     Assert.Equal(44, nullable.Age);
                     Assert.Equal("Reordered", nullable.Note);
                     Assert.Equal(45, converted.Id);
                     Assert.Equal(GeneratedAccountStatus.Active, converted.Status);
                     Assert.Equal(42, converted.OptionalScore);
+                    Assert.Equal(46, strictExtra.Age);
+                    Assert.Equal("Additional", strictExtra.Note);
+                    Assert.Equal(47, strictParameterized.Age);
+                    Assert.Equal("Parameterized", strictParameterized.Note);
                     Assert.Equal(0, FluentMapper.Registry.MaterializationPlanCacheEntryCount);
+
+                    var incompatibleValue = Assert.Throws<FluentMapConfigurationException>(() =>
+                        FluentMapper.Runtime.QueryGeneratedMappedSingle<GeneratedNullableCustomer>(
+                            connection,
+                            "SELECT 'not-an-integer' AS age, 'Invalid' AS note;"));
+                    Assert.Contains(typeof(GeneratedNullableCustomer).FullName, incompatibleValue.Message);
+                    Assert.Contains(nameof(GeneratedNullableCustomer.Age), incompatibleValue.Message);
                 }
             }
             finally

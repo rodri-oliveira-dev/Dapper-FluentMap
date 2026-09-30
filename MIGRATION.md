@@ -53,7 +53,7 @@ Before changing FluentMap package versions:
 - run the existing test suite before and after the upgrade;
 - identify whether the application uses Dommel, `Ignore()` for database-generated columns, assembly scanning, custom Dapper `TypeHandler<T>` implementations, trimming or Native AOT.
 
-Current supported package ranges are documented in [COMPATIBILITY.md](COMPATIBILITY.md). At the time of this guide:
+Current supported package ranges are documented in [COMPATIBILITY.md](COMPATIBILITY.md). The Dapper values are governed by `eng/compatibility-contract.json` and validated against package metadata and CI. At the time of this guide:
 
 ```text
 Dapper [2.1.79,3.0.0)
@@ -298,7 +298,7 @@ For value objects stored through mapped components, use FluentMap-controlled mat
 Map(customer => customer.Cpf.Number).ToColumn("cpf");
 ```
 
-The current materializer uses compatible public constructors. Factory methods are not used.
+The runtime materializer still selects compatible public constructors by default. Maps that previously could not be materialized can now opt into `ConstructUsing(...)` with one to four explicitly mapped root-property values; nested paths are rejected during configuration. This factory path is supported by runtime materialization and isolated runtimes; generated materializers report `DFM011`, and strict generated mode rejects the unsupported shape without fallback.
 
 ## Profiles
 
@@ -338,7 +338,13 @@ Map(product => product.Status)
 
 Normal `Dapper.Query<T>()` does not execute property converters. Use Dapper `TypeHandler<T>` for type-wide conversion.
 
-Write converter metadata exists, but Dapper/Dommel writes do not execute it yet.
+Configured write converters execute only through the Dommel adapter's opt-in `InsertMapped*` and `UpdateMapped*` methods. Historical Dommel `Insert`/`Update` behavior is unchanged. The property converter runs first; Dapper then applies any type handler registered for the converter output type.
+
+Three-input `QueryMapped<TFirst,TSecond,TThird,TReturn>` overloads now complement the historical two-input API. Supply two comma-separated unique `splitOn` boundaries. These APIs compose individual rows only and do not aggregate one-to-many graphs.
+
+## Nullable Annotations
+
+Public assemblies now carry nullable reference annotations. CLR signatures and binary compatibility are unchanged, but nullable-enabled consumers may receive more accurate compiler warnings: optional query parameters/transactions and optional metadata are nullable, and multi-mapping child arguments are nullable because an all-`NULL` segment is passed as `null`. Treat new warnings as contract guidance; do not disable nullable analysis globally to hide them.
 
 ## Generated Registration
 
@@ -351,6 +357,10 @@ config.AddGeneratedMappings();
 This can replace manual registration for eligible maps in the current compilation. It does not scan referenced assemblies and does not remove the need for runtime validation.
 
 Generated materializers are an optimization. Unsupported cases fall back to runtime materialization unless strict generated materialization is explicitly enabled.
+
+Strict generated queries can use `GeneratedParameters` for parameterized commands. Each value has an explicit `DbType`; anonymous objects and other arbitrary parameter bags remain unsupported so strict mode does not introduce reflection-based parameter discovery. Safe reordered and additional result columns that do not resolve to explicitly configured FluentMap members can stay on the generated path, while missing, duplicate/ambiguous or explicitly mapped additional columns fail deterministically. Convention-only Dapper member discovery remains exclusive to the non-strict path.
+
+Generated value-conversion failures now throw `FluentMapConfigurationException` with entity, member, column, provider type and target type context. Code that previously caught a provider-dependent `FormatException` or `InvalidCastException` from generated materialization should catch `FluentMapConfigurationException` and inspect its inner exception instead.
 
 ## Configuration Isolation
 

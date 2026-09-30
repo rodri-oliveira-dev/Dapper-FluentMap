@@ -1,0 +1,152 @@
+name: Compatibility Canary
+
+on:
+  schedule:
+    - cron: "43 7 * * 2"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: compatibility-canary-${{ github.repository }}
+  cancel-in-progress: false
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: "true"
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: "true"
+
+jobs:
+  supported-dapper:
+    name: Supported evidence (${{ matrix.label }}, Dapper ${{ matrix.version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: minimum-supported
+            version: 2.1.79
+          - label: latest-supported
+            version: 2.1.89
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+
+      - name: Restore supported lane
+        run: dotnet restore ./Dapper.FluentMap.slnx -p:DapperPackageVersion=${{ matrix.version }}
+
+      - name: Build supported lane
+        run: dotnet build ./Dapper.FluentMap.slnx --configuration Release --no-restore -p:DapperPackageVersion=${{ matrix.version }}
+
+      - name: Test supported lane
+        run: >-
+          dotnet test ./test/Dapper.FluentMap.Tests/Dapper.FluentMap.Tests.csproj
+          --configuration Release --no-build
+
+  forward-dapper:
+    name: Experimental forward Dapper
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+
+      - name: Resolve forward-looking Dapper version
+        id: resolve
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $supported = '2.1.89'
+          $index = Invoke-RestMethod 'https://api.nuget.org/v3-flatcontainer/dapper/index.json'
+          $candidates = @(
+            $index.versions |
+              Where-Object { [version](($_ -split '-', 2)[0]) -gt [version]$supported } |
+              Sort-Object { [version](($_ -split '-', 2)[0]) }
+          )
+          $candidate = if ($candidates.Count -eq 0) { $null } else { $candidates[-1] }
+          $available = -not [string]::IsNullOrWhiteSpace($candidate)
+          "available=$($available.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+          "version=$candidate" >> $env:GITHUB_OUTPUT
+          if ($available) {
+            "### Experimental Dapper candidate: $candidate" >> $env:GITHUB_STEP_SUMMARY
+          } else {
+            '### No newer Dapper stable/prerelease is currently resolvable.' >> $env:GITHUB_STEP_SUMMARY
+          }
+
+      - name: Restore experimental lane
+        if: ${{ steps.resolve.outputs.available == 'true' }}
+        run: dotnet restore ./Dapper.FluentMap.slnx -p:DapperPackageVersion=${{ steps.resolve.outputs.version }}
+
+      - name: Build experimental lane
+        if: ${{ steps.resolve.outputs.available == 'true' }}
+        run: dotnet build ./Dapper.FluentMap.slnx --configuration Release --no-restore -p:DapperPackageVersion=${{ steps.resolve.outputs.version }}
+
+      - name: Test experimental lane
+        if: ${{ steps.resolve.outputs.available == 'true' }}
+        run: >-
+          dotnet test ./test/Dapper.FluentMap.Tests/Dapper.FluentMap.Tests.csproj
+          --configuration Release --no-build
+
+  provider-clients:
+    name: Experimental latest provider clients
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+
+      - name: Restore latest stable provider clients
+        run: >-
+          dotnet restore ./test/Dapper.FluentMap.ProviderCompatibility.Tests/Dapper.FluentMap.ProviderCompatibility.Tests.csproj
+          -p:SqlClientPackageVersion=*
+          -p:SqliteClientPackageVersion=*
+          -p:MySqlConnectorPackageVersion=*
+          -p:NpgsqlPackageVersion=*
+
+      - name: Report resolved experimental clients
+        shell: pwsh
+        run: |
+          $assets = Get-Content -Raw './test/Dapper.FluentMap.ProviderCompatibility.Tests/obj/project.assets.json' | ConvertFrom-Json
+          $packages = @('Microsoft.Data.SqlClient/', 'Microsoft.Data.Sqlite/', 'MySqlConnector/', 'Npgsql/')
+          foreach ($prefix in $packages) {
+            $resolved = @($assets.libraries.PSObject.Properties.Name | Where-Object { $_ -like "$prefix*" })
+            "- experimental: $($resolved -join ', ')" >> $env:GITHUB_STEP_SUMMARY
+          }
+
+      - name: Build against experimental clients
+        run: >-
+          dotnet build ./test/Dapper.FluentMap.ProviderCompatibility.Tests/Dapper.FluentMap.ProviderCompatibility.Tests.csproj
+          --configuration Release --no-restore
+          -p:SqlClientPackageVersion=*
+          -p:SqliteClientPackageVersion=*
+          -p:MySqlConnectorPackageVersion=*
+          -p:NpgsqlPackageVersion=*
+
+      - name: Run always-available SQLite evidence
+        env:
+          DFM_PROVIDER_FILTER: SQLite
+        run: >-
+          dotnet ./test/Dapper.FluentMap.ProviderCompatibility.Tests/bin/Release/net10.0/Dapper.FluentMap.ProviderCompatibility.Tests.dll
+          -failSkips -parallelMode none

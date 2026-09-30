@@ -9,11 +9,11 @@ namespace Dapper.FluentMap.Materialization
     {
         private GeneratedMaterializerColumn(
             string columnName,
-            string memberPath,
+            string? memberPath,
             bool ignored,
-            Type readConverterType,
-            Type readConverterDatabaseType,
-            Type readConverterPropertyType)
+            Type? readConverterType,
+            Type? readConverterDatabaseType,
+            Type? readConverterPropertyType)
         {
             if (string.IsNullOrWhiteSpace(columnName))
             {
@@ -41,7 +41,7 @@ namespace Dapper.FluentMap.Materialization
         /// <summary>
         /// Gets the mapped member path expected for this column, or <see langword="null"/> for ignored columns.
         /// </summary>
-        public string MemberPath { get; }
+        public string? MemberPath { get; }
 
         /// <summary>
         /// Gets a value indicating whether the current mapping must ignore this column.
@@ -51,17 +51,17 @@ namespace Dapper.FluentMap.Materialization
         /// <summary>
         /// Gets the read converter type applied by the generated materializer, or <see langword="null"/>.
         /// </summary>
-        public Type ReadConverterType { get; }
+        public Type? ReadConverterType { get; }
 
         /// <summary>
         /// Gets the database/provider CLR type accepted by the generated read converter, or <see langword="null"/>.
         /// </summary>
-        public Type ReadConverterDatabaseType { get; }
+        public Type? ReadConverterDatabaseType { get; }
 
         /// <summary>
         /// Gets the property CLR type returned by the generated read converter, or <see langword="null"/>.
         /// </summary>
-        public Type ReadConverterPropertyType { get; }
+        public Type? ReadConverterPropertyType { get; }
 
         /// <summary>
         /// Creates a descriptor for a materialized column.
