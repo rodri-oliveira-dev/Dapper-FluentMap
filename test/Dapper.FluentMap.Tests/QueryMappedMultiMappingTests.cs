@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Dapper;
 using Dapper.FluentMap.Configuration;
@@ -643,7 +644,14 @@ namespace Dapper.FluentMap.Tests
         [Trait("Category", "Integration")]
         public void ThreeSegmentGeneratedAndRuntimeMaterializationShouldBeEquivalent()
         {
-            var generatedRuntime = CreateThreeSegmentRuntime(registerGenerated: true);
+            var materializerCounts = new Dictionary<Type, int>();
+            var generatedRuntime = CreateThreeSegmentRuntime(
+                registerGenerated: true,
+                materializedType =>
+                {
+                    materializerCounts.TryGetValue(materializedType, out var count);
+                    materializerCounts[materializedType] = count + 1;
+                });
             var reflectionRuntime = CreateThreeSegmentRuntime(registerGenerated: false);
 
             using (var connection = OpenConnection())
@@ -666,10 +674,15 @@ namespace Dapper.FluentMap.Tests
                 Assert.Equal(reflection.Order.Total, generated.Order.Total);
                 Assert.Equal(reflection.Shipment.Id, generated.Shipment.Id);
                 Assert.Equal(reflection.Shipment.Status, generated.Shipment.Status);
+                Assert.Equal(1, materializerCounts[typeof(JoinCustomer)]);
+                Assert.Equal(1, materializerCounts[typeof(JoinOrder)]);
+                Assert.Equal(1, materializerCounts[typeof(JoinShipment)]);
             }
         }
 
-        private static FluentMapRuntime CreateThreeSegmentRuntime(bool registerGenerated)
+        private static FluentMapRuntime CreateThreeSegmentRuntime(
+            bool registerGenerated,
+            Action<Type> generatedMaterialized = null)
         {
             var builder = new FluentMapConfigurationBuilder()
                 .AddMap(new JoinCustomerMap())
@@ -685,10 +698,14 @@ namespace Dapper.FluentMap.Tests
                             GeneratedMaterializerColumn.Map("customer_id", nameof(JoinCustomer.Id)),
                             GeneratedMaterializerColumn.Map("customer_name", nameof(JoinCustomer.Name))
                         },
-                        record => new JoinCustomer
+                        record =>
                         {
-                            Id = Convert.ToInt32(record.GetValue(0)),
-                            Name = Convert.ToString(record.GetValue(1))
+                            generatedMaterialized?.Invoke(typeof(JoinCustomer));
+                            return new JoinCustomer
+                            {
+                                Id = Convert.ToInt32(record.GetValue(0)),
+                                Name = Convert.ToString(record.GetValue(1))
+                            };
                         })
                     .AddGeneratedMaterializer(
                         new[]
@@ -696,10 +713,14 @@ namespace Dapper.FluentMap.Tests
                             GeneratedMaterializerColumn.Map("order_id", nameof(JoinOrder.Id)),
                             GeneratedMaterializerColumn.Map("total", nameof(JoinOrder.Total))
                         },
-                        record => new JoinOrder
+                        record =>
                         {
-                            Id = Convert.ToInt32(record.GetValue(0)),
-                            Total = Convert.ToDecimal(record.GetValue(1))
+                            generatedMaterialized?.Invoke(typeof(JoinOrder));
+                            return new JoinOrder
+                            {
+                                Id = Convert.ToInt32(record.GetValue(0)),
+                                Total = Convert.ToDecimal(record.GetValue(1))
+                            };
                         })
                     .AddGeneratedMaterializer(
                         new[]
@@ -707,10 +728,14 @@ namespace Dapper.FluentMap.Tests
                             GeneratedMaterializerColumn.Map("shipment_id", nameof(JoinShipment.Id)),
                             GeneratedMaterializerColumn.Map("shipment_status", nameof(JoinShipment.Status))
                         },
-                        record => new JoinShipment
+                        record =>
                         {
-                            Id = Convert.ToInt32(record.GetValue(0)),
-                            Status = Convert.ToString(record.GetValue(1))
+                            generatedMaterialized?.Invoke(typeof(JoinShipment));
+                            return new JoinShipment
+                            {
+                                Id = Convert.ToInt32(record.GetValue(0)),
+                                Status = Convert.ToString(record.GetValue(1))
+                            };
                         });
             }
 

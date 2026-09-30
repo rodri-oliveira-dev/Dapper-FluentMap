@@ -1,1 +1,11 @@
 #nullable enable
+
+const Dapper.FluentMap.Generators.MappingRegistrationGenerator.DuplicateGeneratedEntityMapDiagnosticId = "DFM007" -> string!
+const Dapper.FluentMap.Generators.MappingRegistrationGenerator.DuplicateGeneratedProfileMapDiagnosticId = "DFM008" -> string!
+const Dapper.FluentMap.Generators.MappingRegistrationGenerator.InvalidGeneratedReadConverterDiagnosticId = "DFM012" -> string!
+const Dapper.FluentMap.Generators.MappingRegistrationGenerator.InvalidGenericMapRegistrationDiagnosticId = "DFM005" -> string!
+const Dapper.FluentMap.Generators.MappingRegistrationGenerator.SkippedGeneratedMapDiagnosticId = "DFM006" -> string!
+const Dapper.FluentMap.Generators.MappingRegistrationGenerator.SkippedGeneratedMaterializerDiagnosticId = "DFM011" -> string!
+Dapper.FluentMap.Generators.MappingRegistrationGenerator
+Dapper.FluentMap.Generators.MappingRegistrationGenerator.Initialize(Microsoft.CodeAnalysis.IncrementalGeneratorInitializationContext context) -> void
+Dapper.FluentMap.Generators.MappingRegistrationGenerator.MappingRegistrationGenerator() -> void

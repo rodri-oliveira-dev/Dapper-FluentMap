@@ -204,7 +204,7 @@ namespace Dapper.FluentMap.Analyzers
                 if (constructor?.MethodKind == MethodKind.Constructor)
                 {
                     constructionStrategies.Add(new ConstructionStrategyInvocation(
-                        constructor,
+                        constructor.ContainingType,
                         GetInvocationNameLocation(invocation)));
                 }
 
@@ -386,17 +386,40 @@ namespace Dapper.FluentMap.Analyzers
             CompilationAnalysisContext context,
             ConcurrentBag<ConstructionStrategyInvocation> constructionStrategies)
         {
-            foreach (var group in constructionStrategies.GroupBy(
-                         invocation => invocation.Constructor,
-                         SymbolEqualityComparer.Default))
+            var invocations = constructionStrategies
+                .OrderBy(invocation => invocation.Location.SourceSpan.Start)
+                .ToList();
+
+            for (var index = 0; index < invocations.Count; index++)
             {
-                foreach (var duplicate in group.OrderBy(invocation => invocation.Location.SourceSpan.Start).Skip(1))
+                var candidate = invocations[index];
+                var duplicatesSameMap = invocations
+                    .Take(index)
+                    .Any(previous => SymbolEqualityComparer.Default.Equals(previous.MapType, candidate.MapType));
+                var duplicatesBaseMap = invocations.Any(other =>
+                    !ReferenceEquals(other, candidate) &&
+                    IsDerivedFrom(candidate.MapType, other.MapType));
+
+                if (duplicatesSameMap || duplicatesBaseMap)
                 {
                     context.ReportDiagnostic(Diagnostic.Create(
                         DuplicateConstructionStrategyRule,
-                        duplicate.Location));
+                        candidate.Location));
                 }
             }
+        }
+
+        private static bool IsDerivedFrom(INamedTypeSymbol type, INamedTypeSymbol possibleBaseType)
+        {
+            for (var current = type.BaseType; current != null; current = current.BaseType)
+            {
+                if (SymbolEqualityComparer.Default.Equals(current, possibleBaseType))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static void ReportDuplicateMemberPaths(
@@ -1458,13 +1481,13 @@ namespace Dapper.FluentMap.Analyzers
 
         private sealed class ConstructionStrategyInvocation
         {
-            internal ConstructionStrategyInvocation(IMethodSymbol constructor, Location location)
+            internal ConstructionStrategyInvocation(INamedTypeSymbol mapType, Location location)
             {
-                Constructor = constructor;
+                MapType = mapType;
                 Location = location;
             }
 
-            internal IMethodSymbol Constructor { get; }
+            internal INamedTypeSymbol MapType { get; }
 
             internal Location Location { get; }
         }

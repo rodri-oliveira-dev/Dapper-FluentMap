@@ -75,6 +75,25 @@ namespace Dapper.FluentMap.Tests
         }
 
         [Fact]
+        public void ValidationShouldRejectNestedConstructionBindingBeforeMaterialization()
+        {
+            FluentMapper.Reset(typeof(NestedFactoryEntity));
+
+            try
+            {
+                var exception = Assert.Throws<FluentMapConfigurationException>(() =>
+                    FluentMapper.Initialize(configuration => configuration.AddMap(new NestedFactoryEntityMap())));
+
+                Assert.Contains("Nested.Name", exception.Message);
+                Assert.Contains("root property paths", exception.Message);
+            }
+            finally
+            {
+                FluentMapper.Reset(typeof(NestedFactoryEntity));
+            }
+        }
+
+        [Fact]
         public void DuplicateConstructionStrategyShouldFailDuringMapConfiguration()
         {
             var exception = Assert.Throws<FluentMapConfigurationException>(() => new DuplicateFactoryCustomerMap());
@@ -322,6 +341,35 @@ namespace Dapper.FluentMap.Tests
                     entity => entity.Third,
                     entity => entity.Fourth,
                     factory);
+            }
+        }
+
+        private sealed class NestedFactoryEntity
+        {
+            private NestedFactoryEntity(string name)
+            {
+                Nested = new NestedFactoryValue { Name = name };
+            }
+
+            public NestedFactoryValue Nested { get; }
+
+            internal static NestedFactoryEntity Restore(string name)
+            {
+                return new NestedFactoryEntity(name);
+            }
+        }
+
+        private sealed class NestedFactoryValue
+        {
+            public string Name { get; set; }
+        }
+
+        private sealed class NestedFactoryEntityMap : EntityMap<NestedFactoryEntity>
+        {
+            public NestedFactoryEntityMap()
+            {
+                Map(entity => entity.Nested.Name).ToColumn("nested_name");
+                ConstructUsing(entity => entity.Nested.Name, NestedFactoryEntity.Restore);
             }
         }
 

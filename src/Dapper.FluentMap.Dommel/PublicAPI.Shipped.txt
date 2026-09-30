@@ -1,1 +1,35 @@
 #nullable enable
+
+Dapper.FluentMap.Dommel.FluentMapConfigurationExtensions
+Dapper.FluentMap.Dommel.Mapping.DommelEntityMap<TEntity>
+Dapper.FluentMap.Dommel.Mapping.DommelEntityMap<TEntity>.DommelEntityMap() -> void
+Dapper.FluentMap.Dommel.Mapping.DommelEntityMap<TEntity>.TableName.get -> string!
+Dapper.FluentMap.Dommel.Mapping.DommelEntityMap<TEntity>.ToTable(string! tableName) -> void
+Dapper.FluentMap.Dommel.Mapping.DommelEntityMap<TEntity>.ToTable(string! tableName, string! schemaName) -> void
+Dapper.FluentMap.Dommel.Mapping.DommelPropertyMap
+Dapper.FluentMap.Dommel.Mapping.DommelPropertyMap.DommelPropertyMap(System.Reflection.PropertyInfo! info) -> void
+Dapper.FluentMap.Dommel.Mapping.DommelPropertyMap.GeneratedOption.get -> System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption?
+Dapper.FluentMap.Dommel.Mapping.DommelPropertyMap.GeneratedOption.set -> void
+Dapper.FluentMap.Dommel.Mapping.DommelPropertyMap.Identity.get -> bool
+Dapper.FluentMap.Dommel.Mapping.DommelPropertyMap.Identity.set -> void
+Dapper.FluentMap.Dommel.Mapping.DommelPropertyMap.IsIdentity() -> Dapper.FluentMap.Dommel.Mapping.DommelPropertyMap!
+Dapper.FluentMap.Dommel.Mapping.DommelPropertyMap.IsKey() -> Dapper.FluentMap.Dommel.Mapping.DommelPropertyMap!
+Dapper.FluentMap.Dommel.Mapping.DommelPropertyMap.Key.get -> bool
+Dapper.FluentMap.Dommel.Mapping.DommelPropertyMap.SetGeneratedOption(System.ComponentModel.DataAnnotations.Schema.DatabaseGeneratedOption option) -> Dapper.FluentMap.Dommel.Mapping.DommelPropertyMap!
+Dapper.FluentMap.Dommel.Mapping.IDommelEntityMap
+Dapper.FluentMap.Dommel.Mapping.IDommelEntityMap.TableName.get -> string!
+Dapper.FluentMap.Dommel.Resolvers.DommelColumnNameResolver
+Dapper.FluentMap.Dommel.Resolvers.DommelColumnNameResolver.DommelColumnNameResolver() -> void
+Dapper.FluentMap.Dommel.Resolvers.DommelColumnNameResolver.ResolveColumnName(System.Reflection.PropertyInfo! propertyInfo) -> string!
+Dapper.FluentMap.Dommel.Resolvers.DommelKeyPropertyResolver
+Dapper.FluentMap.Dommel.Resolvers.DommelKeyPropertyResolver.DommelKeyPropertyResolver() -> void
+Dapper.FluentMap.Dommel.Resolvers.DommelKeyPropertyResolver.ResolveKeyProperties(System.Type! type) -> Dommel.ColumnPropertyInfo![]!
+Dapper.FluentMap.Dommel.Resolvers.DommelPropertyResolver
+Dapper.FluentMap.Dommel.Resolvers.DommelPropertyResolver.DommelPropertyResolver() -> void
+Dapper.FluentMap.Dommel.Resolvers.DommelTableNameResolver
+Dapper.FluentMap.Dommel.Resolvers.DommelTableNameResolver.DommelTableNameResolver() -> void
+Dapper.FluentMap.Dommel.Resolvers.DommelTableNameResolver.ResolveTableName(System.Type! type) -> string!
+override Dapper.FluentMap.Dommel.Mapping.DommelEntityMap<TEntity>.GetPropertyMap(System.Reflection.PropertyInfo! info) -> Dapper.FluentMap.Dommel.Mapping.DommelPropertyMap!
+override Dapper.FluentMap.Dommel.Resolvers.DommelPropertyResolver.FilterComplexTypes(System.Collections.Generic.IEnumerable<System.Reflection.PropertyInfo!>! properties) -> System.Collections.Generic.IEnumerable<System.Reflection.PropertyInfo!>!
+override Dapper.FluentMap.Dommel.Resolvers.DommelPropertyResolver.ResolveProperties(System.Type! type) -> System.Collections.Generic.IEnumerable<Dommel.ColumnPropertyInfo!>!
+static Dapper.FluentMap.Dommel.FluentMapConfigurationExtensions.ForDommel(this Dapper.FluentMap.Configuration.FluentMapConfiguration! config) -> Dapper.FluentMap.Configuration.FluentMapConfiguration!

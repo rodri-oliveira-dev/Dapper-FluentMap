@@ -45,12 +45,41 @@ jobs:
           --filter "*DapperWithFluentMapRootMapping*" "*QueryMappedSimple" "*RuntimeQueryMappedSimple"
           "*RuntimeQueryGeneratedSimpleExtraColumn*" "*QueryMappedGeneratedPropertyConverter*"
           "*QueryMappedTwoSegments*" "*QueryMappedThreeSegments*"
-          --exporters json
+          --exporters fulljson
+
+      - name: Capture benchmark run metadata
+        shell: pwsh
+        env:
+          BENCHMARK_COMMAND: >-
+            dotnet run --project ./benchmarks/Dapper.FluentMap.Benchmarks/Dapper.FluentMap.Benchmarks.csproj
+            --configuration Release --no-build --
+            --filter "*DapperWithFluentMapRootMapping*" "*QueryMappedSimple" "*RuntimeQueryMappedSimple"
+            "*RuntimeQueryGeneratedSimpleExtraColumn*" "*QueryMappedGeneratedPropertyConverter*"
+            "*QueryMappedTwoSegments*" "*QueryMappedThreeSegments*"
+            --exporters fulljson
+          COMMIT_SHA: "${{ github.sha }}"
+          RUNNER_NAME: "${{ runner.name }}"
+          RUNNER_OS: "${{ runner.os }}"
+          RUNNER_ARCH: "${{ runner.arch }}"
+        run: |
+          New-Item -ItemType Directory -Force -Path './artifacts/benchmark-report' | Out-Null
+          $metadata = [ordered]@{
+            command = $env:BENCHMARK_COMMAND
+            commit = $env:COMMIT_SHA
+            runner = [ordered]@{
+              name = $env:RUNNER_NAME
+              os = $env:RUNNER_OS
+              architecture = $env:RUNNER_ARCH
+            }
+            dotnetInfo = ((dotnet --info) -join [Environment]::NewLine)
+          }
+          $metadata | ConvertTo-Json -Depth 4 |
+            Set-Content -LiteralPath './artifacts/benchmark-report/run-metadata.json' -Encoding utf8
 
       - name: Compare with checked-in baseline
         shell: pwsh
         run: |
-          $result = Get-ChildItem './.tmp/benchmarks/BenchmarkDotNet.Artifacts/results/*-report-full-compressed.json' |
+          $result = Get-ChildItem './.tmp/benchmarks/BenchmarkDotNet.Artifacts/results/*-report-full.json' |
             Select-Object -First 1
           if ($null -eq $result) {
             throw 'BenchmarkDotNet JSON output was not produced.'

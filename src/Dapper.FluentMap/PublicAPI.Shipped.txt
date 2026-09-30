@@ -1,1 +1,362 @@
 #nullable enable
+
+abstract Dapper.FluentMap.Mapping.EntityMapBase<TEntity, TPropertyMap>.GetPropertyMap(System.Reflection.PropertyInfo! info) -> TPropertyMap
+Dapper.FluentMap.Configuration.ConventionMappingConfiguration
+Dapper.FluentMap.Configuration.ConventionMappingConfiguration.ConventionType.get -> System.Type!
+Dapper.FluentMap.Configuration.ConventionMappingConfiguration.EntityType.get -> System.Type!
+Dapper.FluentMap.Configuration.ConventionMappingConfiguration.PropertyMaps.get -> System.Collections.Generic.IReadOnlyList<Dapper.FluentMap.Configuration.PropertyMappingConfiguration!>!
+Dapper.FluentMap.Configuration.EntityMappingConfiguration
+Dapper.FluentMap.Configuration.EntityMappingConfiguration.EntityType.get -> System.Type!
+Dapper.FluentMap.Configuration.EntityMappingConfiguration.IncludedBaseTypes.get -> System.Collections.Generic.IReadOnlyList<System.Type!>!
+Dapper.FluentMap.Configuration.EntityMappingConfiguration.MapType.get -> System.Type!
+Dapper.FluentMap.Configuration.EntityMappingConfiguration.PropertyMaps.get -> System.Collections.Generic.IReadOnlyList<Dapper.FluentMap.Configuration.PropertyMappingConfiguration!>!
+Dapper.FluentMap.Configuration.FluentConventionConfiguration
+Dapper.FluentMap.Configuration.FluentConventionConfiguration.FluentConventionConfiguration(Dapper.FluentMap.Conventions.Convention! convention) -> void
+Dapper.FluentMap.Configuration.FluentConventionConfiguration.ForEntitiesInAssembly(System.Reflection.Assembly! assembly, params string![]! namespaces) -> Dapper.FluentMap.Configuration.FluentConventionConfiguration!
+Dapper.FluentMap.Configuration.FluentConventionConfiguration.ForEntitiesInCurrentAssembly(params string![]! namespaces) -> Dapper.FluentMap.Configuration.FluentConventionConfiguration!
+Dapper.FluentMap.Configuration.FluentConventionConfiguration.ForEntity<T>() -> Dapper.FluentMap.Configuration.FluentConventionConfiguration!
+Dapper.FluentMap.Configuration.FluentConventionConfiguration.GetType() -> System.Type!
+Dapper.FluentMap.Configuration.FluentMapConfiguration
+Dapper.FluentMap.Configuration.FluentMapConfiguration.AddConvention<TConvention>() -> Dapper.FluentMap.Configuration.FluentConventionConfiguration!
+Dapper.FluentMap.Configuration.FluentMapConfiguration.AddGeneratedMaterializer<TEntity, TProfile>(System.Collections.Generic.IEnumerable<Dapper.FluentMap.Materialization.GeneratedMaterializerColumn!>! columns, Dapper.FluentMap.Materialization.GeneratedRowMaterializer<TEntity!>! materializer) -> Dapper.FluentMap.Configuration.FluentMapConfiguration!
+Dapper.FluentMap.Configuration.FluentMapConfiguration.AddGeneratedMaterializer<TEntity>(Dapper.FluentMap.Materialization.GeneratedMaterializerDescriptor<TEntity!>! descriptor) -> Dapper.FluentMap.Configuration.FluentMapConfiguration!
+Dapper.FluentMap.Configuration.FluentMapConfiguration.AddGeneratedMaterializer<TEntity>(System.Collections.Generic.IEnumerable<Dapper.FluentMap.Materialization.GeneratedMaterializerColumn!>! columns, Dapper.FluentMap.Materialization.GeneratedRowMaterializer<TEntity!>! materializer) -> Dapper.FluentMap.Configuration.FluentMapConfiguration!
+Dapper.FluentMap.Configuration.FluentMapConfiguration.AddMap<TEntity>(Dapper.FluentMap.Mapping.IEntityMap<TEntity!>! mapper) -> void
+Dapper.FluentMap.Configuration.FluentMapConfiguration.AddMap<TMap>() -> Dapper.FluentMap.Configuration.FluentMapConfiguration!
+Dapper.FluentMap.Configuration.FluentMapConfiguration.AddMapsFromAssembly(System.Reflection.Assembly! assembly, params string![]! namespaces) -> Dapper.FluentMap.Configuration.FluentMapConfiguration!
+Dapper.FluentMap.Configuration.FluentMapConfiguration.AddMapsFromAssemblyContaining<TMarker>(params string![]! namespaces) -> Dapper.FluentMap.Configuration.FluentMapConfiguration!
+Dapper.FluentMap.Configuration.FluentMapConfiguration.AddProfile<TMap>() -> Dapper.FluentMap.Configuration.FluentMapConfiguration!
+Dapper.FluentMap.Configuration.FluentMapConfiguration.FluentMapConfiguration() -> void
+Dapper.FluentMap.Configuration.FluentMapConfiguration.GetType() -> System.Type!
+Dapper.FluentMap.Configuration.FluentMapConfiguration.UseNamingPolicy(Dapper.FluentMap.Naming.NamingPolicy! namingPolicy, bool caseSensitive = true) -> Dapper.FluentMap.Configuration.FluentConventionConfiguration!
+Dapper.FluentMap.Configuration.FluentMapConfiguration.UseNamingPolicy(System.Func<string!, string!>! transformer, bool caseSensitive = true) -> Dapper.FluentMap.Configuration.FluentConventionConfiguration!
+Dapper.FluentMap.Configuration.FluentMapConfigurationBuilder
+Dapper.FluentMap.Configuration.FluentMapConfigurationBuilder.AddConvention<TConvention>() -> Dapper.FluentMap.Configuration.FluentConventionConfiguration!
+Dapper.FluentMap.Configuration.FluentMapConfigurationBuilder.AddGeneratedMaterializer<TEntity, TProfile>(System.Collections.Generic.IEnumerable<Dapper.FluentMap.Materialization.GeneratedMaterializerColumn!>! columns, Dapper.FluentMap.Materialization.GeneratedRowMaterializer<TEntity!>! materializer) -> Dapper.FluentMap.Configuration.FluentMapConfigurationBuilder!
+Dapper.FluentMap.Configuration.FluentMapConfigurationBuilder.AddGeneratedMaterializer<TEntity>(Dapper.FluentMap.Materialization.GeneratedMaterializerDescriptor<TEntity!>! descriptor) -> Dapper.FluentMap.Configuration.FluentMapConfigurationBuilder!
+Dapper.FluentMap.Configuration.FluentMapConfigurationBuilder.AddGeneratedMaterializer<TEntity>(System.Collections.Generic.IEnumerable<Dapper.FluentMap.Materialization.GeneratedMaterializerColumn!>! columns, Dapper.FluentMap.Materialization.GeneratedRowMaterializer<TEntity!>! materializer) -> Dapper.FluentMap.Configuration.FluentMapConfigurationBuilder!
+Dapper.FluentMap.Configuration.FluentMapConfigurationBuilder.AddMap<TEntity>(Dapper.FluentMap.Mapping.IEntityMap<TEntity!>! mapper) -> Dapper.FluentMap.Configuration.FluentMapConfigurationBuilder!
+Dapper.FluentMap.Configuration.FluentMapConfigurationBuilder.AddMap<TMap>() -> Dapper.FluentMap.Configuration.FluentMapConfigurationBuilder!
+Dapper.FluentMap.Configuration.FluentMapConfigurationBuilder.AddMapsFromAssembly(System.Reflection.Assembly! assembly, params string![]! namespaces) -> Dapper.FluentMap.Configuration.FluentMapConfigurationBuilder!
+Dapper.FluentMap.Configuration.FluentMapConfigurationBuilder.AddMapsFromAssemblyContaining<TMarker>(params string![]! namespaces) -> Dapper.FluentMap.Configuration.FluentMapConfigurationBuilder!
+Dapper.FluentMap.Configuration.FluentMapConfigurationBuilder.AddProfile<TMap>() -> Dapper.FluentMap.Configuration.FluentMapConfigurationBuilder!
+Dapper.FluentMap.Configuration.FluentMapConfigurationBuilder.Build() -> Dapper.FluentMap.Configuration.ImmutableFluentMapConfiguration!
+Dapper.FluentMap.Configuration.FluentMapConfigurationBuilder.Configure(System.Action<Dapper.FluentMap.Configuration.FluentMapConfiguration!>! configure) -> Dapper.FluentMap.Configuration.FluentMapConfigurationBuilder!
+Dapper.FluentMap.Configuration.FluentMapConfigurationBuilder.FluentMapConfigurationBuilder() -> void
+Dapper.FluentMap.Configuration.FluentMapConfigurationBuilder.UseNamingPolicy(Dapper.FluentMap.Naming.NamingPolicy! namingPolicy, bool caseSensitive = true) -> Dapper.FluentMap.Configuration.FluentConventionConfiguration!
+Dapper.FluentMap.Configuration.FluentMapConfigurationBuilder.UseNamingPolicy(System.Func<string!, string!>! transformer, bool caseSensitive = true) -> Dapper.FluentMap.Configuration.FluentConventionConfiguration!
+Dapper.FluentMap.Configuration.FluentMapConfigurationBuilder.UseStrictGeneratedMaterialization() -> Dapper.FluentMap.Configuration.FluentMapConfigurationBuilder!
+Dapper.FluentMap.Configuration.FluentMapConfigurationBuilder.Validate() -> void
+Dapper.FluentMap.Configuration.GeneratedMaterializerConfiguration
+Dapper.FluentMap.Configuration.GeneratedMaterializerConfiguration.Columns.get -> System.Collections.Generic.IReadOnlyList<Dapper.FluentMap.Materialization.GeneratedMaterializerColumn!>!
+Dapper.FluentMap.Configuration.GeneratedMaterializerConfiguration.EntityType.get -> System.Type!
+Dapper.FluentMap.Configuration.GeneratedMaterializerConfiguration.ProfileType.get -> System.Type?
+Dapper.FluentMap.Configuration.ImmutableFluentMapConfiguration
+Dapper.FluentMap.Configuration.ImmutableFluentMapConfiguration.CreateRuntime() -> Dapper.FluentMap.FluentMapRuntime!
+Dapper.FluentMap.Configuration.ImmutableFluentMapConfiguration.EntityMaps.get -> System.Collections.Generic.IReadOnlyDictionary<System.Type!, Dapper.FluentMap.Configuration.EntityMappingConfiguration!>!
+Dapper.FluentMap.Configuration.ImmutableFluentMapConfiguration.GeneratedMaterializers.get -> System.Collections.Generic.IReadOnlyList<Dapper.FluentMap.Configuration.GeneratedMaterializerConfiguration!>!
+Dapper.FluentMap.Configuration.ImmutableFluentMapConfiguration.ProfileMaps.get -> System.Collections.Generic.IReadOnlyList<Dapper.FluentMap.Configuration.ProfileMappingConfiguration!>!
+Dapper.FluentMap.Configuration.ImmutableFluentMapConfiguration.StrictGeneratedMaterialization.get -> bool
+Dapper.FluentMap.Configuration.ImmutableFluentMapConfiguration.TypeConventions.get -> System.Collections.Generic.IReadOnlyDictionary<System.Type!, System.Collections.Generic.IReadOnlyList<Dapper.FluentMap.Configuration.ConventionMappingConfiguration!>!>!
+Dapper.FluentMap.Configuration.ProfileMappingConfiguration
+Dapper.FluentMap.Configuration.ProfileMappingConfiguration.EntityType.get -> System.Type!
+Dapper.FluentMap.Configuration.ProfileMappingConfiguration.IncludedBaseTypes.get -> System.Collections.Generic.IReadOnlyList<System.Type!>!
+Dapper.FluentMap.Configuration.ProfileMappingConfiguration.MapType.get -> System.Type!
+Dapper.FluentMap.Configuration.ProfileMappingConfiguration.ProfileType.get -> System.Type!
+Dapper.FluentMap.Configuration.ProfileMappingConfiguration.PropertyMaps.get -> System.Collections.Generic.IReadOnlyList<Dapper.FluentMap.Configuration.PropertyMappingConfiguration!>!
+Dapper.FluentMap.Configuration.PropertyMappingConfiguration
+Dapper.FluentMap.Configuration.PropertyMappingConfiguration.CaseSensitive.get -> bool
+Dapper.FluentMap.Configuration.PropertyMappingConfiguration.ColumnName.get -> string!
+Dapper.FluentMap.Configuration.PropertyMappingConfiguration.Conversion.get -> Dapper.FluentMap.Mapping.PropertyConversionMetadata!
+Dapper.FluentMap.Configuration.PropertyMappingConfiguration.Ignored.get -> bool
+Dapper.FluentMap.Configuration.PropertyMappingConfiguration.MemberPath.get -> string!
+Dapper.FluentMap.Configuration.PropertyMappingConfiguration.Persistence.get -> Dapper.FluentMap.Mapping.PropertyPersistenceMetadata!
+Dapper.FluentMap.Configuration.PropertyMappingConfiguration.PropertyInfo.get -> System.Reflection.PropertyInfo!
+Dapper.FluentMap.Conventions.Convention
+Dapper.FluentMap.Conventions.Convention.Convention() -> void
+Dapper.FluentMap.Conventions.Convention.ConventionConfigurations.get -> System.Collections.Generic.IList<Dapper.FluentMap.Conventions.PropertyConventionConfiguration!>!
+Dapper.FluentMap.Conventions.Convention.GetType() -> System.Type!
+Dapper.FluentMap.Conventions.Convention.Properties() -> Dapper.FluentMap.Conventions.PropertyConventionConfiguration!
+Dapper.FluentMap.Conventions.Convention.Properties<T>() -> Dapper.FluentMap.Conventions.PropertyConventionConfiguration!
+Dapper.FluentMap.Conventions.Convention.PropertyMaps.get -> System.Collections.Generic.IList<Dapper.FluentMap.Mapping.PropertyMap!>!
+Dapper.FluentMap.Conventions.ConventionPropertyConfiguration
+Dapper.FluentMap.Conventions.ConventionPropertyConfiguration.ConventionPropertyConfiguration() -> void
+Dapper.FluentMap.Conventions.ConventionPropertyConfiguration.GetType() -> System.Type!
+Dapper.FluentMap.Conventions.ConventionPropertyConfiguration.HasColumnName(string! columnName) -> Dapper.FluentMap.Conventions.ConventionPropertyConfiguration!
+Dapper.FluentMap.Conventions.ConventionPropertyConfiguration.HasPrefix(string! prefix) -> Dapper.FluentMap.Conventions.ConventionPropertyConfiguration!
+Dapper.FluentMap.Conventions.ConventionPropertyConfiguration.IsCaseInsensitive() -> Dapper.FluentMap.Conventions.ConventionPropertyConfiguration!
+Dapper.FluentMap.Conventions.ConventionPropertyConfiguration.Transform(System.Func<string!, string!>! transformer) -> Dapper.FluentMap.Conventions.ConventionPropertyConfiguration!
+Dapper.FluentMap.Conventions.PropertyConventionConfiguration
+Dapper.FluentMap.Conventions.PropertyConventionConfiguration.Configure(System.Action<Dapper.FluentMap.Conventions.ConventionPropertyConfiguration!>! configure) -> void
+Dapper.FluentMap.Conventions.PropertyConventionConfiguration.GetType() -> System.Type!
+Dapper.FluentMap.Conventions.PropertyConventionConfiguration.PropertyConventionConfiguration() -> void
+Dapper.FluentMap.Conventions.PropertyConventionConfiguration.Where(System.Func<System.Reflection.PropertyInfo!, bool>! predicate) -> Dapper.FluentMap.Conventions.PropertyConventionConfiguration!
+Dapper.FluentMap.Diagnostics.ConstructorParameterExplanation
+Dapper.FluentMap.Diagnostics.ConstructorParameterExplanation.Constructor.get -> System.Reflection.ConstructorInfo!
+Dapper.FluentMap.Diagnostics.ConstructorParameterExplanation.Name.get -> string!
+Dapper.FluentMap.Diagnostics.ConstructorParameterExplanation.ParameterType.get -> System.Type!
+Dapper.FluentMap.Diagnostics.MappingExplanation
+Dapper.FluentMap.Diagnostics.MappingExplanation.ConventionTypes.get -> System.Collections.Generic.IReadOnlyList<System.Type!>!
+Dapper.FluentMap.Diagnostics.MappingExplanation.Diagnostics.get -> System.Collections.Generic.IReadOnlyList<string!>!
+Dapper.FluentMap.Diagnostics.MappingExplanation.EntityMapType.get -> System.Type?
+Dapper.FluentMap.Diagnostics.MappingExplanation.EntityType.get -> System.Type!
+Dapper.FluentMap.Diagnostics.MappingExplanation.Members.get -> System.Collections.Generic.IReadOnlyList<Dapper.FluentMap.Diagnostics.MemberMappingExplanation!>!
+Dapper.FluentMap.Diagnostics.MappingExplanation.ProfileType.get -> System.Type?
+Dapper.FluentMap.Diagnostics.MappingMaterialization
+Dapper.FluentMap.Diagnostics.MappingMaterialization.Dapper = 0 -> Dapper.FluentMap.Diagnostics.MappingMaterialization
+Dapper.FluentMap.Diagnostics.MappingMaterialization.Nested = 1 -> Dapper.FluentMap.Diagnostics.MappingMaterialization
+Dapper.FluentMap.Diagnostics.MappingMaterialization.ValueObject = 2 -> Dapper.FluentMap.Diagnostics.MappingMaterialization
+Dapper.FluentMap.Diagnostics.MappingSource
+Dapper.FluentMap.Diagnostics.MappingSource.Convention = 2 -> Dapper.FluentMap.Diagnostics.MappingSource
+Dapper.FluentMap.Diagnostics.MappingSource.DapperDefault = 4 -> Dapper.FluentMap.Diagnostics.MappingSource
+Dapper.FluentMap.Diagnostics.MappingSource.Explicit = 0 -> Dapper.FluentMap.Diagnostics.MappingSource
+Dapper.FluentMap.Diagnostics.MappingSource.Inherited = 1 -> Dapper.FluentMap.Diagnostics.MappingSource
+Dapper.FluentMap.Diagnostics.MappingSource.NamingPolicy = 3 -> Dapper.FluentMap.Diagnostics.MappingSource
+Dapper.FluentMap.Diagnostics.MemberMappingExplanation
+Dapper.FluentMap.Diagnostics.MemberMappingExplanation.CaseSensitive.get -> bool
+Dapper.FluentMap.Diagnostics.MemberMappingExplanation.ColumnName.get -> string!
+Dapper.FluentMap.Diagnostics.MemberMappingExplanation.ConstructorParameters.get -> System.Collections.Generic.IReadOnlyList<Dapper.FluentMap.Diagnostics.ConstructorParameterExplanation!>!
+Dapper.FluentMap.Diagnostics.MemberMappingExplanation.ConventionType.get -> System.Type?
+Dapper.FluentMap.Diagnostics.MemberMappingExplanation.Conversion.get -> Dapper.FluentMap.Mapping.PropertyConversionMetadata!
+Dapper.FluentMap.Diagnostics.MemberMappingExplanation.Ignored.get -> bool
+Dapper.FluentMap.Diagnostics.MemberMappingExplanation.InheritedFrom.get -> System.Type?
+Dapper.FluentMap.Diagnostics.MemberMappingExplanation.Materialization.get -> Dapper.FluentMap.Diagnostics.MappingMaterialization
+Dapper.FluentMap.Diagnostics.MemberMappingExplanation.MemberPath.get -> string!
+Dapper.FluentMap.Diagnostics.MemberMappingExplanation.Persistence.get -> Dapper.FluentMap.Mapping.PropertyPersistenceMetadata!
+Dapper.FluentMap.Diagnostics.MemberMappingExplanation.PropertyInfo.get -> System.Reflection.PropertyInfo!
+Dapper.FluentMap.Diagnostics.MemberMappingExplanation.Source.get -> Dapper.FluentMap.Diagnostics.MappingSource
+Dapper.FluentMap.FluentMapConfigurationException
+Dapper.FluentMap.FluentMapConfigurationException.FluentMapConfigurationException() -> void
+Dapper.FluentMap.FluentMapConfigurationException.FluentMapConfigurationException(string! message) -> void
+Dapper.FluentMap.FluentMapConfigurationException.FluentMapConfigurationException(string! message, System.Exception! innerException) -> void
+Dapper.FluentMap.FluentMapper
+Dapper.FluentMap.FluentMapRuntime
+Dapper.FluentMap.FluentMapRuntime.Configuration.get -> Dapper.FluentMap.Configuration.ImmutableFluentMapConfiguration!
+Dapper.FluentMap.FluentMapRuntime.Explain<TEntity, TProfile>() -> Dapper.FluentMap.Diagnostics.MappingExplanation!
+Dapper.FluentMap.FluentMapRuntime.Explain<TEntity>() -> Dapper.FluentMap.Diagnostics.MappingExplanation!
+Dapper.FluentMap.FluentMapRuntime.FluentMapRuntime(Dapper.FluentMap.Configuration.ImmutableFluentMapConfiguration! configuration) -> void
+Dapper.FluentMap.FluentMapRuntime.QueryGeneratedMapped<TEntity, TProfile>(System.Data.IDbConnection! connection, string! sql, object? param = null, System.Data.IDbTransaction? transaction = null, int? commandTimeout = null, System.Data.CommandType? commandType = null) -> System.Collections.Generic.IEnumerable<TEntity!>!
+Dapper.FluentMap.FluentMapRuntime.QueryGeneratedMapped<TEntity>(System.Data.IDbConnection! connection, string! sql, object? param = null, System.Data.IDbTransaction? transaction = null, int? commandTimeout = null, System.Data.CommandType? commandType = null) -> System.Collections.Generic.IEnumerable<TEntity!>!
+Dapper.FluentMap.FluentMapRuntime.QueryGeneratedMappedSingle<TEntity, TProfile>(System.Data.IDbConnection! connection, string! sql, object? param = null, System.Data.IDbTransaction? transaction = null, int? commandTimeout = null, System.Data.CommandType? commandType = null) -> TEntity!
+Dapper.FluentMap.FluentMapRuntime.QueryGeneratedMappedSingle<TEntity>(System.Data.IDbConnection! connection, string! sql, object? param = null, System.Data.IDbTransaction? transaction = null, int? commandTimeout = null, System.Data.CommandType? commandType = null) -> TEntity!
+Dapper.FluentMap.FluentMapRuntime.QueryMapped<TEntity, TProfile>(System.Data.IDbConnection! connection, string! sql, object? param = null, System.Data.IDbTransaction? transaction = null, int? commandTimeout = null, System.Data.CommandType? commandType = null) -> System.Collections.Generic.IEnumerable<TEntity!>!
+Dapper.FluentMap.FluentMapRuntime.QueryMapped<TEntity>(System.Data.IDbConnection! connection, string! sql, object? param = null, System.Data.IDbTransaction? transaction = null, int? commandTimeout = null, System.Data.CommandType? commandType = null) -> System.Collections.Generic.IEnumerable<TEntity!>!
+Dapper.FluentMap.FluentMapRuntime.QueryMapped<TFirst, TSecond, TReturn, TFirstProfile, TSecondProfile>(System.Data.IDbConnection! connection, string! sql, System.Func<TFirst!, TSecond?, TReturn>! map, object? param = null, System.Data.IDbTransaction? transaction = null, int? commandTimeout = null, System.Data.CommandType? commandType = null, string! splitOn = "Id") -> System.Collections.Generic.IEnumerable<TReturn>!
+Dapper.FluentMap.FluentMapRuntime.QueryMapped<TFirst, TSecond, TReturn>(System.Data.IDbConnection! connection, string! sql, System.Func<TFirst!, TSecond?, TReturn>! map, object? param = null, System.Data.IDbTransaction? transaction = null, int? commandTimeout = null, System.Data.CommandType? commandType = null, string! splitOn = "Id") -> System.Collections.Generic.IEnumerable<TReturn>!
+Dapper.FluentMap.FluentMapRuntime.QueryMappedSingle<TEntity, TProfile>(System.Data.IDbConnection! connection, string! sql, object? param = null, System.Data.IDbTransaction? transaction = null, int? commandTimeout = null, System.Data.CommandType? commandType = null) -> TEntity!
+Dapper.FluentMap.FluentMapRuntime.QueryMappedSingle<TEntity>(System.Data.IDbConnection! connection, string! sql, object? param = null, System.Data.IDbTransaction? transaction = null, int? commandTimeout = null, System.Data.CommandType? commandType = null) -> TEntity!
+Dapper.FluentMap.FluentMapRuntime.QueryMappedUnbuffered<TEntity, TProfile>(System.Data.IDbConnection! connection, string! sql, object? param = null, System.Data.IDbTransaction? transaction = null, int? commandTimeout = null, System.Data.CommandType? commandType = null) -> System.Collections.Generic.IEnumerable<TEntity!>!
+Dapper.FluentMap.FluentMapRuntime.QueryMappedUnbuffered<TEntity>(System.Data.IDbConnection! connection, string! sql, object? param = null, System.Data.IDbTransaction? transaction = null, int? commandTimeout = null, System.Data.CommandType? commandType = null) -> System.Collections.Generic.IEnumerable<TEntity!>!
+Dapper.FluentMap.FluentMapRuntime.QueryMappedUnbufferedAsync<TEntity>(System.Data.Common.DbConnection! connection, string! sql, object? param = null, System.Data.IDbTransaction? transaction = null, int? commandTimeout = null, System.Data.CommandType? commandType = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<TEntity!>!
+Dapper.FluentMap.FluentMapRuntime.QueryMultipleMapped(System.Data.IDbConnection! connection, string! sql, object? param = null) -> Dapper.FluentMap.MappedGridReader!
+Dapper.FluentMap.FluentMapRuntime.QueryMultipleMappedAsync(System.Data.Common.DbConnection! connection, string! sql, object? param = null, System.Data.IDbTransaction? transaction = null, int? commandTimeout = null, System.Data.CommandType? commandType = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Dapper.FluentMap.MappedGridReader!>!
+Dapper.FluentMap.FluentMapRuntime.Validate() -> void
+Dapper.FluentMap.MappedGridReader
+Dapper.FluentMap.MappedGridReader.Dispose() -> void
+Dapper.FluentMap.MappedGridReader.DisposeAsync() -> System.Threading.Tasks.ValueTask
+Dapper.FluentMap.MappedGridReader.IsConsumed.get -> bool
+Dapper.FluentMap.MappedGridReader.ReadMapped<TEntity, TProfile>() -> System.Collections.Generic.IEnumerable<TEntity!>!
+Dapper.FluentMap.MappedGridReader.ReadMapped<TEntity>() -> System.Collections.Generic.IEnumerable<TEntity!>!
+Dapper.FluentMap.MappedGridReader.ReadMappedAsync<TEntity, TProfile>(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<TEntity!>!>!
+Dapper.FluentMap.MappedGridReader.ReadMappedAsync<TEntity>(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<TEntity!>!>!
+Dapper.FluentMap.MappedGridReader.ReadMappedSingle<TEntity, TProfile>() -> TEntity!
+Dapper.FluentMap.MappedGridReader.ReadMappedSingle<TEntity>() -> TEntity!
+Dapper.FluentMap.MappedGridReader.ReadMappedSingleAsync<TEntity, TProfile>(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<TEntity!>!
+Dapper.FluentMap.MappedGridReader.ReadMappedSingleAsync<TEntity>(System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<TEntity!>!
+Dapper.FluentMap.Mapping.EntityMap<TEntity>
+Dapper.FluentMap.Mapping.EntityMap<TEntity>.EntityMap() -> void
+Dapper.FluentMap.Mapping.EntityMapBase<TEntity, TPropertyMap>
+Dapper.FluentMap.Mapping.EntityMapBase<TEntity, TPropertyMap>.EntityMapBase() -> void
+Dapper.FluentMap.Mapping.EntityMapBase<TEntity, TPropertyMap>.IncludeBase<TBase>() -> void
+Dapper.FluentMap.Mapping.EntityMapBase<TEntity, TPropertyMap>.Map(System.Linq.Expressions.Expression<System.Func<TEntity, object!>!>! expression) -> TPropertyMap
+Dapper.FluentMap.Mapping.EntityMapBase<TEntity, TPropertyMap>.PropertyMaps.get -> System.Collections.Generic.IList<Dapper.FluentMap.Mapping.IPropertyMap!>!
+Dapper.FluentMap.Mapping.IEntityMap
+Dapper.FluentMap.Mapping.IEntityMap.PropertyMaps.get -> System.Collections.Generic.IList<Dapper.FluentMap.Mapping.IPropertyMap!>!
+Dapper.FluentMap.Mapping.IEntityMap<TEntity>
+Dapper.FluentMap.Mapping.IMappingProfile
+Dapper.FluentMap.Mapping.IProfileMap<TProfile>
+Dapper.FluentMap.Mapping.IPropertyConverter<TDatabase, TProperty>
+Dapper.FluentMap.Mapping.IPropertyMap
+Dapper.FluentMap.Mapping.IPropertyMap.CaseSensitive.get -> bool
+Dapper.FluentMap.Mapping.IPropertyMap.ColumnName.get -> string!
+Dapper.FluentMap.Mapping.IPropertyMap.Ignored.get -> bool
+Dapper.FluentMap.Mapping.IPropertyMap.PropertyInfo.get -> System.Reflection.PropertyInfo!
+Dapper.FluentMap.Mapping.IPropertyMapWithConversionMetadata
+Dapper.FluentMap.Mapping.IPropertyMapWithConversionMetadata.Conversion.get -> Dapper.FluentMap.Mapping.PropertyConversionMetadata!
+Dapper.FluentMap.Mapping.IPropertyMapWithPersistenceMetadata
+Dapper.FluentMap.Mapping.IPropertyMapWithPersistenceMetadata.Persistence.get -> Dapper.FluentMap.Mapping.PropertyPersistenceMetadata!
+Dapper.FluentMap.Mapping.IReadPropertyConverter<TDatabase, TProperty>
+Dapper.FluentMap.Mapping.IReadPropertyConverter<TDatabase, TProperty>.ConvertFromDatabase(TDatabase value) -> TProperty
+Dapper.FluentMap.Mapping.IWritePropertyConverter<TProperty, TDatabase>
+Dapper.FluentMap.Mapping.IWritePropertyConverter<TProperty, TDatabase>.ConvertToDatabase(TProperty value) -> TDatabase
+Dapper.FluentMap.Mapping.PropertyConversionDirection
+Dapper.FluentMap.Mapping.PropertyConversionDirection.Read = 0 -> Dapper.FluentMap.Mapping.PropertyConversionDirection
+Dapper.FluentMap.Mapping.PropertyConversionDirection.Write = 1 -> Dapper.FluentMap.Mapping.PropertyConversionDirection
+Dapper.FluentMap.Mapping.PropertyConversionMetadata
+Dapper.FluentMap.Mapping.PropertyConversionMetadata.HasReadConverter.get -> bool
+Dapper.FluentMap.Mapping.PropertyConversionMetadata.HasWriteConverter.get -> bool
+Dapper.FluentMap.Mapping.PropertyConversionMetadata.ReadConverter.get -> Dapper.FluentMap.Mapping.PropertyConverterMetadata?
+Dapper.FluentMap.Mapping.PropertyConversionMetadata.WriteConverter.get -> Dapper.FluentMap.Mapping.PropertyConverterMetadata?
+Dapper.FluentMap.Mapping.PropertyConverterMetadata
+Dapper.FluentMap.Mapping.PropertyConverterMetadata.ConverterType.get -> System.Type!
+Dapper.FluentMap.Mapping.PropertyConverterMetadata.DatabaseType.get -> System.Type!
+Dapper.FluentMap.Mapping.PropertyConverterMetadata.Direction.get -> Dapper.FluentMap.Mapping.PropertyConversionDirection
+Dapper.FluentMap.Mapping.PropertyConverterMetadata.PropertyType.get -> System.Type!
+Dapper.FluentMap.Mapping.PropertyMap
+Dapper.FluentMap.Mapping.PropertyMap.PropertyMap(System.Reflection.PropertyInfo! info) -> void
+Dapper.FluentMap.Mapping.PropertyMap.PropertyMap(System.Reflection.PropertyInfo! info, string! columnName) -> void
+Dapper.FluentMap.Mapping.PropertyMap.PropertyMap(System.Reflection.PropertyInfo! info, string! columnName, bool caseSensitive) -> void
+Dapper.FluentMap.Mapping.PropertyMapBase<TPropertyMap>
+Dapper.FluentMap.Mapping.PropertyMapBase<TPropertyMap>.CaseSensitive.get -> bool
+Dapper.FluentMap.Mapping.PropertyMapBase<TPropertyMap>.ColumnName.get -> string!
+Dapper.FluentMap.Mapping.PropertyMapBase<TPropertyMap>.Computed() -> TPropertyMap!
+Dapper.FluentMap.Mapping.PropertyMapBase<TPropertyMap>.Conversion.get -> Dapper.FluentMap.Mapping.PropertyConversionMetadata!
+Dapper.FluentMap.Mapping.PropertyMapBase<TPropertyMap>.ConvertFromDatabaseUsing<TConverter, TDatabase>() -> TPropertyMap!
+Dapper.FluentMap.Mapping.PropertyMapBase<TPropertyMap>.ConvertFromDatabaseUsing<TDatabase, TProperty>(Dapper.FluentMap.Mapping.IReadPropertyConverter<TDatabase, TProperty>! converter) -> TPropertyMap!
+Dapper.FluentMap.Mapping.PropertyMapBase<TPropertyMap>.ConvertFromDatabaseUsing<TDatabase, TProperty>(Dapper.FluentMap.Mapping.ReadPropertyConverter<TDatabase, TProperty>! converter) -> TPropertyMap!
+Dapper.FluentMap.Mapping.PropertyMapBase<TPropertyMap>.ConvertToDatabaseUsing<TConverter, TDatabase>() -> TPropertyMap!
+Dapper.FluentMap.Mapping.PropertyMapBase<TPropertyMap>.ConvertToDatabaseUsing<TProperty, TDatabase>(Dapper.FluentMap.Mapping.IWritePropertyConverter<TProperty, TDatabase>! converter) -> TPropertyMap!
+Dapper.FluentMap.Mapping.PropertyMapBase<TPropertyMap>.ConvertToDatabaseUsing<TProperty, TDatabase>(Dapper.FluentMap.Mapping.WritePropertyConverter<TProperty, TDatabase>! converter) -> TPropertyMap!
+Dapper.FluentMap.Mapping.PropertyMapBase<TPropertyMap>.ConvertUsing<TConverter, TDatabase>() -> TPropertyMap!
+Dapper.FluentMap.Mapping.PropertyMapBase<TPropertyMap>.ConvertUsing<TDatabase, TProperty>(Dapper.FluentMap.Mapping.IPropertyConverter<TDatabase, TProperty>! converter) -> TPropertyMap!
+Dapper.FluentMap.Mapping.PropertyMapBase<TPropertyMap>.DatabaseDefaultOnInsert() -> TPropertyMap!
+Dapper.FluentMap.Mapping.PropertyMapBase<TPropertyMap>.ExcludeFromInsert() -> TPropertyMap!
+Dapper.FluentMap.Mapping.PropertyMapBase<TPropertyMap>.ExcludeFromUpdate() -> TPropertyMap!
+Dapper.FluentMap.Mapping.PropertyMapBase<TPropertyMap>.GetType() -> System.Type!
+Dapper.FluentMap.Mapping.PropertyMapBase<TPropertyMap>.Ignore() -> TPropertyMap!
+Dapper.FluentMap.Mapping.PropertyMapBase<TPropertyMap>.Ignored.get -> bool
+Dapper.FluentMap.Mapping.PropertyMapBase<TPropertyMap>.MarkAsComputed() -> void
+Dapper.FluentMap.Mapping.PropertyMapBase<TPropertyMap>.MarkAsIdentity() -> void
+Dapper.FluentMap.Mapping.PropertyMapBase<TPropertyMap>.MarkAsKey() -> void
+Dapper.FluentMap.Mapping.PropertyMapBase<TPropertyMap>.MarkAsNotGenerated() -> void
+Dapper.FluentMap.Mapping.PropertyMapBase<TPropertyMap>.Persistence.get -> Dapper.FluentMap.Mapping.PropertyPersistenceMetadata!
+Dapper.FluentMap.Mapping.PropertyMapBase<TPropertyMap>.PropertyInfo.get -> System.Reflection.PropertyInfo!
+Dapper.FluentMap.Mapping.PropertyMapBase<TPropertyMap>.PropertyMapBase(System.Reflection.PropertyInfo! info) -> void
+Dapper.FluentMap.Mapping.PropertyMapBase<TPropertyMap>.ReadOnly() -> TPropertyMap!
+Dapper.FluentMap.Mapping.PropertyMapBase<TPropertyMap>.ToColumn(string! columnName, bool caseSensitive = true) -> TPropertyMap!
+Dapper.FluentMap.Mapping.PropertyMapBase<TPropertyMap>.UsePersistence(Dapper.FluentMap.Mapping.PropertyPersistenceMetadata! persistence) -> void
+Dapper.FluentMap.Mapping.PropertyPersistenceMetadata
+Dapper.FluentMap.Mapping.PropertyPersistenceMetadata.HasDatabaseDefaultOnInsert.get -> bool
+Dapper.FluentMap.Mapping.PropertyPersistenceMetadata.IgnoredByFluentMap.get -> bool
+Dapper.FluentMap.Mapping.PropertyPersistenceMetadata.IsComputed.get -> bool
+Dapper.FluentMap.Mapping.PropertyPersistenceMetadata.IsGenerated.get -> bool
+Dapper.FluentMap.Mapping.PropertyPersistenceMetadata.IsIdentity.get -> bool
+Dapper.FluentMap.Mapping.PropertyPersistenceMetadata.IsKey.get -> bool
+Dapper.FluentMap.Mapping.PropertyPersistenceMetadata.ParticipatesInInsert.get -> bool
+Dapper.FluentMap.Mapping.PropertyPersistenceMetadata.ParticipatesInMaterialization.get -> bool
+Dapper.FluentMap.Mapping.PropertyPersistenceMetadata.ParticipatesInUpdate.get -> bool
+Dapper.FluentMap.Mapping.ReadPropertyConverter<TDatabase, TProperty>
+Dapper.FluentMap.Mapping.WritePropertyConverter<TProperty, TDatabase>
+Dapper.FluentMap.Materialization.GeneratedMaterializerColumn
+Dapper.FluentMap.Materialization.GeneratedMaterializerColumn.ColumnName.get -> string!
+Dapper.FluentMap.Materialization.GeneratedMaterializerColumn.Ignored.get -> bool
+Dapper.FluentMap.Materialization.GeneratedMaterializerColumn.MemberPath.get -> string?
+Dapper.FluentMap.Materialization.GeneratedMaterializerColumn.ReadConverterDatabaseType.get -> System.Type?
+Dapper.FluentMap.Materialization.GeneratedMaterializerColumn.ReadConverterPropertyType.get -> System.Type?
+Dapper.FluentMap.Materialization.GeneratedMaterializerColumn.ReadConverterType.get -> System.Type?
+Dapper.FluentMap.Materialization.GeneratedMaterializerDescriptor<TEntity>
+Dapper.FluentMap.Materialization.GeneratedMaterializerDescriptor<TEntity>.Columns.get -> System.Collections.Generic.IReadOnlyList<Dapper.FluentMap.Materialization.GeneratedMaterializerColumn!>!
+Dapper.FluentMap.Materialization.GeneratedMaterializerDescriptor<TEntity>.EntityType.get -> System.Type!
+Dapper.FluentMap.Materialization.GeneratedMaterializerDescriptor<TEntity>.GeneratedMaterializerDescriptor(System.Collections.Generic.IEnumerable<Dapper.FluentMap.Materialization.GeneratedMaterializerColumn!>! columns, Dapper.FluentMap.Materialization.GeneratedRowMaterializer<TEntity!>! materializer) -> void
+Dapper.FluentMap.Materialization.GeneratedMaterializerDescriptor<TEntity>.GeneratedMaterializerDescriptor(System.Type? profileType, System.Collections.Generic.IEnumerable<Dapper.FluentMap.Materialization.GeneratedMaterializerColumn!>! columns, Dapper.FluentMap.Materialization.GeneratedRowMaterializer<TEntity!>! materializer) -> void
+Dapper.FluentMap.Materialization.GeneratedMaterializerDescriptor<TEntity>.Materializer.get -> Dapper.FluentMap.Materialization.GeneratedRowMaterializer<TEntity!>!
+Dapper.FluentMap.Materialization.GeneratedMaterializerDescriptor<TEntity>.ProfileType.get -> System.Type?
+Dapper.FluentMap.Materialization.GeneratedRowMaterializer<TEntity>
+Dapper.FluentMap.Naming.NamingPolicy
+Dapper.FluentMap.Naming.NamingPolicy.GetColumnName(string! memberName) -> string!
+Dapper.FluentMap.Naming.NamingPolicy.GetType() -> System.Type!
+Dapper.FluentMap.Naming.NamingPolicy.Then(Dapper.FluentMap.Naming.NamingPolicy! next) -> Dapper.FluentMap.Naming.NamingPolicy!
+Dapper.FluentMap.Naming.NamingPolicy.Then(System.Func<string!, string!>! transformer) -> Dapper.FluentMap.Naming.NamingPolicy!
+Dapper.FluentMap.Naming.NamingPolicy.WithPrefix(string! prefix) -> Dapper.FluentMap.Naming.NamingPolicy!
+Dapper.FluentMap.Naming.NamingPolicy.WithSuffix(string! suffix) -> Dapper.FluentMap.Naming.NamingPolicy!
+Dapper.FluentMap.QueryMappedExtensions
+Dapper.FluentMap.TypeMaps.FluentConventionTypeMap<TEntity>
+Dapper.FluentMap.TypeMaps.FluentConventionTypeMap<TEntity>.FluentConventionTypeMap() -> void
+Dapper.FluentMap.TypeMaps.FluentMapTypeMap<TEntity>
+Dapper.FluentMap.TypeMaps.FluentMapTypeMap<TEntity>.FluentMapTypeMap() -> void
+Dapper.FluentMap.TypeMaps.MultiTypeMap
+Dapper.FluentMap.TypeMaps.MultiTypeMap.FindConstructor(string![]! names, System.Type![]! types) -> System.Reflection.ConstructorInfo!
+Dapper.FluentMap.TypeMaps.MultiTypeMap.FindExplicitConstructor() -> System.Reflection.ConstructorInfo!
+Dapper.FluentMap.TypeMaps.MultiTypeMap.GetConstructorParameter(System.Reflection.ConstructorInfo! constructor, string! columnName) -> Dapper.SqlMapper.IMemberMap!
+Dapper.FluentMap.TypeMaps.MultiTypeMap.GetMember(string! columnName) -> Dapper.SqlMapper.IMemberMap!
+Dapper.FluentMap.TypeMaps.MultiTypeMap.MultiTypeMap(params Dapper.SqlMapper.ITypeMap![]! mappers) -> void
+Dapper.FluentMap.Utils.FluentMapConfigurationExtensions
+Dapper.FluentMap.Utils.ReflectionHelper
+override Dapper.FluentMap.Configuration.FluentConventionConfiguration.Equals(object! obj) -> bool
+override Dapper.FluentMap.Configuration.FluentConventionConfiguration.GetHashCode() -> int
+override Dapper.FluentMap.Configuration.FluentConventionConfiguration.ToString() -> string!
+override Dapper.FluentMap.Configuration.FluentMapConfiguration.Equals(object! obj) -> bool
+override Dapper.FluentMap.Configuration.FluentMapConfiguration.GetHashCode() -> int
+override Dapper.FluentMap.Configuration.FluentMapConfiguration.ToString() -> string!
+override Dapper.FluentMap.Conventions.Convention.Equals(object! obj) -> bool
+override Dapper.FluentMap.Conventions.Convention.GetHashCode() -> int
+override Dapper.FluentMap.Conventions.Convention.ToString() -> string!
+override Dapper.FluentMap.Conventions.ConventionPropertyConfiguration.Equals(object! obj) -> bool
+override Dapper.FluentMap.Conventions.ConventionPropertyConfiguration.GetHashCode() -> int
+override Dapper.FluentMap.Conventions.ConventionPropertyConfiguration.ToString() -> string!
+override Dapper.FluentMap.Conventions.PropertyConventionConfiguration.Equals(object! obj) -> bool
+override Dapper.FluentMap.Conventions.PropertyConventionConfiguration.GetHashCode() -> int
+override Dapper.FluentMap.Conventions.PropertyConventionConfiguration.ToString() -> string!
+override Dapper.FluentMap.Diagnostics.MappingExplanation.ToString() -> string!
+override Dapper.FluentMap.Mapping.EntityMap<TEntity>.GetPropertyMap(System.Reflection.PropertyInfo! info) -> Dapper.FluentMap.Mapping.PropertyMap!
+override Dapper.FluentMap.Mapping.PropertyMapBase<TPropertyMap>.Equals(object! obj) -> bool
+override Dapper.FluentMap.Mapping.PropertyMapBase<TPropertyMap>.GetHashCode() -> int
+override Dapper.FluentMap.Mapping.PropertyMapBase<TPropertyMap>.ToString() -> string!
+override Dapper.FluentMap.Naming.NamingPolicy.Equals(object! obj) -> bool
+override Dapper.FluentMap.Naming.NamingPolicy.GetHashCode() -> int
+override Dapper.FluentMap.Naming.NamingPolicy.ToString() -> string!
+static Dapper.FluentMap.FluentMapper.Configuration.get -> Dapper.FluentMap.Configuration.ImmutableFluentMapConfiguration!
+static Dapper.FluentMap.FluentMapper.Explain<TEntity, TProfile>() -> Dapper.FluentMap.Diagnostics.MappingExplanation!
+static Dapper.FluentMap.FluentMapper.Explain<TEntity>() -> Dapper.FluentMap.Diagnostics.MappingExplanation!
+static Dapper.FluentMap.FluentMapper.GetEntityMaps() -> System.Collections.Generic.IReadOnlyDictionary<System.Type!, Dapper.FluentMap.Mapping.IEntityMap!>!
+static Dapper.FluentMap.FluentMapper.GetTypeConventions() -> System.Collections.Generic.IReadOnlyDictionary<System.Type!, System.Collections.Generic.IReadOnlyList<Dapper.FluentMap.Conventions.Convention!>!>!
+static Dapper.FluentMap.FluentMapper.Initialize(System.Action<Dapper.FluentMap.Configuration.FluentMapConfiguration!>! configure) -> void
+static Dapper.FluentMap.FluentMapper.Runtime.get -> Dapper.FluentMap.FluentMapRuntime!
+static Dapper.FluentMap.FluentMapper.Validate() -> void
+static Dapper.FluentMap.Materialization.GeneratedMaterializerColumn.Ignore(string! columnName) -> Dapper.FluentMap.Materialization.GeneratedMaterializerColumn!
+static Dapper.FluentMap.Materialization.GeneratedMaterializerColumn.Map(string! columnName, string! memberPath) -> Dapper.FluentMap.Materialization.GeneratedMaterializerColumn!
+static Dapper.FluentMap.Materialization.GeneratedMaterializerColumn.Map(string! columnName, string! memberPath, System.Type! readConverterType, System.Type! readConverterDatabaseType, System.Type! readConverterPropertyType) -> Dapper.FluentMap.Materialization.GeneratedMaterializerColumn!
+static Dapper.FluentMap.Naming.NamingPolicy.Custom(System.Func<string!, string!>! transformer) -> Dapper.FluentMap.Naming.NamingPolicy!
+static Dapper.FluentMap.Naming.NamingPolicy.Identity.get -> Dapper.FluentMap.Naming.NamingPolicy!
+static Dapper.FluentMap.Naming.NamingPolicy.Prefix(string! prefix) -> Dapper.FluentMap.Naming.NamingPolicy!
+static Dapper.FluentMap.Naming.NamingPolicy.SnakeCase.get -> Dapper.FluentMap.Naming.NamingPolicy!
+static Dapper.FluentMap.Naming.NamingPolicy.Suffix(string! suffix) -> Dapper.FluentMap.Naming.NamingPolicy!
+static Dapper.FluentMap.QueryMappedExtensions.QueryMapped<TEntity, TProfile>(this System.Data.IDbConnection! connection, Dapper.CommandDefinition command) -> System.Collections.Generic.IEnumerable<TEntity!>!
+static Dapper.FluentMap.QueryMappedExtensions.QueryMapped<TEntity, TProfile>(this System.Data.IDbConnection! connection, string! sql, object? param = null, System.Data.IDbTransaction? transaction = null, int? commandTimeout = null, System.Data.CommandType? commandType = null) -> System.Collections.Generic.IEnumerable<TEntity!>!
+static Dapper.FluentMap.QueryMappedExtensions.QueryMapped<TEntity>(this System.Data.IDbConnection! connection, Dapper.CommandDefinition command) -> System.Collections.Generic.IEnumerable<TEntity!>!
+static Dapper.FluentMap.QueryMappedExtensions.QueryMapped<TEntity>(this System.Data.IDbConnection! connection, string! sql, object? param = null, System.Data.IDbTransaction? transaction = null, int? commandTimeout = null, System.Data.CommandType? commandType = null) -> System.Collections.Generic.IEnumerable<TEntity!>!
+static Dapper.FluentMap.QueryMappedExtensions.QueryMapped<TFirst, TSecond, TReturn, TFirstProfile, TSecondProfile>(this System.Data.IDbConnection! connection, Dapper.CommandDefinition command, System.Func<TFirst!, TSecond?, TReturn>! map, string! splitOn = "Id") -> System.Collections.Generic.IEnumerable<TReturn>!
+static Dapper.FluentMap.QueryMappedExtensions.QueryMapped<TFirst, TSecond, TReturn, TFirstProfile, TSecondProfile>(this System.Data.IDbConnection! connection, string! sql, System.Func<TFirst!, TSecond?, TReturn>! map, object? param = null, System.Data.IDbTransaction? transaction = null, int? commandTimeout = null, System.Data.CommandType? commandType = null, string! splitOn = "Id") -> System.Collections.Generic.IEnumerable<TReturn>!
+static Dapper.FluentMap.QueryMappedExtensions.QueryMapped<TFirst, TSecond, TReturn>(this System.Data.IDbConnection! connection, Dapper.CommandDefinition command, System.Func<TFirst!, TSecond?, TReturn>! map, string! splitOn = "Id") -> System.Collections.Generic.IEnumerable<TReturn>!
+static Dapper.FluentMap.QueryMappedExtensions.QueryMapped<TFirst, TSecond, TReturn>(this System.Data.IDbConnection! connection, string! sql, System.Func<TFirst!, TSecond?, TReturn>! map, object? param = null, System.Data.IDbTransaction? transaction = null, int? commandTimeout = null, System.Data.CommandType? commandType = null, string! splitOn = "Id") -> System.Collections.Generic.IEnumerable<TReturn>!
+static Dapper.FluentMap.QueryMappedExtensions.QueryMappedAsync<TEntity, TProfile>(this System.Data.IDbConnection! connection, Dapper.CommandDefinition command) -> System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<TEntity!>!>!
+static Dapper.FluentMap.QueryMappedExtensions.QueryMappedAsync<TEntity, TProfile>(this System.Data.IDbConnection! connection, string! sql, object? param = null, System.Data.IDbTransaction? transaction = null, int? commandTimeout = null, System.Data.CommandType? commandType = null) -> System.Threading.Tasks.Task<System.Collections.Generic.IEnumerable<TEntity!>!>!
+static Dapper.FluentMap.QueryMappedExtensions.QueryMappedSingle<TEntity, TProfile>(this System.Data.IDbConnection! connection, string! sql, object? param = null, System.Data.IDbTransaction? transaction = null, int? commandTimeout = null, System.Data.CommandType? commandType = null) -> TEntity!
+static Dapper.FluentMap.QueryMappedExtensions.QueryMappedSingle<TEntity>(this System.Data.IDbConnection! connection, string! sql, object? param = null, System.Data.IDbTransaction? transaction = null, int? commandTimeout = null, System.Data.CommandType? commandType = null) -> TEntity!
+static Dapper.FluentMap.QueryMappedExtensions.QueryMappedSingleAsync<TEntity, TProfile>(this System.Data.IDbConnection! connection, string! sql, object? param = null, System.Data.IDbTransaction? transaction = null, int? commandTimeout = null, System.Data.CommandType? commandType = null) -> System.Threading.Tasks.Task<TEntity!>!
+static Dapper.FluentMap.QueryMappedExtensions.QueryMappedUnbuffered<TEntity, TProfile>(this System.Data.IDbConnection! connection, Dapper.CommandDefinition command) -> System.Collections.Generic.IEnumerable<TEntity!>!
+static Dapper.FluentMap.QueryMappedExtensions.QueryMappedUnbuffered<TEntity, TProfile>(this System.Data.IDbConnection! connection, string! sql, object? param = null, System.Data.IDbTransaction? transaction = null, int? commandTimeout = null, System.Data.CommandType? commandType = null) -> System.Collections.Generic.IEnumerable<TEntity!>!
+static Dapper.FluentMap.QueryMappedExtensions.QueryMappedUnbuffered<TEntity>(this System.Data.IDbConnection! connection, Dapper.CommandDefinition command) -> System.Collections.Generic.IEnumerable<TEntity!>!
+static Dapper.FluentMap.QueryMappedExtensions.QueryMappedUnbuffered<TEntity>(this System.Data.IDbConnection! connection, string! sql, object? param = null, System.Data.IDbTransaction? transaction = null, int? commandTimeout = null, System.Data.CommandType? commandType = null) -> System.Collections.Generic.IEnumerable<TEntity!>!
+static Dapper.FluentMap.QueryMappedExtensions.QueryMappedUnbufferedAsync<TEntity, TProfile>(this System.Data.Common.DbConnection! connection, Dapper.CommandDefinition command) -> System.Collections.Generic.IAsyncEnumerable<TEntity!>!
+static Dapper.FluentMap.QueryMappedExtensions.QueryMappedUnbufferedAsync<TEntity, TProfile>(this System.Data.Common.DbConnection! connection, string! sql, object? param = null, System.Data.IDbTransaction? transaction = null, int? commandTimeout = null, System.Data.CommandType? commandType = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<TEntity!>!
+static Dapper.FluentMap.QueryMappedExtensions.QueryMappedUnbufferedAsync<TEntity, TProfile>(this System.Data.Common.DbConnection! connection, string! sql, System.Threading.CancellationToken cancellationToken) -> System.Collections.Generic.IAsyncEnumerable<TEntity!>!
+static Dapper.FluentMap.QueryMappedExtensions.QueryMappedUnbufferedAsync<TEntity>(this System.Data.Common.DbConnection! connection, Dapper.CommandDefinition command) -> System.Collections.Generic.IAsyncEnumerable<TEntity!>!
+static Dapper.FluentMap.QueryMappedExtensions.QueryMappedUnbufferedAsync<TEntity>(this System.Data.Common.DbConnection! connection, string! sql, object? param = null, System.Data.IDbTransaction? transaction = null, int? commandTimeout = null, System.Data.CommandType? commandType = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Collections.Generic.IAsyncEnumerable<TEntity!>!
+static Dapper.FluentMap.QueryMappedExtensions.QueryMappedUnbufferedAsync<TEntity>(this System.Data.Common.DbConnection! connection, string! sql, System.Threading.CancellationToken cancellationToken) -> System.Collections.Generic.IAsyncEnumerable<TEntity!>!
+static Dapper.FluentMap.QueryMappedExtensions.QueryMultipleMapped(this System.Data.IDbConnection! connection, Dapper.CommandDefinition command) -> Dapper.FluentMap.MappedGridReader!
+static Dapper.FluentMap.QueryMappedExtensions.QueryMultipleMapped(this System.Data.IDbConnection! connection, string! sql, object? param = null, System.Data.IDbTransaction? transaction = null, int? commandTimeout = null, System.Data.CommandType? commandType = null) -> Dapper.FluentMap.MappedGridReader!
+static Dapper.FluentMap.QueryMappedExtensions.QueryMultipleMappedAsync(this System.Data.Common.DbConnection! connection, Dapper.CommandDefinition command) -> System.Threading.Tasks.Task<Dapper.FluentMap.MappedGridReader!>!
+static Dapper.FluentMap.QueryMappedExtensions.QueryMultipleMappedAsync(this System.Data.Common.DbConnection! connection, string! sql, object? param = null, System.Data.IDbTransaction? transaction = null, int? commandTimeout = null, System.Data.CommandType? commandType = null, System.Threading.CancellationToken cancellationToken = default(System.Threading.CancellationToken)) -> System.Threading.Tasks.Task<Dapper.FluentMap.MappedGridReader!>!
+static Dapper.FluentMap.TypeMaps.MultiTypeMap.MatchColumnNames(Dapper.FluentMap.Mapping.IPropertyMap! map, string! columnName) -> bool
+static Dapper.FluentMap.TypeMaps.MultiTypeMap.TypePropertyMapCache.get -> System.Collections.Concurrent.ConcurrentDictionary<string!, System.Reflection.PropertyInfo!>!
+static Dapper.FluentMap.Utils.FluentMapConfigurationExtensions.ApplyMapsFromAssemblies(this Dapper.FluentMap.Configuration.FluentMapConfiguration! configuration, params System.Reflection.Assembly![]! assemblies) -> void
+static Dapper.FluentMap.Utils.ReflectionHelper.GetMemberInfo(System.Linq.Expressions.LambdaExpression! lambda) -> System.Reflection.MemberInfo!
+static readonly Dapper.FluentMap.FluentMapper.EntityMaps -> System.Collections.Concurrent.ConcurrentDictionary<System.Type!, Dapper.FluentMap.Mapping.IEntityMap!>!
+static readonly Dapper.FluentMap.FluentMapper.TypeConventions -> System.Collections.Concurrent.ConcurrentDictionary<System.Type!, System.Collections.Generic.IList<Dapper.FluentMap.Conventions.Convention!>!>!
+static readonly Dapper.FluentMap.Mapping.PropertyConversionMetadata.Default -> Dapper.FluentMap.Mapping.PropertyConversionMetadata!
+static readonly Dapper.FluentMap.Mapping.PropertyPersistenceMetadata.Default -> Dapper.FluentMap.Mapping.PropertyPersistenceMetadata!
+static readonly Dapper.FluentMap.Mapping.PropertyPersistenceMetadata.Ignored -> Dapper.FluentMap.Mapping.PropertyPersistenceMetadata!
+virtual Dapper.FluentMap.Mapping.ReadPropertyConverter<TDatabase, TProperty>.Invoke(TDatabase value) -> TProperty
+virtual Dapper.FluentMap.Mapping.WritePropertyConverter<TProperty, TDatabase>.Invoke(TProperty value) -> TDatabase
+virtual Dapper.FluentMap.Materialization.GeneratedRowMaterializer<TEntity>.Invoke(System.Data.IDataRecord! record) -> TEntity!

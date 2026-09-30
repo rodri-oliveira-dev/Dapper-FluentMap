@@ -100,6 +100,12 @@ namespace Dapper.FluentMap.Dommel
                     new DommelPropertyResolver().ResolveProperties(type).Select(property => property.Property))
                 .Where(property => !generatedKeys.Contains(property))
                 .ToArray();
+            if (properties.Length == 0)
+            {
+                throw new FluentMapConfigurationException(
+                    $"Entity '{type.FullName}' has no properties eligible for a mapped INSERT.");
+            }
+
             var tableName = global::Dommel.Resolvers.Table(type, sqlBuilder);
             var columnNames = properties
                 .Select(property => global::Dommel.Resolvers.Column(property, sqlBuilder, false))
@@ -126,12 +132,24 @@ namespace Dapper.FluentMap.Dommel
             var type = typeof(TEntity);
             var sqlBuilder = DommelMapper.GetSqlBuilder(connection);
             var keyProperties = new DommelKeyPropertyResolver().ResolveKeyProperties(type);
+            if (keyProperties.Length == 0)
+            {
+                throw new FluentMapConfigurationException(
+                    $"Entity '{type.FullName}' has no key property available for a mapped UPDATE predicate.");
+            }
+
             var keySet = new HashSet<PropertyInfo>(keyProperties.Select(key => key.Property));
             var updateProperties = new DommelPropertyResolver()
                 .ResolveProperties(type)
                 .Where(property => !property.IsGenerated && !keySet.Contains(property.Property))
                 .Select(property => property.Property)
                 .ToArray();
+            if (updateProperties.Length == 0)
+            {
+                throw new FluentMapConfigurationException(
+                    $"Entity '{type.FullName}' has no properties eligible for a mapped UPDATE.");
+            }
+
             var tableName = global::Dommel.Resolvers.Table(type, sqlBuilder);
             var assignments = updateProperties.Select(property =>
                 global::Dommel.Resolvers.Column(property, sqlBuilder, false) + " = " +
@@ -166,7 +184,9 @@ namespace Dapper.FluentMap.Dommel
                 var conversion = propertyMap == null
                     ? PropertyConversionMetadata.Default
                     : PropertyMapConversion.GetConversion(propertyMap);
-                var columnName = propertyMap == null ? property.Name : propertyMap.ColumnName;
+                var columnName = propertyMap == null || string.IsNullOrWhiteSpace(propertyMap.ColumnName)
+                    ? property.Name
+                    : propertyMap.ColumnName;
 
                 if (conversion.HasWriteConverter && value != null)
                 {

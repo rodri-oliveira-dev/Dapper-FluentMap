@@ -443,27 +443,60 @@ CREATE TABLE write_conversion_boundary_entities (
             SQLitePCL.Batteries_V2.Init();
             SqlMapper.AddTypeHandler(new ConvertedCodeTypeHandler());
 
-            FluentMapper.Initialize(config =>
+            try
             {
-                config.AddMap(new TypeHandledWriteEntityMap());
-                config.ForDommel();
-            });
+                FluentMapper.Initialize(config =>
+                {
+                    config.AddMap(new TypeHandledWriteEntityMap());
+                    config.ForDommel();
+                });
 
-            using (var connection = OpenConnection())
-            {
-                connection.Execute(@"
+                using (var connection = OpenConnection())
+                {
+                    connection.Execute(@"
 CREATE TABLE type_handled_write_entities (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     code TEXT NOT NULL
 );");
 
-                var id = Convert.ToInt32(connection.InsertMapped(new TypeHandledWriteEntity { Code = "value" }));
+                    var id = Convert.ToInt32(connection.InsertMapped(new TypeHandledWriteEntity { Code = "value" }));
 
-                Assert.Equal(
-                    "handler:converted:value",
-                    connection.QuerySingle<string>(
-                        "SELECT code FROM type_handled_write_entities WHERE id = @id;",
-                        new { id }));
+                    Assert.Equal(
+                        "handler:converted:value",
+                        connection.QuerySingle<string>(
+                            "SELECT code FROM type_handled_write_entities WHERE id = @id;",
+                            new { id }));
+                }
+            }
+            finally
+            {
+                SqlMapper.ResetTypeHandlers();
+            }
+        }
+
+        [Fact]
+        public void MappedWritesShouldRejectEntitiesWithoutEligibleValues()
+        {
+            PreTest();
+            SQLitePCL.Batteries_V2.Init();
+
+            FluentMapper.Initialize(config =>
+            {
+                config.AddMap(new IdentityOnlyEntityMap());
+                config.ForDommel();
+            });
+
+            using (var connection = OpenConnection())
+            {
+                var insertException = Assert.Throws<FluentMapConfigurationException>(() =>
+                    connection.InsertMapped(new IdentityOnlyEntity()));
+                var updateException = Assert.Throws<FluentMapConfigurationException>(() =>
+                    connection.UpdateMapped(new IdentityOnlyEntity { Id = 1 }));
+
+                Assert.Contains(typeof(IdentityOnlyEntity).FullName, insertException.Message);
+                Assert.Contains("INSERT", insertException.Message);
+                Assert.Contains(typeof(IdentityOnlyEntity).FullName, updateException.Message);
+                Assert.Contains("UPDATE", updateException.Message);
             }
         }
 
@@ -773,6 +806,20 @@ WHERE id = @id;", new { id });
             public int Id { get; set; }
 
             public string Code { get; set; }
+        }
+
+        private sealed class IdentityOnlyEntity
+        {
+            public int Id { get; set; }
+        }
+
+        private sealed class IdentityOnlyEntityMap : DommelEntityMap<IdentityOnlyEntity>
+        {
+            public IdentityOnlyEntityMap()
+            {
+                ToTable("identity_only_entities");
+                Map(entity => entity.Id).ToColumn("id").IsIdentity();
+            }
         }
 
         private sealed class TypeHandledWriteEntityMap : DommelEntityMap<TypeHandledWriteEntity>

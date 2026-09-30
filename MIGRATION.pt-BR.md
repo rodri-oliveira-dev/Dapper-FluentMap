@@ -298,7 +298,7 @@ Para value objects armazenados por componentes mapeados, use materialização co
 Map(customer => customer.Cpf.Number).ToColumn("cpf");
 ```
 
-O materializador de runtime continua selecionando construtores públicos compatíveis por padrão. Maps que antes não podiam ser materializados agora podem optar por `ConstructUsing(...)`, com um a quatro valores explicitamente mapeados. Esse caminho de factory é suportado pela materialização em runtime e por runtimes isolados; materializadores gerados reportam `DFM011`, e o modo strict generated rejeita o shape sem fallback.
+O materializador de runtime continua selecionando construtores públicos compatíveis por padrão. Maps que antes não podiam ser materializados agora podem optar por `ConstructUsing(...)`, com um a quatro valores de propriedades raiz explicitamente mapeadas; caminhos aninhados são rejeitados durante a configuração. Esse caminho de factory é suportado pela materialização em runtime e por runtimes isolados; materializadores gerados reportam `DFM011`, e o modo strict generated rejeita o shape sem fallback.
 
 ## Profiles
 
@@ -342,10 +342,11 @@ Write converters configurados são executados apenas pelos métodos opt-in `Inse
 
 Overloads `QueryMapped<TFirst,TSecond,TThird,TReturn>` com três entradas agora complementam a API histórica de duas entradas. Informe duas fronteiras `splitOn` únicas, separadas por vírgula. Essas APIs apenas compõem linhas individuais e não agregam grafos um-para-muitos.
 
-## Registro Gerado
+## Anotações Nullable
 
 Os assemblies públicos agora carregam anotações de nullable reference types. As assinaturas CLR e a compatibilidade binária não mudam, mas consumidores com nullable habilitado podem receber warnings mais precisos: parâmetros/transações opcionais e metadados opcionais são nullable, e argumentos filhos de multi-mapping são nullable porque um segmento contendo apenas `NULL` é entregue como `null`. Trate os novos warnings como orientação de contrato; não desabilite a análise nullable globalmente para ocultá-los.
 
+## Registro Gerado
 
 Instale `FluentMap.Generators` e chame:
 
@@ -357,7 +358,9 @@ Isso pode substituir registro manual para maps elegíveis da compilação atual.
 
 Materializadores gerados são uma otimização. Casos não suportados usam materialização runtime como fallback, exceto quando o modo estrito de materialização gerada é habilitado explicitamente.
 
-Queries strict generated podem usar `GeneratedParameters` para comandos parametrizados. Cada valor possui um `DbType` explícito; objetos anônimos e outros bags de parâmetros arbitrários continuam não suportados, para que o modo estrito não introduza descoberta de parâmetros por reflection. Colunas reordenadas e colunas adicionais não mapeadas seguras podem permanecer no caminho gerado; colunas obrigatórias ausentes, nomes duplicados/ambíguos ou colunas adicionais mapeadas falham deterministicamente.
+Queries strict generated podem usar `GeneratedParameters` para comandos parametrizados. Cada valor possui um `DbType` explícito; objetos anônimos e outros bags de parâmetros arbitrários continuam não suportados, para que o modo estrito não introduza descoberta de parâmetros por reflection. Colunas reordenadas e colunas adicionais que não resolvem para membros configurados explicitamente no FluentMap podem permanecer no caminho gerado; colunas obrigatórias ausentes, nomes duplicados/ambíguos ou colunas adicionais explicitamente mapeadas falham deterministicamente. A descoberta de membros apenas por convenção do Dapper permanece exclusiva do caminho não estrito.
+
+Falhas de conversão de valores gerados agora lançam `FluentMapConfigurationException` com contexto da entidade, membro, coluna, tipo do provider e tipo de destino. Código que antes capturava `FormatException` ou `InvalidCastException`, dependentes do provider, deve capturar `FluentMapConfigurationException` e inspecionar a exceção interna.
 
 ## Isolamento de Configuração
 

@@ -156,7 +156,7 @@ public CustomerMap()
 }
 ```
 
-`ConstructUsing` aceita de um a quatro valores explicitamente mapeados, valida cada binding e é preservado por runtimes isolados. Factories delegate são estratégias de materialização em runtime: o source generator registra o map, mas reporta `DFM011` e não emite materializador gerado. Portanto, o modo strict generated rejeita esse shape sem fallback silencioso.
+`ConstructUsing` aceita de um a quatro valores de propriedades raiz explicitamente mapeadas, valida cada binding e é preservado por runtimes isolados. Caminhos de propriedades aninhadas são rejeitados durante a configuração porque factories explícitas atualmente vinculam apenas o nó raiz de materialização. Factories delegate são estratégias de materialização em runtime: o source generator registra o map, mas reporta `DFM011` e não emite materializador gerado. Portanto, o modo strict generated rejeita esse shape sem fallback silencioso.
 
 ## Mapping Profiles
 
@@ -412,7 +412,7 @@ var customer = runtime.QueryGeneratedMappedSingle<Customer>(
 
 `GeneratedParameters` vincula somente valores de entrada nomeados explicitamente e com `DbType` explícito; ele não inspeciona objetos anônimos. Comandos sem parâmetros continuam suportados. Objetos de parâmetros arbitrários falham antes de abrir a conexão, e o diagnóstico identifica `QueryMapped*` como alternativa não estrita.
 
-Materializadores gerados aceitam colunas obrigatórias reordenadas e colunas adicionais somente quando os nomes adicionais não resolvem membros mapeados. Colunas obrigatórias ausentes, nomes duplicados, colunas adicionais mapeadas, valores CLR incompatíveis do provider e shapes aninhados não suportados falham deterministicamente, sem fallback silencioso para materialização runtime.
+Materializadores gerados aceitam colunas obrigatórias reordenadas e colunas adicionais somente quando os nomes adicionais não resolvem membros configurados explicitamente no FluentMap. Colunas obrigatórias ausentes, nomes duplicados, colunas adicionais explicitamente mapeadas, valores CLR incompatíveis do provider e shapes aninhados não suportados falham deterministicamente, sem fallback silencioso para materialização runtime. A resolução strict generated não usa reflection para descobrir membros disponíveis apenas pela convenção do Dapper; use a API não estrita quando essa descoberta for necessária.
 
 O caminho gerado estrito possui um contrato suportado mais restrito do que a materialização normal controlada pelo FluentMap. Revise [COMPATIBILITY.md](COMPATIBILITY.md) antes de usá-lo em deployments com trimming ou Native AOT.
 

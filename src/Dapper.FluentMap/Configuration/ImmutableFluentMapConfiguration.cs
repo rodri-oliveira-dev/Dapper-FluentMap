@@ -209,7 +209,7 @@ namespace Dapper.FluentMap.Configuration
         /// <summary>
         /// Gets the selected mapping profile type.
         /// </summary>
-        public Type? ProfileType { get; }
+        public Type ProfileType { get; }
 
         /// <summary>
         /// Gets the concrete map type that produced this profile configuration.
@@ -387,7 +387,7 @@ namespace Dapper.FluentMap.Configuration
     {
         private GeneratedMaterializerConfiguration(
             Type entityType,
-            Type profileType,
+            Type? profileType,
             IReadOnlyList<GeneratedMaterializerColumn> columns,
             Func<IDataRecord, object> materializer)
         {
@@ -405,7 +405,7 @@ namespace Dapper.FluentMap.Configuration
         /// <summary>
         /// Gets the mapping profile type, or <see langword="null"/> for the default map.
         /// </summary>
-        public Type ProfileType { get; }
+        public Type? ProfileType { get; }
 
         /// <summary>
         /// Gets the ordered column shape expected by the generated materializer.
@@ -428,7 +428,7 @@ namespace Dapper.FluentMap.Configuration
     {
         internal GeneratedMaterializerRegistrationSnapshot(
             Type entityType,
-            Type profileType,
+            Type? profileType,
             IReadOnlyList<GeneratedMaterializerColumn> columns,
             Func<IDataRecord, object> materializer)
         {
@@ -440,7 +440,7 @@ namespace Dapper.FluentMap.Configuration
 
         internal Type EntityType { get; }
 
-        internal Type ProfileType { get; }
+        internal Type? ProfileType { get; }
 
         internal IReadOnlyList<GeneratedMaterializerColumn> Columns { get; }
 

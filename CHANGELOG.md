@@ -18,9 +18,10 @@ The historical archived package history is not reconstructed here. This changelo
 
 ### Changed
 
-- Generated materializers now accept safe additional unmapped reader columns and provide specific strict diagnostics for missing, duplicate/ambiguous and mapped additional columns.
+- Generated materializers now accept safe additional reader columns that do not resolve to explicit FluentMap members and provide specific strict diagnostics for missing, duplicate/ambiguous and explicitly mapped additional columns; Dapper convention-only discovery remains a non-strict behavior.
 - Two- and three-input multi-mapping now share a single segment materialization pipeline.
 - Public projects now emit deliberate nullable reference annotations using staged `Nullable=annotations`; optional query inputs, metadata and multi-mapping null-child delegates reflect actual behavior without changing CLR signatures.
+- Generated value-conversion failures now surface as contextual `FluentMapConfigurationException` instances instead of leaking provider-dependent `FormatException` or `InvalidCastException` exceptions.
 
 ## [3.4.0] - 2026-09-27
 

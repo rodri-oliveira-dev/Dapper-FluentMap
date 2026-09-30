@@ -9,7 +9,7 @@ Every shipped project under `src/` has `PublicAPI.Shipped.txt` and `PublicAPI.Un
 For an intentional API change:
 
 1. update implementation, XML documentation and focused tests;
-2. run `dotnet format <project.csproj> analyzers --diagnostics RS0016 RS0017` to update `PublicAPI.Unshipped.txt`;
+2. run `dotnet format analyzers <project.csproj> --diagnostics RS0016 RS0036` to update additions and nullable annotations in `PublicAPI.Unshipped.txt`; record approved removals of shipped APIs manually in `PublicAPI.Unshipped.txt` with the `*REMOVED*` prefix;
 3. review the API-file diff as a compatibility contract, including nullability markers;
 4. document consumer and SemVer impact;
 5. after the API ships, move its entries from `PublicAPI.Unshipped.txt` to `PublicAPI.Shipped.txt` in ordinal order.

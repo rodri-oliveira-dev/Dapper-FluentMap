@@ -203,11 +203,11 @@ namespace Dapper.FluentMap
             IDbConnection connection,
             string sql,
             Func<TFirst, TSecond?, TThird?, TReturn> map,
+            string splitOn,
             object? param = null,
             IDbTransaction? transaction = null,
             int? commandTimeout = null,
-            CommandType? commandType = null,
-            string? splitOn = null)
+            CommandType? commandType = null)
             where TFirst : class
             where TSecond : class
             where TThird : class
@@ -241,11 +241,11 @@ namespace Dapper.FluentMap
             IDbConnection connection,
             string sql,
             Func<TFirst, TSecond?, TThird?, TReturn> map,
+            string splitOn,
             object? param = null,
             IDbTransaction? transaction = null,
             int? commandTimeout = null,
             CommandType? commandType = null,
-            string? splitOn = null,
             CancellationToken cancellationToken = default)
             where TFirst : class
             where TSecond : class
@@ -283,11 +283,11 @@ namespace Dapper.FluentMap
             IDbConnection connection,
             string sql,
             Func<TFirst, TSecond?, TThird?, TReturn> map,
+            string splitOn,
             object? param = null,
             IDbTransaction? transaction = null,
             int? commandTimeout = null,
             CommandType? commandType = null,
-            string? splitOn = null,
             CancellationToken cancellationToken = default)
             where TFirst : class
             where TSecond : class
@@ -328,11 +328,11 @@ namespace Dapper.FluentMap
             IDbConnection connection,
             string sql,
             Func<TFirst, TSecond?, TThird?, TReturn> map,
+            string splitOn,
             object? param = null,
             IDbTransaction? transaction = null,
             int? commandTimeout = null,
-            CommandType? commandType = null,
-            string? splitOn = null)
+            CommandType? commandType = null)
             where TFirst : class
             where TSecond : class
             where TThird : class

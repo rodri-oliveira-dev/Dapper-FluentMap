@@ -622,6 +622,10 @@ namespace Dapper.FluentMap
         /// <returns>The composed rows.</returns>
         [RequiresUnreferencedCode(QueryMappedApiAnnotations.RequiresUnreferencedCodeMessage)]
         [RequiresDynamicCode(QueryMappedApiAnnotations.RequiresDynamicCodeMessage)]
+        [SuppressMessage(
+            "ApiDesign",
+            "RS0027:API with optional parameter(s) should have the most parameters among its public overloads",
+            Justification = "The established two-segment overload retains its optional splitOn contract; new three-segment overloads require two explicit boundaries.")]
         public static IEnumerable<TReturn> QueryMapped<
             [DynamicallyAccessedMembers(QueryMappedApiAnnotations.MaterializedEntityMemberTypes)]
             TFirst,
@@ -656,6 +660,10 @@ namespace Dapper.FluentMap
         /// </summary>
         [RequiresUnreferencedCode(QueryMappedApiAnnotations.RequiresUnreferencedCodeMessage)]
         [RequiresDynamicCode(QueryMappedApiAnnotations.RequiresDynamicCodeMessage)]
+        [SuppressMessage(
+            "ApiDesign",
+            "RS0027:API with optional parameter(s) should have the most parameters among its public overloads",
+            Justification = "The established two-segment overload retains its optional splitOn contract; new three-segment overloads require two explicit boundaries.")]
         public static IEnumerable<TReturn> QueryMapped<
             [DynamicallyAccessedMembers(QueryMappedApiAnnotations.MaterializedEntityMemberTypes)]
             TFirst,
@@ -697,11 +705,11 @@ namespace Dapper.FluentMap
             this IDbConnection connection,
             string sql,
             Func<TFirst, TSecond?, TThird?, TReturn> map,
+            string splitOn,
             object? param = null,
             IDbTransaction? transaction = null,
             int? commandTimeout = null,
-            CommandType? commandType = null,
-            string? splitOn = null)
+            CommandType? commandType = null)
             where TFirst : class
             where TSecond : class
             where TThird : class
@@ -731,7 +739,7 @@ namespace Dapper.FluentMap
             this IDbConnection connection,
             CommandDefinition command,
             Func<TFirst, TSecond?, TThird?, TReturn> map,
-            string? splitOn = null)
+            string splitOn)
             where TFirst : class
             where TSecond : class
             where TThird : class
@@ -756,11 +764,11 @@ namespace Dapper.FluentMap
             this IDbConnection connection,
             string sql,
             Func<TFirst, TSecond?, TThird?, TReturn> map,
+            string splitOn,
             object? param = null,
             IDbTransaction? transaction = null,
             int? commandTimeout = null,
-            CommandType? commandType = null,
-            string? splitOn = null)
+            CommandType? commandType = null)
             where TFirst : class
             where TSecond : class
             where TThird : class
@@ -832,11 +840,11 @@ namespace Dapper.FluentMap
             this IDbConnection connection,
             string sql,
             Func<TFirst, TSecond?, TThird?, TReturn> map,
+            string splitOn,
             object? param = null,
             IDbTransaction? transaction = null,
             int? commandTimeout = null,
             CommandType? commandType = null,
-            string? splitOn = null,
             CancellationToken cancellationToken = default)
             where TFirst : class
             where TSecond : class
@@ -903,11 +911,11 @@ namespace Dapper.FluentMap
             this IDbConnection connection,
             string sql,
             Func<TFirst, TSecond?, TThird?, TReturn> map,
+            string splitOn,
             object? param = null,
             IDbTransaction? transaction = null,
             int? commandTimeout = null,
             CommandType? commandType = null,
-            string? splitOn = null,
             CancellationToken cancellationToken = default)
             where TFirst : class
             where TSecond : class
@@ -986,6 +994,10 @@ namespace Dapper.FluentMap
         /// <returns>The composed rows.</returns>
         [RequiresUnreferencedCode(QueryMappedApiAnnotations.RequiresUnreferencedCodeMessage)]
         [RequiresDynamicCode(QueryMappedApiAnnotations.RequiresDynamicCodeMessage)]
+        [SuppressMessage(
+            "ApiDesign",
+            "RS0027:API with optional parameter(s) should have the most parameters among its public overloads",
+            Justification = "The established profiled two-segment overload retains its optional splitOn contract; new three-segment overloads require two explicit boundaries.")]
         public static IEnumerable<TReturn> QueryMapped<
             [DynamicallyAccessedMembers(QueryMappedApiAnnotations.MaterializedEntityMemberTypes)]
             TFirst,
@@ -1024,6 +1036,10 @@ namespace Dapper.FluentMap
         /// </summary>
         [RequiresUnreferencedCode(QueryMappedApiAnnotations.RequiresUnreferencedCodeMessage)]
         [RequiresDynamicCode(QueryMappedApiAnnotations.RequiresDynamicCodeMessage)]
+        [SuppressMessage(
+            "ApiDesign",
+            "RS0027:API with optional parameter(s) should have the most parameters among its public overloads",
+            Justification = "The established profiled two-segment overload retains its optional splitOn contract; new three-segment overloads require two explicit boundaries.")]
         public static IEnumerable<TReturn> QueryMapped<
             [DynamicallyAccessedMembers(QueryMappedApiAnnotations.MaterializedEntityMemberTypes)]
             TFirst,
@@ -1344,9 +1360,10 @@ namespace Dapper.FluentMap
                 throw new ArgumentNullException(nameof(runtime));
             }
 
+            var boundaries = ParseSplitBoundaries(splitOn, entityTypes.Length);
             using (var reader = SqlMapper.ExecuteReader(connection, command))
             {
-                var segments = CreateSegments(reader, splitOn, entityTypes.Length);
+                var segments = CreateSegments(reader, boundaries, entityTypes.Length);
                 var materializers = CreateSegmentMaterializers(segments, entityTypes, profileTypes, runtime);
                 var results = new List<TReturn>();
 
@@ -1378,19 +1395,32 @@ namespace Dapper.FluentMap
                 throw new ArgumentNullException(nameof(runtime));
             }
 
+            var boundaries = ParseSplitBoundaries(splitOn, entityTypes.Length);
             using (var reader = await SqlMapper.ExecuteReaderAsync(connection, command).ConfigureAwait(false))
             {
-                var segments = CreateSegments(reader, splitOn, entityTypes.Length);
+                var segments = CreateSegments(reader, boundaries, entityTypes.Length);
                 var materializers = CreateSegmentMaterializers(segments, entityTypes, profileTypes, runtime);
                 var results = new List<TReturn>();
 
-                while (reader.Read())
+                while (await ReadSegmentRowAsync(reader, command.CancellationToken).ConfigureAwait(false))
                 {
                     results.Add(map(MaterializeSegments(segments, materializers)));
                 }
 
                 return results;
             }
+        }
+
+        private static Task<bool> ReadSegmentRowAsync(IDataReader reader, CancellationToken cancellationToken)
+        {
+            var dbReader = reader as DbDataReader;
+            if (dbReader != null)
+            {
+                return dbReader.ReadAsync(cancellationToken);
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            return Task.FromResult(reader.Read());
         }
 
         internal static async Task<MappedGridReader> ExecuteMultipleMappedAsync(
@@ -1412,7 +1442,7 @@ namespace Dapper.FluentMap
             return new MappedGridReader(reader, runtime);
         }
 
-        private static SegmentDataRecord[] CreateSegments(IDataRecord reader, string splitOn, int segmentCount)
+        private static string[] ParseSplitBoundaries(string splitOn, int segmentCount)
         {
             if (string.IsNullOrWhiteSpace(splitOn))
             {
@@ -1441,6 +1471,14 @@ namespace Dapper.FluentMap
                     "The splitOn boundary '" + duplicateBoundary.Key + "' is duplicated and ambiguous.");
             }
 
+            return boundaries;
+        }
+
+        private static SegmentDataRecord[] CreateSegments(
+            IDataRecord reader,
+            IReadOnlyList<string> boundaries,
+            int segmentCount)
+        {
             var indexes = new List<int> { 0 };
             foreach (var boundary in boundaries)
             {

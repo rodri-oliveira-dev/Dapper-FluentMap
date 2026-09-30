@@ -15,16 +15,26 @@ $ErrorActionPreference = 'Stop'
 $baseline = Get-Content -Raw -LiteralPath $BaselinePath | ConvertFrom-Json
 $current = Get-Content -Raw -LiteralPath $CurrentPath | ConvertFrom-Json
 $shortRun = @($current.Benchmarks | Where-Object { $_.DisplayInfo -like '*ShortRun*' })
+if ($shortRun.Count -eq 0) {
+  throw 'The BenchmarkDotNet report contains no ShortRun benchmark results.'
+}
 
 New-Item -ItemType Directory -Force -Path $OutputDirectory | Out-Null
 
 $comparisons = foreach ($scenario in $baseline.scenarios) {
-  $matches = @($shortRun | Where-Object { $_.Method -eq $scenario.method })
-  if ($matches.Count -ne 1) {
-    throw "Expected one ShortRun result for '$($scenario.method)', found $($matches.Count)."
+  $candidates = @($shortRun | Where-Object { $_.Method -eq $scenario.method })
+  if ($candidates.Count -ne 1) {
+    throw "Expected one ShortRun result for '$($scenario.method)', found $($candidates.Count)."
   }
 
-  $result = $matches[0]
+  $result = $candidates[0]
+  if ($null -eq $result.Statistics -or
+      $null -eq $result.Statistics.Mean -or
+      $null -eq $result.Memory -or
+      $null -eq $result.Memory.BytesAllocatedPerOperation) {
+    throw "Benchmark result for '$($scenario.method)' is missing Statistics.Mean or Memory.BytesAllocatedPerOperation."
+  }
+
   $timeDelta = (($result.Statistics.Mean - $scenario.meanNanoseconds) / $scenario.meanNanoseconds) * 100
   $allocationDelta = (($result.Memory.BytesAllocatedPerOperation - $scenario.allocatedBytes) / $scenario.allocatedBytes) * 100
   $material = $timeDelta -gt $baseline.timeRegressionThresholdPercent -or

@@ -75,6 +75,12 @@ namespace Dapper.FluentMap
 
             foreach (var binding in strategy.Bindings)
             {
+                if (binding.MemberPath.IsNested)
+                {
+                    throw new FluentMapConfigurationException(
+                        $"Explicit construction for entity '{FormatType(entityType)}' binds nested property path '{binding.MemberPath}'. ConstructUsing(...) supports only root property paths.");
+                }
+
                 if (!mappedPaths.Contains(binding.MemberPath))
                 {
                     throw new FluentMapConfigurationException(

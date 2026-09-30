@@ -18,6 +18,11 @@ namespace Dapper.FluentMap
 {
     internal sealed class MappingRegistry
     {
+        private static readonly GeneratedMaterializerEntry NoCompatibleGeneratedMaterializer =
+            GeneratedMaterializerEntry.Create(
+                Array.Empty<GeneratedMaterializerColumn>(),
+                _ => null);
+
         private readonly bool _installDapperTypeMaps;
 
         private readonly ConcurrentDictionary<MappingCacheKey, MappingCacheEntry> _propertyMapCache =
@@ -302,6 +307,8 @@ namespace Dapper.FluentMap
                 throw new FluentMapConfigurationException(
                     $"Entity '{descriptor.EntityType.FullName}' already has a generated materializer registered for the same column shape{profileContext}.");
             }
+
+            InvalidateType(descriptor.EntityType);
         }
 
         internal void AddGeneratedMaterializer(
@@ -340,6 +347,8 @@ namespace Dapper.FluentMap
                 throw new FluentMapConfigurationException(
                     $"Entity '{entityType.FullName}' already has a generated materializer registered for the same column shape{profileContext}.");
             }
+
+            InvalidateType(entityType);
         }
 
         internal bool TryGetGeneratedMaterializer(
@@ -377,6 +386,12 @@ namespace Dapper.FluentMap
 
             if (_generatedMaterializerResolutionCache.TryGetValue(cacheKey, out entry))
             {
+                if (ReferenceEquals(entry, NoCompatibleGeneratedMaterializer))
+                {
+                    materializer = null;
+                    return false;
+                }
+
                 materializer = entry.Materialize;
                 return true;
             }
@@ -392,6 +407,7 @@ namespace Dapper.FluentMap
                 return true;
             }
 
+            _generatedMaterializerResolutionCache.TryAdd(cacheKey, NoCompatibleGeneratedMaterializer);
             materializer = null;
             return false;
         }

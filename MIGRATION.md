@@ -298,7 +298,7 @@ For value objects stored through mapped components, use FluentMap-controlled mat
 Map(customer => customer.Cpf.Number).ToColumn("cpf");
 ```
 
-The runtime materializer still selects compatible public constructors by default. Maps that previously could not be materialized can now opt into `ConstructUsing(...)` with one to four explicitly mapped values. This factory path is supported by runtime materialization and isolated runtimes; generated materializers report `DFM011`, and strict generated mode rejects the unsupported shape without fallback.
+The runtime materializer still selects compatible public constructors by default. Maps that previously could not be materialized can now opt into `ConstructUsing(...)` with one to four explicitly mapped root-property values; nested paths are rejected during configuration. This factory path is supported by runtime materialization and isolated runtimes; generated materializers report `DFM011`, and strict generated mode rejects the unsupported shape without fallback.
 
 ## Profiles
 
@@ -342,10 +342,11 @@ Configured write converters execute only through the Dommel adapter's opt-in `In
 
 Three-input `QueryMapped<TFirst,TSecond,TThird,TReturn>` overloads now complement the historical two-input API. Supply two comma-separated unique `splitOn` boundaries. These APIs compose individual rows only and do not aggregate one-to-many graphs.
 
-## Generated Registration
+## Nullable Annotations
 
 Public assemblies now carry nullable reference annotations. CLR signatures and binary compatibility are unchanged, but nullable-enabled consumers may receive more accurate compiler warnings: optional query parameters/transactions and optional metadata are nullable, and multi-mapping child arguments are nullable because an all-`NULL` segment is passed as `null`. Treat new warnings as contract guidance; do not disable nullable analysis globally to hide them.
 
+## Generated Registration
 
 Install `FluentMap.Generators` and call:
 
@@ -357,7 +358,9 @@ This can replace manual registration for eligible maps in the current compilatio
 
 Generated materializers are an optimization. Unsupported cases fall back to runtime materialization unless strict generated materialization is explicitly enabled.
 
-Strict generated queries can use `GeneratedParameters` for parameterized commands. Each value has an explicit `DbType`; anonymous objects and other arbitrary parameter bags remain unsupported so strict mode does not introduce reflection-based parameter discovery. Safe reordered and unmapped additional result columns can stay on the generated path, while missing, duplicate/ambiguous or mapped additional columns fail deterministically.
+Strict generated queries can use `GeneratedParameters` for parameterized commands. Each value has an explicit `DbType`; anonymous objects and other arbitrary parameter bags remain unsupported so strict mode does not introduce reflection-based parameter discovery. Safe reordered and additional result columns that do not resolve to explicitly configured FluentMap members can stay on the generated path, while missing, duplicate/ambiguous or explicitly mapped additional columns fail deterministically. Convention-only Dapper member discovery remains exclusive to the non-strict path.
+
+Generated value-conversion failures now throw `FluentMapConfigurationException` with entity, member, column, provider type and target type context. Code that previously caught a provider-dependent `FormatException` or `InvalidCastException` from generated materialization should catch `FluentMapConfigurationException` and inspect its inner exception instead.
 
 ## Configuration Isolation
 

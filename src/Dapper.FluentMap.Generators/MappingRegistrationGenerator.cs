@@ -861,7 +861,7 @@ namespace Dapper.FluentMap.Generators
             builder.AppendLine("                throw new global::Dapper.FluentMap.FluentMapConfigurationException(");
             builder.AppendLine("                    \"Generated materialization failed for entity '\" + entityTypeName + \"'.\" + profileContext +");
             builder.AppendLine("                    \" Member path: '\" + memberPath + \"'. Column: '\" + columnName + \"'. Provider CLR type: '\" + value.GetType().FullName +");
-            builder.AppendLine("                    \"'. Target type: '\" + targetTypeName + \"'. Strict generated materialization does not use runtime reflection fallback.\",");
+            builder.AppendLine("                    \"'. Target type: '\" + targetTypeName + \"'. Generated materializers do not fall back to runtime reflection conversion.\",");
             builder.AppendLine("                    exception);");
             builder.AppendLine("            }");
             builder.AppendLine("        }");

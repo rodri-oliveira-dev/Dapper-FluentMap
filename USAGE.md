@@ -156,7 +156,7 @@ public CustomerMap()
 }
 ```
 
-`ConstructUsing` supports one to four explicitly mapped values, validates every binding, and is preserved by isolated runtimes. Delegate factories are runtime-materialization strategies: the source generator registers the map but reports `DFM011` and does not emit a generated materializer. Strict generated mode therefore rejects that shape instead of silently using the factory through reflection.
+`ConstructUsing` supports one to four explicitly mapped root-property values, validates every binding, and is preserved by isolated runtimes. Nested property paths are rejected during configuration because explicit factories currently bind only the root materialization node. Delegate factories are runtime-materialization strategies: the source generator registers the map but reports `DFM011` and does not emit a generated materializer. Strict generated mode therefore rejects that shape instead of silently using the factory through reflection.
 
 ## Mapping Profiles
 
@@ -412,7 +412,7 @@ var customer = runtime.QueryGeneratedMappedSingle<Customer>(
 
 `GeneratedParameters` binds only explicitly named input values with an explicit `DbType`; it does not inspect anonymous objects. Parameterless commands remain supported. Arbitrary parameter objects fail before the connection is opened, with `QueryMapped*` identified as the non-strict alternative.
 
-Generated materializers accept reordered required columns and additional columns only when the additional names do not resolve to mapped members. Missing required columns, duplicate names, mapped additional columns, incompatible provider values and unsupported nested shapes fail deterministically instead of silently using runtime materialization.
+Generated materializers accept reordered required columns and additional columns only when the additional names do not resolve to explicitly configured FluentMap members. Missing required columns, duplicate names, explicitly mapped additional columns, incompatible provider values and unsupported nested shapes fail deterministically instead of silently using runtime materialization. Strict generated resolution does not reflect over convention-only entity members; use the non-strict API when Dapper default-member discovery is required.
 
 The strict generated path has a narrower supported contract than normal FluentMap-controlled materialization. Review [COMPATIBILITY.md](COMPATIBILITY.md) before using it for trimming or Native AOT deployments.
 
