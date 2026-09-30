@@ -737,6 +737,38 @@ public sealed class CustomerMap : EntityMap<Customer>
         }
 
         [Fact]
+        public void ExplicitConstructionStrategyShouldRegisterMapAndReportRuntimeOnlyBoundary()
+        {
+            var source = @"
+using Dapper.FluentMap.Mapping;
+
+public sealed class Customer
+{
+    private Customer(int id) { Id = id; }
+    public int Id { get; }
+    public static Customer Restore(int id) => new Customer(id);
+}
+
+public sealed class CustomerMap : EntityMap<Customer>
+{
+    public CustomerMap()
+    {
+        Map(customer => customer.Id).ToColumn(""customer_id"");
+        ConstructUsing(customer => customer.Id, Customer.Restore);
+    }
+}";
+
+            var result = RunGenerator(source);
+            var diagnostic = Assert.Single(result.DfmDiagnostics);
+
+            Assert.Equal(MappingRegistrationGenerator.SkippedGeneratedMaterializerDiagnosticId, diagnostic.Id);
+            Assert.Contains("ConstructUsing", diagnostic.GetMessage(), StringComparison.Ordinal);
+            Assert.Contains("runtime materialization", diagnostic.GetMessage(), StringComparison.Ordinal);
+            Assert.Contains(".AddMap<global::CustomerMap>()", result.GeneratedSource, StringComparison.Ordinal);
+            Assert.DoesNotContain(".AddGeneratedMaterializer<global::Customer>(", result.GeneratedSource, StringComparison.Ordinal);
+        }
+
+        [Fact]
         public void DuplicateProfileMappingsShouldReportDiagnostic()
         {
             var source = @"

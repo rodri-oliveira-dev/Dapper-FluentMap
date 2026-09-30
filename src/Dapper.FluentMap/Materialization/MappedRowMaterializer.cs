@@ -34,9 +34,24 @@ namespace Dapper.FluentMap.Materialization
             FluentMapRuntime runtime)
             where TEntity : class
         {
+            var materializer = CreateMaterializer(reader, typeof(TEntity), profileType, runtime);
+            return record => (TEntity)materializer(record);
+        }
+
+        internal static Func<IDataRecord, object> CreateMaterializer(
+            IDataRecord reader,
+            [DynamicallyAccessedMembers(QueryMappedApiAnnotations.MaterializedEntityMemberTypes)] Type entityType,
+            Type profileType,
+            FluentMapRuntime runtime)
+        {
             if (runtime == null)
             {
                 throw new ArgumentNullException(nameof(runtime));
+            }
+
+            if (entityType == null)
+            {
+                throw new ArgumentNullException(nameof(entityType));
             }
 
             var columnNames = GetColumnNames(reader);
@@ -44,21 +59,21 @@ namespace Dapper.FluentMap.Materialization
             Func<IDataRecord, object> generatedMaterializer;
             var hasGeneratedMaterializer = runtime.StrictGeneratedMaterialization
                 ? runtime.Registry.TryGetStrictGeneratedMaterializer(
-                    typeof(TEntity), profileType, columnNames, out generatedMaterializer)
+                    entityType, profileType, columnNames, out generatedMaterializer)
                 : runtime.Registry.TryGetGeneratedMaterializer(
-                    typeof(TEntity), profileType, columnNames, out generatedMaterializer);
+                    entityType, profileType, columnNames, out generatedMaterializer);
             if (hasGeneratedMaterializer)
             {
-                return record => (TEntity)generatedMaterializer(record);
+                return generatedMaterializer;
             }
 
             if (runtime.StrictGeneratedMaterialization)
             {
-                ThrowMissingGeneratedMaterializer<TEntity>(profileType, runtime, columnNames);
+                ThrowMissingGeneratedMaterializer(entityType, profileType, runtime, columnNames);
             }
 
-            var plan = runtime.Registry.GetMaterializationPlan(typeof(TEntity), profileType, columnNames);
-            return record => (TEntity)plan.Materialize(record);
+            var plan = runtime.Registry.GetMaterializationPlan(entityType, profileType, columnNames);
+            return plan.Materialize;
         }
 
         internal static Func<IDataRecord, TEntity> CreateGeneratedMaterializer<TEntity>(
@@ -94,9 +109,18 @@ namespace Dapper.FluentMap.Materialization
             string[] columnNames)
             where TEntity : class
         {
+            ThrowMissingGeneratedMaterializer(typeof(TEntity), profileType, runtime, columnNames);
+        }
+
+        private static void ThrowMissingGeneratedMaterializer(
+            Type entityType,
+            Type profileType,
+            FluentMapRuntime runtime,
+            string[] columnNames)
+        {
             throw new FluentMapConfigurationException(
                 "Strict generated materialization is enabled, but FluentMap could not resolve a compatible generated materializer. " +
-                runtime.Registry.DescribeMissingGeneratedMaterializer(typeof(TEntity), profileType, columnNames) +
+                runtime.Registry.DescribeMissingGeneratedMaterializer(entityType, profileType, columnNames) +
                 " Register a compatible generated materializer, query a documented generated shape, or use QueryMapped* with strict generated materialization disabled for the non-strict runtime fallback.");
         }
 

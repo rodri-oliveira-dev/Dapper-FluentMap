@@ -484,6 +484,239 @@ namespace Dapper.FluentMap.Tests
             }
         }
 
+        [Fact]
+        [Trait("Category", "Integration")]
+        public void QueryMappedShouldMaterializeThreeSegmentsThroughSharedPipeline()
+        {
+            PreTest(typeof(JoinCustomer), typeof(JoinOrder), typeof(JoinShipment));
+            try
+            {
+                FluentMapper.Initialize(configuration =>
+                {
+                    configuration.AddMap(new JoinCustomerMap());
+                    configuration.AddMap(new JoinOrderMap());
+                    configuration.AddMap(new JoinShipmentMap());
+                });
+
+                using (var connection = OpenConnection())
+                {
+                    var row = connection.QueryMapped<JoinCustomer, JoinOrder, JoinShipment, CustomerOrderShipment>(
+                            "SELECT 1 AS customer_id, 'Ada' AS customer_name, 10 AS order_id, 12.5 AS total, 100 AS shipment_id, 'sent' AS shipment_status;",
+                            (customer, order, shipment) => new CustomerOrderShipment(customer, order, shipment),
+                            splitOn: "order_id,shipment_id")
+                        .Single();
+
+                    Assert.Equal(1, row.Customer.Id);
+                    Assert.Equal(10, row.Order.Id);
+                    Assert.Equal(100, row.Shipment.Id);
+                    Assert.Equal("sent", row.Shipment.Status);
+                }
+            }
+            finally
+            {
+                PreTest(typeof(JoinCustomer), typeof(JoinOrder), typeof(JoinShipment));
+            }
+        }
+
+        [Fact]
+        [Trait("Category", "Integration")]
+        public async System.Threading.Tasks.Task QueryMappedAsyncShouldMaterializeThreeSegments()
+        {
+            PreTest(typeof(JoinCustomer), typeof(JoinOrder), typeof(JoinShipment));
+            try
+            {
+                FluentMapper.Initialize(configuration =>
+                {
+                    configuration.AddMap(new JoinCustomerMap());
+                    configuration.AddMap(new JoinOrderMap());
+                    configuration.AddMap(new JoinShipmentMap());
+                });
+
+                using (var connection = OpenConnection())
+                {
+                    var rows = await connection.QueryMappedAsync<JoinCustomer, JoinOrder, JoinShipment, CustomerOrderShipment>(
+                        "SELECT 2 AS customer_id, 'Grace' AS customer_name, 20 AS order_id, 25.5 AS total, 200 AS shipment_id, 'ready' AS shipment_status;",
+                        (customer, order, shipment) => new CustomerOrderShipment(customer, order, shipment),
+                        splitOn: "order_id,shipment_id",
+                        cancellationToken: TestContext.Current.CancellationToken);
+                    var row = rows.Single();
+
+                    Assert.Equal(2, row.Customer.Id);
+                    Assert.Equal(20, row.Order.Id);
+                    Assert.Equal(200, row.Shipment.Id);
+                }
+            }
+            finally
+            {
+                PreTest(typeof(JoinCustomer), typeof(JoinOrder), typeof(JoinShipment));
+            }
+        }
+
+        [Fact]
+        [Trait("Category", "Integration")]
+        public void ThreeSegmentQueryShouldPassAllNullChildrenAsNull()
+        {
+            PreTest(typeof(JoinCustomer), typeof(JoinOrder), typeof(JoinShipment));
+            try
+            {
+                FluentMapper.Initialize(configuration =>
+                {
+                    configuration.AddMap(new JoinCustomerMap());
+                    configuration.AddMap(new JoinOrderMap());
+                    configuration.AddMap(new JoinShipmentMap());
+                });
+
+                using (var connection = OpenConnection())
+                {
+                    var row = connection.QueryMapped<JoinCustomer, JoinOrder, JoinShipment, CustomerOrderShipment>(
+                            "SELECT 3 AS customer_id, 'Null children' AS customer_name, NULL AS order_id, NULL AS total, NULL AS shipment_id, NULL AS shipment_status;",
+                            (customer, order, shipment) => new CustomerOrderShipment(customer, order, shipment),
+                            splitOn: "order_id,shipment_id")
+                        .Single();
+
+                    Assert.NotNull(row.Customer);
+                    Assert.Null(row.Order);
+                    Assert.Null(row.Shipment);
+                }
+            }
+            finally
+            {
+                PreTest(typeof(JoinCustomer), typeof(JoinOrder), typeof(JoinShipment));
+            }
+        }
+
+        [Theory]
+        [InlineData("order_id")]
+        [InlineData("order_id,")]
+        [InlineData("order_id,order_id")]
+        [Trait("Category", "Integration")]
+        public void ThreeSegmentQueryShouldValidateEverySplitBoundary(string splitOn)
+        {
+            using (var connection = OpenConnection())
+            {
+                var exception = Assert.ThrowsAny<Exception>(() =>
+                    connection.QueryMapped<JoinCustomer, JoinOrder, JoinShipment, CustomerOrderShipment>(
+                            "SELECT 1 AS customer_id, 2 AS order_id, 3 AS shipment_id;",
+                            (customer, order, shipment) => new CustomerOrderShipment(customer, order, shipment),
+                            splitOn: splitOn)
+                        .ToList());
+
+                Assert.Contains("splitOn", exception.Message, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+
+        [Fact]
+        [Trait("Category", "Integration")]
+        public void ThreeSegmentQueryShouldHonorPerSegmentProfilesAndIsolatedRuntime()
+        {
+            var runtime = new FluentMapConfigurationBuilder()
+                .AddProfile<LegacyJoinCustomerMap>()
+                .AddProfile<ArchivedJoinOrderMap>()
+                .AddProfile<TrackedJoinShipmentMap>()
+                .Build()
+                .CreateRuntime();
+
+            using (var connection = OpenConnection())
+            {
+                var row = runtime.QueryMapped<
+                        JoinCustomer,
+                        JoinOrder,
+                        JoinShipment,
+                        CustomerOrderShipment,
+                        LegacyProfile,
+                        ArchiveProfile,
+                        TrackingProfile>(
+                        connection,
+                        "SELECT 4 AS legacy_customer_id, 'Profiled' AS legal_name, 40 AS archived_order_id, 44.5 AS archived_total, 400 AS tracked_shipment_id, 'tracked' AS tracked_status;",
+                        (customer, order, shipment) => new CustomerOrderShipment(customer, order, shipment),
+                        splitOn: "archived_order_id,tracked_shipment_id")
+                    .Single();
+
+                Assert.Equal(4, row.Customer.Id);
+                Assert.Equal(40, row.Order.Id);
+                Assert.Equal(400, row.Shipment.Id);
+                Assert.Equal("tracked", row.Shipment.Status);
+            }
+        }
+
+        [Fact]
+        [Trait("Category", "Integration")]
+        public void ThreeSegmentGeneratedAndRuntimeMaterializationShouldBeEquivalent()
+        {
+            var generatedRuntime = CreateThreeSegmentRuntime(registerGenerated: true);
+            var reflectionRuntime = CreateThreeSegmentRuntime(registerGenerated: false);
+
+            using (var connection = OpenConnection())
+            {
+                const string sql = "SELECT 5 AS customer_id, 'Equivalent' AS customer_name, 50 AS order_id, 50.5 AS total, 500 AS shipment_id, 'equivalent' AS shipment_status;";
+                var generated = generatedRuntime.QueryMapped<JoinCustomer, JoinOrder, JoinShipment, CustomerOrderShipment>(
+                    connection,
+                    sql,
+                    (customer, order, shipment) => new CustomerOrderShipment(customer, order, shipment),
+                    splitOn: "order_id,shipment_id").Single();
+                var reflection = reflectionRuntime.QueryMapped<JoinCustomer, JoinOrder, JoinShipment, CustomerOrderShipment>(
+                    connection,
+                    sql,
+                    (customer, order, shipment) => new CustomerOrderShipment(customer, order, shipment),
+                    splitOn: "order_id,shipment_id").Single();
+
+                Assert.Equal(reflection.Customer.Id, generated.Customer.Id);
+                Assert.Equal(reflection.Customer.Name, generated.Customer.Name);
+                Assert.Equal(reflection.Order.Id, generated.Order.Id);
+                Assert.Equal(reflection.Order.Total, generated.Order.Total);
+                Assert.Equal(reflection.Shipment.Id, generated.Shipment.Id);
+                Assert.Equal(reflection.Shipment.Status, generated.Shipment.Status);
+            }
+        }
+
+        private static FluentMapRuntime CreateThreeSegmentRuntime(bool registerGenerated)
+        {
+            var builder = new FluentMapConfigurationBuilder()
+                .AddMap(new JoinCustomerMap())
+                .AddMap(new JoinOrderMap())
+                .AddMap(new JoinShipmentMap());
+
+            if (registerGenerated)
+            {
+                builder
+                    .AddGeneratedMaterializer(
+                        new[]
+                        {
+                            GeneratedMaterializerColumn.Map("customer_id", nameof(JoinCustomer.Id)),
+                            GeneratedMaterializerColumn.Map("customer_name", nameof(JoinCustomer.Name))
+                        },
+                        record => new JoinCustomer
+                        {
+                            Id = Convert.ToInt32(record.GetValue(0)),
+                            Name = Convert.ToString(record.GetValue(1))
+                        })
+                    .AddGeneratedMaterializer(
+                        new[]
+                        {
+                            GeneratedMaterializerColumn.Map("order_id", nameof(JoinOrder.Id)),
+                            GeneratedMaterializerColumn.Map("total", nameof(JoinOrder.Total))
+                        },
+                        record => new JoinOrder
+                        {
+                            Id = Convert.ToInt32(record.GetValue(0)),
+                            Total = Convert.ToDecimal(record.GetValue(1))
+                        })
+                    .AddGeneratedMaterializer(
+                        new[]
+                        {
+                            GeneratedMaterializerColumn.Map("shipment_id", nameof(JoinShipment.Id)),
+                            GeneratedMaterializerColumn.Map("shipment_status", nameof(JoinShipment.Status))
+                        },
+                        record => new JoinShipment
+                        {
+                            Id = Convert.ToInt32(record.GetValue(0)),
+                            Status = Convert.ToString(record.GetValue(1))
+                        });
+            }
+
+            return builder.Build().CreateRuntime();
+        }
+
         private static CustomerOrder MaterializeCustomerOrder(bool registerGeneratedMaterializers)
         {
             PreTest(typeof(JoinCustomer), typeof(JoinOrder));
@@ -565,6 +798,22 @@ namespace Dapper.FluentMap.Tests
             public JoinOrder Order { get; }
         }
 
+        private sealed class CustomerOrderShipment
+        {
+            public CustomerOrderShipment(JoinCustomer customer, JoinOrder order, JoinShipment shipment)
+            {
+                Customer = customer;
+                Order = order;
+                Shipment = shipment;
+            }
+
+            public JoinCustomer Customer { get; }
+
+            public JoinOrder Order { get; }
+
+            public JoinShipment Shipment { get; }
+        }
+
         private sealed class JoinCustomer
         {
             public int Id { get; set; }
@@ -577,6 +826,13 @@ namespace Dapper.FluentMap.Tests
             public int Id { get; set; }
 
             public decimal Total { get; set; }
+        }
+
+        private sealed class JoinShipment
+        {
+            public int Id { get; set; }
+
+            public string Status { get; set; }
         }
 
         private sealed class DefaultSplitOrder
@@ -604,11 +860,24 @@ namespace Dapper.FluentMap.Tests
             }
         }
 
+        private sealed class JoinShipmentMap : EntityMap<JoinShipment>
+        {
+            public JoinShipmentMap()
+            {
+                Map(shipment => shipment.Id).ToColumn("shipment_id");
+                Map(shipment => shipment.Status).ToColumn("shipment_status");
+            }
+        }
+
         private sealed class LegacyProfile : IMappingProfile
         {
         }
 
         private sealed class ArchiveProfile : IMappingProfile
+        {
+        }
+
+        private sealed class TrackingProfile : IMappingProfile
         {
         }
 
@@ -627,6 +896,15 @@ namespace Dapper.FluentMap.Tests
             {
                 Map(order => order.Id).ToColumn("archived_order_id");
                 Map(order => order.Total).ToColumn("archived_total");
+            }
+        }
+
+        private sealed class TrackedJoinShipmentMap : EntityMap<JoinShipment>, IProfileMap<TrackingProfile>
+        {
+            public TrackedJoinShipmentMap()
+            {
+                Map(shipment => shipment.Id).ToColumn("tracked_shipment_id");
+                Map(shipment => shipment.Status).ToColumn("tracked_status");
             }
         }
 

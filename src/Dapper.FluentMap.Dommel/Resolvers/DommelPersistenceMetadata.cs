@@ -45,9 +45,17 @@ namespace Dapper.FluentMap.Dommel.Resolvers
                 .ResolveProperties(type)
                 .Where(property =>
                 {
-                    PropertyPersistenceMetadata persistence;
-                    return !TryGetPersistence(property.Property, out persistence) ||
-                        persistence.ParticipatesInInsert;
+                    var propertyMap = ResolvePropertyMap(type, entityMap, property.Property.Name);
+                    if (propertyMap == null)
+                    {
+                        return true;
+                    }
+
+                    var mapWithPersistence = propertyMap as IPropertyMapWithPersistenceMetadata;
+                    var persistence = mapWithPersistence == null
+                        ? (propertyMap.Ignored ? PropertyPersistenceMetadata.Ignored : PropertyPersistenceMetadata.Default)
+                        : mapWithPersistence.Persistence;
+                    return persistence.ParticipatesInInsert;
                 })
                 .Select(property => property.Property);
         }

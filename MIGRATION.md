@@ -298,7 +298,7 @@ For value objects stored through mapped components, use FluentMap-controlled mat
 Map(customer => customer.Cpf.Number).ToColumn("cpf");
 ```
 
-The current materializer uses compatible public constructors. Factory methods are not used.
+The runtime materializer still selects compatible public constructors by default. Maps that previously could not be materialized can now opt into `ConstructUsing(...)` with one to four explicitly mapped values. This factory path is supported by runtime materialization and isolated runtimes; generated materializers report `DFM011`, and strict generated mode rejects the unsupported shape without fallback.
 
 ## Profiles
 
@@ -338,7 +338,9 @@ Map(product => product.Status)
 
 Normal `Dapper.Query<T>()` does not execute property converters. Use Dapper `TypeHandler<T>` for type-wide conversion.
 
-Write converter metadata exists, but Dapper/Dommel writes do not execute it yet.
+Configured write converters execute only through the Dommel adapter's opt-in `InsertMapped*` and `UpdateMapped*` methods. Historical Dommel `Insert`/`Update` behavior is unchanged. The property converter runs first; Dapper then applies any type handler registered for the converter output type.
+
+Three-input `QueryMapped<TFirst,TSecond,TThird,TReturn>` overloads now complement the historical two-input API. Supply two comma-separated unique `splitOn` boundaries. These APIs compose individual rows only and do not aggregate one-to-many graphs.
 
 ## Generated Registration
 

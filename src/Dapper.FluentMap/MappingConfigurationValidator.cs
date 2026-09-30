@@ -48,6 +48,39 @@ namespace Dapper.FluentMap
             var maps = GetEntityMapDescriptors(entityType, propertyMaps, entityMap.GetType(), "composed entity map").ToList();
             ValidateColumnConflicts(entityType, maps, "composed entity map", entityMap.GetType());
             ValidateNestedMaterializationPaths(entityType, maps, "composed entity map", entityMap.GetType());
+            ValidateConstructionStrategy(entityType, entityMap, propertyMaps);
+        }
+
+        private static void ValidateConstructionStrategy(
+            Type entityType,
+            IEntityMap entityMap,
+            IEnumerable<IPropertyMap> propertyMaps)
+        {
+            var strategy = (entityMap as IEntityMapWithConstructionStrategy)?.ConstructionStrategy;
+            if (strategy == null)
+            {
+                return;
+            }
+
+            if (strategy.EntityType != entityType)
+            {
+                throw new FluentMapConfigurationException(
+                    $"Explicit construction strategy for '{FormatType(strategy.EntityType)}' cannot be used by entity map '{FormatType(entityMap.GetType())}' for '{FormatType(entityType)}'.");
+            }
+
+            var mappedPaths = propertyMaps
+                .Where(map => !map.Ignored)
+                .Select(PropertyMapIdentity.GetMemberPath)
+                .ToList();
+
+            foreach (var binding in strategy.Bindings)
+            {
+                if (!mappedPaths.Contains(binding.MemberPath))
+                {
+                    throw new FluentMapConfigurationException(
+                        $"Explicit construction for entity '{FormatType(entityType)}' binds property path '{binding.MemberPath}', but that path is not an active explicit mapping. Map the property path before passing it to ConstructUsing(...).");
+                }
+            }
         }
 
         internal static void ValidateConvention(Type entityType, Convention convention)

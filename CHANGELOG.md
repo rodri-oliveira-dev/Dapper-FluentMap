@@ -9,10 +9,15 @@ The historical archived package history is not reconstructed here. This changelo
 ### Added
 
 - Added reflection-free `GeneratedParameters` for parameterized strict-generated queries, including provider-matrix and Native AOT smoke coverage.
+- Added Dommel `InsertMapped*`/`UpdateMapped*` operations that execute per-property write converters while preserving persistence exclusions and Dapper type-handler precedence.
+- Added three-input FluentMap-controlled multi-mapping with multiple validated `splitOn` boundaries, per-segment profiles, async execution, null-child semantics and isolated-runtime APIs.
+- Added explicit `ConstructUsing(...)` factory strategies for one to four mapped values, with configuration validation and deterministic generated/strict boundaries.
+- Added analyzer diagnostic `DFM016` for duplicate explicit construction strategies.
 
 ### Changed
 
 - Generated materializers now accept safe additional unmapped reader columns and provide specific strict diagnostics for missing, duplicate/ambiguous and mapped additional columns.
+- Two- and three-input multi-mapping now share a single segment materialization pipeline.
 
 ## [3.4.0] - 2026-09-27
 

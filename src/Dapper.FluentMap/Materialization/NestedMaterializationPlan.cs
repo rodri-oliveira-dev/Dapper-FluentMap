@@ -37,7 +37,9 @@ namespace Dapper.FluentMap.Materialization
             }
 
             var defaultTypeMap = new DefaultTypeMap(entityType);
-            var rootNode = MaterializationNode.Root(entityType);
+            var rootNode = MaterializationNode.Root(
+                entityType,
+                registry.GetConstructionStrategy(entityType, profileType));
 
             for (var i = 0; i < columnNames.Count; i++)
             {
@@ -436,15 +438,22 @@ namespace Dapper.FluentMap.Materialization
             private int[] _subtreeColumnIndexes;
             private Func<object> _parameterlessFactory;
             private ConstructorPlan _constructorPlan;
+            private ExplicitFactoryPlan _explicitFactoryPlan;
             private NestedLeaf[] _postConstructorLeaves;
             private MaterializationNode[] _postConstructorChildren;
 
-            private MaterializationNode(Type type, PropertyInfo parentProperty, string memberPath, bool isRoot)
+            private MaterializationNode(
+                Type type,
+                PropertyInfo parentProperty,
+                string memberPath,
+                bool isRoot,
+                EntityConstructionStrategy constructionStrategy = null)
             {
                 Type = type;
                 ParentProperty = parentProperty;
                 MemberPath = memberPath;
                 _isRoot = isRoot;
+                ConstructionStrategy = constructionStrategy;
 
                 if (parentProperty != null)
                 {
@@ -463,11 +472,13 @@ namespace Dapper.FluentMap.Materialization
 
             internal Action<object, object> Setter { get; }
 
+            private EntityConstructionStrategy ConstructionStrategy { get; }
+
             internal bool CanAssignToParent => _isRoot || Setter != null;
 
-            internal static MaterializationNode Root(Type type)
+            internal static MaterializationNode Root(Type type, EntityConstructionStrategy constructionStrategy)
             {
-                return new MaterializationNode(type, null, type.Name, isRoot: true);
+                return new MaterializationNode(type, null, type.Name, isRoot: true, constructionStrategy);
             }
 
             internal void AddPropertyPath(
@@ -573,7 +584,7 @@ namespace Dapper.FluentMap.Materialization
                     return;
                 }
 
-                var existing = _constructorPlan == null && Getter != null
+                var existing = _constructorPlan == null && _explicitFactoryPlan == null && Getter != null
                     ? Getter(parent)
                     : null;
                 var value = Materialize(record, existing, forceNew: false);
@@ -603,6 +614,12 @@ namespace Dapper.FluentMap.Materialization
             private void SelectConstructionPlan(Type entityType)
             {
                 _parameterlessFactory = CreateParameterlessFactory(Type);
+
+                if (ConstructionStrategy != null)
+                {
+                    SelectExplicitFactoryPlan(entityType);
+                    return;
+                }
 
                 var requiresConstructor = _parameterlessFactory == null ||
                                           _leaves.Any(leaf => !leaf.CanAssign) ||
@@ -641,6 +658,61 @@ namespace Dapper.FluentMap.Materialization
                 {
                     throw new FluentMapConfigurationException(
                         $"Type '{FormatType(Type)}' at member path '{MemberPath}' on entity '{FormatType(entityType)}' cannot assign nested value object '{unsupportedChild.MemberPath}'. It has no public setter and is not bound to constructor '{FormatConstructor(_constructorPlan.Constructor)}'.");
+                }
+            }
+
+            private void SelectExplicitFactoryPlan(Type entityType)
+            {
+                var bindings = new List<ExplicitFactoryBinding>();
+                foreach (var configuredBinding in ConstructionStrategy.Bindings)
+                {
+                    var leaf = _leaves.SingleOrDefault(candidate =>
+                        string.Equals(candidate.MemberPath, configuredBinding.MemberPath.ToString(), StringComparison.Ordinal));
+                    var child = _children.SingleOrDefault(candidate =>
+                        string.Equals(candidate.MemberPath, configuredBinding.MemberPath.ToString(), StringComparison.Ordinal));
+
+                    if (leaf == null && child == null)
+                    {
+                        throw new FluentMapConfigurationException(
+                            $"Explicit construction for entity '{FormatType(entityType)}' requires mapped property path '{configuredBinding.MemberPath}', but the current result shape does not contain its mapped column.");
+                    }
+
+                    var materializedType = leaf == null ? child.Type : leaf.TargetType;
+                    if (!IsParameterCompatible(configuredBinding.ValueType, materializedType))
+                    {
+                        throw new FluentMapConfigurationException(
+                            $"Explicit construction for entity '{FormatType(entityType)}' binds property path '{configuredBinding.MemberPath}' as '{FormatType(configuredBinding.ValueType)}', but materialization produces '{FormatType(materializedType)}'.");
+                    }
+
+                    bindings.Add(leaf == null
+                        ? ExplicitFactoryBinding.ForChild(configuredBinding, child)
+                        : ExplicitFactoryBinding.ForLeaf(configuredBinding, leaf));
+                }
+
+                _explicitFactoryPlan = new ExplicitFactoryPlan(
+                    entityType,
+                    MemberPath,
+                    ConstructionStrategy.Factory,
+                    bindings);
+                _postConstructorLeaves = _leaves
+                    .Where(leaf => !_explicitFactoryPlan.Uses(leaf))
+                    .ToArray();
+                _postConstructorChildren = _children
+                    .Where(child => !_explicitFactoryPlan.Uses(child))
+                    .ToArray();
+
+                var unsupportedLeaf = _postConstructorLeaves.FirstOrDefault(leaf => !leaf.CanAssign);
+                if (unsupportedLeaf != null)
+                {
+                    throw new FluentMapConfigurationException(
+                        $"Explicit construction for entity '{FormatType(entityType)}' does not bind read-only mapped property '{unsupportedLeaf.MemberPath}'. Column: '{unsupportedLeaf.ColumnName}'.");
+                }
+
+                var unsupportedChild = _postConstructorChildren.FirstOrDefault(child => !child.CanAssignToParent);
+                if (unsupportedChild != null)
+                {
+                    throw new FluentMapConfigurationException(
+                        $"Explicit construction for entity '{FormatType(entityType)}' does not bind read-only nested value object '{unsupportedChild.MemberPath}'.");
                 }
             }
 
@@ -742,7 +814,9 @@ namespace Dapper.FluentMap.Materialization
 
             private object Materialize(IDataRecord record, object existing, bool forceNew)
             {
-                var current = _constructorPlan != null
+                var current = _explicitFactoryPlan != null
+                    ? _explicitFactoryPlan.Materialize(record)
+                    : _constructorPlan != null
                     ? _constructorPlan.Materialize(record)
                     : forceNew || existing == null
                         ? _parameterlessFactory()
@@ -771,6 +845,91 @@ namespace Dapper.FluentMap.Materialization
             {
                 return _leaves.Select(leaf => leaf.ColumnName)
                     .Concat(_children.SelectMany(child => child.GetColumnNames()));
+            }
+        }
+
+        private sealed class ExplicitFactoryPlan
+        {
+            private readonly Type _entityType;
+            private readonly string _memberPath;
+            private readonly Func<object[], object> _factory;
+            private readonly ExplicitFactoryBinding[] _bindings;
+
+            internal ExplicitFactoryPlan(
+                Type entityType,
+                string memberPath,
+                Func<object[], object> factory,
+                IEnumerable<ExplicitFactoryBinding> bindings)
+            {
+                _entityType = entityType;
+                _memberPath = memberPath;
+                _factory = factory;
+                _bindings = bindings.ToArray();
+            }
+
+            internal bool Uses(NestedLeaf leaf)
+            {
+                return _bindings.Any(binding => binding.Leaf == leaf);
+            }
+
+            internal bool Uses(MaterializationNode child)
+            {
+                return _bindings.Any(binding => binding.Child == child);
+            }
+
+            internal object Materialize(IDataRecord record)
+            {
+                var values = _bindings.Select(binding => binding.GetValue(record)).ToArray();
+                try
+                {
+                    var entity = _factory(values);
+                    if (entity == null)
+                    {
+                        throw new InvalidOperationException("The configured factory returned null.");
+                    }
+
+                    return entity;
+                }
+                catch (Exception exception)
+                {
+                    throw new FluentMapConfigurationException(
+                        $"Explicit construction factory failed for entity '{FormatType(_entityType)}' at member path '{_memberPath}'. Bound property paths: {string.Join(", ", _bindings.Select(binding => "'" + binding.ConfiguredBinding.MemberPath + "'"))}. See the inner exception for the factory failure.",
+                        exception);
+                }
+            }
+        }
+
+        private sealed class ExplicitFactoryBinding
+        {
+            private ExplicitFactoryBinding(
+                ConstructionValueBinding configuredBinding,
+                NestedLeaf leaf,
+                MaterializationNode child)
+            {
+                ConfiguredBinding = configuredBinding;
+                Leaf = leaf;
+                Child = child;
+            }
+
+            internal ConstructionValueBinding ConfiguredBinding { get; }
+
+            internal NestedLeaf Leaf { get; }
+
+            internal MaterializationNode Child { get; }
+
+            internal static ExplicitFactoryBinding ForLeaf(ConstructionValueBinding binding, NestedLeaf leaf)
+            {
+                return new ExplicitFactoryBinding(binding, leaf, null);
+            }
+
+            internal static ExplicitFactoryBinding ForChild(ConstructionValueBinding binding, MaterializationNode child)
+            {
+                return new ExplicitFactoryBinding(binding, null, child);
+            }
+
+            internal object GetValue(IDataRecord record)
+            {
+                return Leaf == null ? Child.MaterializeValue(record) : Leaf.GetValue(record);
             }
         }
 

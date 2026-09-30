@@ -298,7 +298,7 @@ Para value objects armazenados por componentes mapeados, use materialização co
 Map(customer => customer.Cpf.Number).ToColumn("cpf");
 ```
 
-O materializador atual usa construtores públicos compatíveis. Factory methods não são utilizados.
+O materializador de runtime continua selecionando construtores públicos compatíveis por padrão. Maps que antes não podiam ser materializados agora podem optar por `ConstructUsing(...)`, com um a quatro valores explicitamente mapeados. Esse caminho de factory é suportado pela materialização em runtime e por runtimes isolados; materializadores gerados reportam `DFM011`, e o modo strict generated rejeita o shape sem fallback.
 
 ## Profiles
 
@@ -338,7 +338,9 @@ Map(product => product.Status)
 
 `Dapper.Query<T>()` normal não executa property converters. Use `TypeHandler<T>` do Dapper para conversões globais por tipo.
 
-Existe metadata de write converter, mas escritas Dapper/Dommel ainda não a executam.
+Write converters configurados são executados apenas pelos métodos opt-in `InsertMapped*` e `UpdateMapped*` do adapter Dommel. O comportamento histórico de `Insert`/`Update` do Dommel permanece inalterado. O conversor da propriedade executa primeiro; depois, o Dapper aplica eventual type handler registrado para o tipo de saída do conversor.
+
+Overloads `QueryMapped<TFirst,TSecond,TThird,TReturn>` com três entradas agora complementam a API histórica de duas entradas. Informe duas fronteiras `splitOn` únicas, separadas por vírgula. Essas APIs apenas compõem linhas individuais e não agregam grafos um-para-muitos.
 
 ## Registro Gerado
 

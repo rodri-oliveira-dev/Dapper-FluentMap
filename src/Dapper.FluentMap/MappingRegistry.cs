@@ -234,6 +234,18 @@ namespace Dapper.FluentMap
                 .PropertyMap;
         }
 
+        internal EntityConstructionStrategy GetConstructionStrategy(Type type, Type profileType)
+        {
+            IEntityMap entityMap;
+            var found = profileType == null
+                ? EntityMaps.TryGetValue(type, out entityMap)
+                : ProfileMaps.TryGetValue(new MappingProfileKey(type, profileType), out entityMap);
+
+            return found
+                ? (entityMap as IEntityMapWithConstructionStrategy)?.ConstructionStrategy
+                : null;
+        }
+
         internal IPropertyMap GetConventionPropertyMap(Type type, string columnName)
         {
             var cacheKey = MappingCacheKey.ConventionOnly(type, columnName);

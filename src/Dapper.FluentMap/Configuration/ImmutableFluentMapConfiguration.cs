@@ -123,12 +123,14 @@ namespace Dapper.FluentMap.Configuration
             Type entityType,
             Type mapType,
             IReadOnlyList<PropertyMappingConfiguration> propertyMaps,
-            IReadOnlyList<Type> includedBaseTypes)
+            IReadOnlyList<Type> includedBaseTypes,
+            EntityConstructionStrategy constructionStrategy)
         {
             EntityType = entityType;
             MapType = mapType;
             PropertyMaps = propertyMaps;
             IncludedBaseTypes = includedBaseTypes;
+            ConstructionStrategy = constructionStrategy;
         }
 
         /// <summary>
@@ -151,6 +153,8 @@ namespace Dapper.FluentMap.Configuration
         /// </summary>
         public IReadOnlyList<Type> IncludedBaseTypes { get; }
 
+        internal EntityConstructionStrategy ConstructionStrategy { get; }
+
         internal static EntityMappingConfiguration Create(Type entityType, IEntityMap map)
         {
             if (entityType == null)
@@ -164,13 +168,15 @@ namespace Dapper.FluentMap.Configuration
             }
 
             var includedBaseTypes = map as IEntityMapWithIncludedBaseTypes;
+            var mapWithConstruction = map as IEntityMapWithConstructionStrategy;
             return new EntityMappingConfiguration(
                 entityType,
                 map.GetType(),
                 new ReadOnlyCollection<PropertyMappingConfiguration>(
                     map.PropertyMaps.Select(PropertyMappingConfiguration.Create).ToList()),
                 new ReadOnlyCollection<Type>(
-                    includedBaseTypes == null ? new List<Type>() : includedBaseTypes.IncludedBaseTypes.ToList()));
+                    includedBaseTypes == null ? new List<Type>() : includedBaseTypes.IncludedBaseTypes.ToList()),
+                mapWithConstruction?.ConstructionStrategy);
         }
     }
 
@@ -184,13 +190,15 @@ namespace Dapper.FluentMap.Configuration
             Type profileType,
             Type mapType,
             IReadOnlyList<PropertyMappingConfiguration> propertyMaps,
-            IReadOnlyList<Type> includedBaseTypes)
+            IReadOnlyList<Type> includedBaseTypes,
+            EntityConstructionStrategy constructionStrategy)
         {
             EntityType = entityType;
             ProfileType = profileType;
             MapType = mapType;
             PropertyMaps = propertyMaps;
             IncludedBaseTypes = includedBaseTypes;
+            ConstructionStrategy = constructionStrategy;
         }
 
         /// <summary>
@@ -218,6 +226,8 @@ namespace Dapper.FluentMap.Configuration
         /// </summary>
         public IReadOnlyList<Type> IncludedBaseTypes { get; }
 
+        internal EntityConstructionStrategy ConstructionStrategy { get; }
+
         internal static ProfileMappingConfiguration Create(Type entityType, Type profileType, IEntityMap map)
         {
             var entityMap = EntityMappingConfiguration.Create(entityType, map);
@@ -226,7 +236,8 @@ namespace Dapper.FluentMap.Configuration
                 profileType,
                 entityMap.MapType,
                 entityMap.PropertyMaps,
-                entityMap.IncludedBaseTypes);
+                entityMap.IncludedBaseTypes,
+                entityMap.ConstructionStrategy);
         }
     }
 

@@ -23,6 +23,7 @@ namespace Dapper.FluentMap.Analyzers
         public const string InvalidPersistenceBehaviorDiagnosticId = "DFM013";
         public const string InvalidPropertyConverterDiagnosticId = "DFM014";
         public const string DuplicatePropertyConverterDiagnosticId = "DFM015";
+        public const string DuplicateConstructionStrategyDiagnosticId = "DFM016";
 
         private const string Category = "Dapper.FluentMap.Configuration";
         private const string MappingNamespace = "Dapper.FluentMap.Mapping";
@@ -122,6 +123,16 @@ namespace Dapper.FluentMap.Analyzers
             isEnabledByDefault: true,
             description: "A single FluentMap property mapping can have at most one read converter and at most one write converter.");
 
+        private static readonly DiagnosticDescriptor DuplicateConstructionStrategyRule = new DiagnosticDescriptor(
+            DuplicateConstructionStrategyDiagnosticId,
+            "Explicit construction strategy is configured more than once",
+            "Entity map constructor configures more than one ConstructUsing(...) strategy",
+            Category,
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true,
+            description: "An entity map can configure only one explicit construction strategy.",
+            customTags: WellKnownDiagnosticTags.CompilationEnd);
+
         public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics =>
             ImmutableArray.Create(
                 InvalidMapExpressionRule,
@@ -133,7 +144,8 @@ namespace Dapper.FluentMap.Analyzers
                 DuplicateProfileRegistrationRule,
                 InvalidPersistenceBehaviorRule,
                 InvalidPropertyConverterRule,
-                DuplicatePropertyConverterRule);
+                DuplicatePropertyConverterRule,
+                DuplicateConstructionStrategyRule);
 
         public override void Initialize(AnalysisContext context)
         {
@@ -144,9 +156,10 @@ namespace Dapper.FluentMap.Analyzers
             {
                 var constructorMapInvocations = new ConcurrentBag<MapInvocation>();
                 var profileRegistrations = new ConcurrentBag<ProfileRegistrationInvocation>();
+                var constructionStrategies = new ConcurrentBag<ConstructionStrategyInvocation>();
 
                 startContext.RegisterSyntaxNodeAction(
-                    nodeContext => AnalyzeInvocation(nodeContext, constructorMapInvocations, profileRegistrations),
+                    nodeContext => AnalyzeInvocation(nodeContext, constructorMapInvocations, profileRegistrations, constructionStrategies),
                     SyntaxKind.InvocationExpression);
 
                 startContext.RegisterCompilationEndAction(
@@ -154,6 +167,7 @@ namespace Dapper.FluentMap.Analyzers
                     {
                         AnalyzeConstructorMapInvocations(endContext, constructorMapInvocations);
                         AnalyzeProfileRegistrations(endContext, profileRegistrations);
+                        AnalyzeConstructionStrategies(endContext, constructionStrategies);
                     });
             });
         }
@@ -161,7 +175,8 @@ namespace Dapper.FluentMap.Analyzers
         private static void AnalyzeInvocation(
             SyntaxNodeAnalysisContext context,
             ConcurrentBag<MapInvocation> constructorMapInvocations,
-            ConcurrentBag<ProfileRegistrationInvocation> profileRegistrations)
+            ConcurrentBag<ProfileRegistrationInvocation> profileRegistrations,
+            ConcurrentBag<ConstructionStrategyInvocation> constructionStrategies)
         {
             var invocation = (InvocationExpressionSyntax)context.Node;
             var method = context.SemanticModel.GetSymbolInfo(invocation, context.CancellationToken).Symbol as IMethodSymbol;
@@ -180,6 +195,19 @@ namespace Dapper.FluentMap.Analyzers
             if (IsIncludeBaseInvocation(method))
             {
                 AnalyzeIncludeBaseInvocation(context, invocation, method);
+                return;
+            }
+
+            if (IsConstructUsingInvocation(method))
+            {
+                var constructor = context.ContainingSymbol as IMethodSymbol;
+                if (constructor?.MethodKind == MethodKind.Constructor)
+                {
+                    constructionStrategies.Add(new ConstructionStrategyInvocation(
+                        constructor,
+                        GetInvocationNameLocation(invocation)));
+                }
+
                 return;
             }
 
@@ -351,6 +379,23 @@ namespace Dapper.FluentMap.Analyzers
 
                 ReportDuplicateMemberPaths(context, invocations);
                 ReportDuplicateColumns(context, invocations);
+            }
+        }
+
+        private static void AnalyzeConstructionStrategies(
+            CompilationAnalysisContext context,
+            ConcurrentBag<ConstructionStrategyInvocation> constructionStrategies)
+        {
+            foreach (var group in constructionStrategies.GroupBy(
+                         invocation => invocation.Constructor,
+                         SymbolEqualityComparer.Default))
+            {
+                foreach (var duplicate in group.OrderBy(invocation => invocation.Location.SourceSpan.Start).Skip(1))
+                {
+                    context.ReportDiagnostic(Diagnostic.Create(
+                        DuplicateConstructionStrategyRule,
+                        duplicate.Location));
+                }
             }
         }
 
@@ -794,6 +839,13 @@ namespace Dapper.FluentMap.Analyzers
                    method.IsGenericMethod &&
                    method.TypeArguments.Length == 1 &&
                    method.Parameters.Length == 0 &&
+                   IsType(method.ContainingType.OriginalDefinition, MappingNamespace, "EntityMapBase`2");
+        }
+
+        private static bool IsConstructUsingInvocation(IMethodSymbol method)
+        {
+            return method.Name == "ConstructUsing" &&
+                   method.IsGenericMethod &&
                    IsType(method.ContainingType.OriginalDefinition, MappingNamespace, "EntityMapBase`2");
         }
 
@@ -1400,6 +1452,19 @@ namespace Dapper.FluentMap.Analyzers
             internal INamedTypeSymbol EntityType { get; }
 
             internal INamedTypeSymbol ProfileType { get; }
+
+            internal Location Location { get; }
+        }
+
+        private sealed class ConstructionStrategyInvocation
+        {
+            internal ConstructionStrategyInvocation(IMethodSymbol constructor, Location location)
+            {
+                Constructor = constructor;
+                Location = location;
+            }
+
+            internal IMethodSymbol Constructor { get; }
 
             internal Location Location { get; }
         }

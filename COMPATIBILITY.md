@@ -107,7 +107,7 @@ var runtime = new FluentMapConfigurationBuilder()
 var customer = runtime.QueryMappedSingle<Customer>(connection, sql);
 ```
 
-That isolation applies to `QueryMapped*`, `QueryGeneratedMapped*`, two-type `splitOn` multi-mapping including per-segment profile overloads, `ReadMapped*`, `QueryMultipleMapped`, streaming, profiles, converters, diagnostics and generated materializer lookup. It does not make normal Dapper queries or Dommel select a runtime per call.
+That isolation applies to `QueryMapped*`, `QueryGeneratedMapped*`, two/three-type `splitOn` multi-mapping including per-segment profile overloads, explicit `ConstructUsing(...)` factories, `ReadMapped*`, `QueryMultipleMapped`, streaming, profiles, converters, diagnostics and generated materializer lookup. It does not make normal Dapper queries or Dommel select a runtime per call.
 
 ## API Compatibility
 
@@ -133,5 +133,7 @@ The maintained 3.x line follows Semantic Versioning. See the GitHub releases pag
 - Full Native AOT support is not claimed.
 - Provider behavior outside the exact tested server/client versions listed above is not certified.
 - Dommel configuration isolation per `FluentMapRuntime` is not supported.
-- Three-or-more-type multi-mapping, graph aggregation and CRUD generation are not implemented.
+- Multi-mapping is supported for two or three input types. Four-or-more input types, automatic graph aggregation and generic core CRUD generation are not implemented.
+- Explicit delegate construction strategies are supported by runtime materialization. The generator reports `DFM011` and strict generated mode rejects those shapes; no full Native AOT claim is made for delegate factories.
+- Property write conversion is supported only by the Dommel adapter's opt-in `InsertMapped*` and `UpdateMapped*` APIs. Historical Dommel `Insert`/`Update` do not execute property converters.
 - `MappedGridReader` result sets must be consumed sequentially; concurrent reads are rejected deterministically.

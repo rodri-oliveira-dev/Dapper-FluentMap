@@ -12,3 +12,4 @@ DFM010 | Dapper.FluentMap.Configuration | Error | Mapping profile is registered 
 DFM013 | Dapper.FluentMap.Configuration | Error | Persistence mapping behavior is invalid.
 DFM014 | Dapper.FluentMap.Configuration | Error | Property converter is invalid.
 DFM015 | Dapper.FluentMap.Configuration | Error | Property converter is configured more than once.
+DFM016 | Dapper.FluentMap.Configuration | Error | Explicit construction strategy is configured more than once.

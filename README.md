@@ -30,10 +30,10 @@ See [MIGRATION.md](MIGRATION.md) when moving from FluentMap 2.x.
 | --- | --- |
 | Explicit property-to-column mapping | `EntityMap<T>`, `Map(...).ToColumn(...)` |
 | Conventions and naming policies | `AddConvention(...)`, `UseNamingPolicy(...)` |
-| Immutable constructor mapping | historical Dapper type-map bridge |
+| Immutable/factory construction | constructor mapping, `ConstructUsing(...)` |
 | Nested objects and component value objects | `QueryMapped*` |
 | Alternate SQL shapes | mapping profiles |
-| Two-type multi-mapping | `QueryMapped<TFirst,TSecond,TReturn>(...)` |
+| Two/three-type multi-mapping | `QueryMapped<...>(..., splitOn: ...)` |
 | Multiple result sets | `QueryMultipleMapped*`, `ReadMapped*` |
 | Sync/async streaming | `QueryMappedUnbuffered*` |
 | Per-property conversion | property converters |
@@ -41,7 +41,7 @@ See [MIGRATION.md](MIGRATION.md) when moving from FluentMap 2.x.
 | Strict generated path | `UseStrictGeneratedMaterialization()`, `QueryGeneratedMapped*` |
 | Isolated configuration | `FluentMapRuntime` |
 | Dependency Injection | `AddFluentMap(...)` |
-| Dommel persistence metadata | `Dapper.FluentMap.Dommel` |
+| Dommel persistence/write conversion | `InsertMapped*`, `UpdateMapped*` |
 | Compile-time diagnostics | `FluentMap.Analyzers` |
 
 Detailed examples are in [USAGE.md](USAGE.md).
@@ -115,7 +115,7 @@ Examples include:
 
 - nested objects and component value objects;
 - profiles;
-- two-type `splitOn` multi-mapping;
+- two/three-type `splitOn` multi-mapping;
 - mapped multiple result sets;
 - sync/async streaming;
 - property converters;

@@ -962,6 +962,12 @@ namespace Dapper.FluentMap.Generators
                 return null;
             }
 
+            if (ContainsExplicitConstructionInvocation(constructor, semanticModel, cancellationToken))
+            {
+                skipReason = "explicit ConstructUsing(...) strategies are supported by runtime materialization but are not emitted by generated materializers";
+                return null;
+            }
+
             var mapInvocations = new List<GeneratedMapInvocation>();
             foreach (var invocation in constructor.Body.DescendantNodes().OfType<InvocationExpressionSyntax>())
             {
@@ -1116,6 +1122,25 @@ namespace Dapper.FluentMap.Generators
             {
                 var method = semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol as IMethodSymbol;
                 if (IsIncludeBaseInvocation(method))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool ContainsExplicitConstructionInvocation(
+            ConstructorDeclarationSyntax constructor,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken)
+        {
+            foreach (var invocation in constructor.Body.DescendantNodes().OfType<InvocationExpressionSyntax>())
+            {
+                var method = semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol as IMethodSymbol;
+                if (method != null &&
+                    method.Name == "ConstructUsing" &&
+                    IsType(method.ContainingType.OriginalDefinition, MappingNamespace, "EntityMapBase`2"))
                 {
                     return true;
                 }

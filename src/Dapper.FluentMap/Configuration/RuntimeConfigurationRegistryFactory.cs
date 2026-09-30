@@ -54,13 +54,19 @@ namespace Dapper.FluentMap.Configuration
         private sealed class SnapshotEntityMap :
             IEntityMap,
             IEntityMapWithIncludedBaseTypes,
+            IEntityMapWithConstructionStrategy,
             IRuntimeEntityMapMetadata
         {
-            private SnapshotEntityMap(Type mapType, IList<IPropertyMap> propertyMaps, IList<Type> includedBaseTypes)
+            private SnapshotEntityMap(
+                Type mapType,
+                IList<IPropertyMap> propertyMaps,
+                IList<Type> includedBaseTypes,
+                EntityConstructionStrategy constructionStrategy)
             {
                 MapType = mapType;
                 PropertyMaps = propertyMaps;
                 IncludedBaseTypes = includedBaseTypes;
+                ConstructionStrategy = constructionStrategy;
             }
 
             public IList<IPropertyMap> PropertyMaps { get; }
@@ -69,12 +75,15 @@ namespace Dapper.FluentMap.Configuration
 
             public Type MapType { get; }
 
+            public EntityConstructionStrategy ConstructionStrategy { get; }
+
             internal static SnapshotEntityMap FromEntityConfiguration(EntityMappingConfiguration map)
             {
                 return new SnapshotEntityMap(
                     map.MapType,
                     map.PropertyMaps.Select(SnapshotPropertyMap.FromConfiguration).Cast<IPropertyMap>().ToList(),
-                    map.IncludedBaseTypes.ToList());
+                    map.IncludedBaseTypes.ToList(),
+                    map.ConstructionStrategy);
             }
 
             internal static SnapshotEntityMap FromProfileConfiguration(ProfileMappingConfiguration map)
@@ -82,7 +91,8 @@ namespace Dapper.FluentMap.Configuration
                 return new SnapshotEntityMap(
                     map.MapType,
                     map.PropertyMaps.Select(SnapshotPropertyMap.FromConfiguration).Cast<IPropertyMap>().ToList(),
-                    map.IncludedBaseTypes.ToList());
+                    map.IncludedBaseTypes.ToList(),
+                    map.ConstructionStrategy);
             }
         }
 

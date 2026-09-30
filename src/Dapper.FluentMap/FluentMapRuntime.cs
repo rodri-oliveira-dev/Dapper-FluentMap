@@ -187,6 +187,184 @@ namespace Dapper.FluentMap
         }
 
         /// <summary>
+        /// Executes a query, splits each row into three segments using this runtime and composes the return value.
+        /// </summary>
+        /// <remarks>
+        /// <paramref name="splitOn"/> must contain two comma-separated, unique boundaries in result order.
+        /// All-database-null child segments are passed to <paramref name="map"/> as <see langword="null"/>.
+        /// </remarks>
+        [RequiresUnreferencedCode(QueryMappedApiAnnotations.RequiresUnreferencedCodeMessage)]
+        [RequiresDynamicCode(QueryMappedApiAnnotations.RequiresDynamicCodeMessage)]
+        public IEnumerable<TReturn> QueryMapped<
+            [DynamicallyAccessedMembers(QueryMappedApiAnnotations.MaterializedEntityMemberTypes)] TFirst,
+            [DynamicallyAccessedMembers(QueryMappedApiAnnotations.MaterializedEntityMemberTypes)] TSecond,
+            [DynamicallyAccessedMembers(QueryMappedApiAnnotations.MaterializedEntityMemberTypes)] TThird,
+            TReturn>(
+            IDbConnection connection,
+            string sql,
+            Func<TFirst, TSecond, TThird, TReturn> map,
+            object param = null,
+            IDbTransaction transaction = null,
+            int? commandTimeout = null,
+            CommandType? commandType = null,
+            string splitOn = null)
+            where TFirst : class
+            where TSecond : class
+            where TThird : class
+        {
+            if (sql == null)
+            {
+                throw new ArgumentNullException(nameof(sql));
+            }
+
+            return QueryMappedExtensions.ExecuteMapped<TFirst, TSecond, TThird, TReturn>(
+                connection,
+                new CommandDefinition(sql, param, transaction, commandTimeout, commandType),
+                map,
+                splitOn,
+                null,
+                null,
+                null,
+                this);
+        }
+
+        /// <summary>
+        /// Asynchronously executes a query, materializes three segments using this runtime and composes the return value.
+        /// </summary>
+        [RequiresUnreferencedCode(QueryMappedApiAnnotations.RequiresUnreferencedCodeMessage)]
+        [RequiresDynamicCode(QueryMappedApiAnnotations.RequiresDynamicCodeMessage)]
+        public Task<IEnumerable<TReturn>> QueryMappedAsync<
+            [DynamicallyAccessedMembers(QueryMappedApiAnnotations.MaterializedEntityMemberTypes)] TFirst,
+            [DynamicallyAccessedMembers(QueryMappedApiAnnotations.MaterializedEntityMemberTypes)] TSecond,
+            [DynamicallyAccessedMembers(QueryMappedApiAnnotations.MaterializedEntityMemberTypes)] TThird,
+            TReturn>(
+            IDbConnection connection,
+            string sql,
+            Func<TFirst, TSecond, TThird, TReturn> map,
+            object param = null,
+            IDbTransaction transaction = null,
+            int? commandTimeout = null,
+            CommandType? commandType = null,
+            string splitOn = null,
+            CancellationToken cancellationToken = default)
+            where TFirst : class
+            where TSecond : class
+            where TThird : class
+        {
+            if (sql == null)
+            {
+                throw new ArgumentNullException(nameof(sql));
+            }
+
+            if (map == null)
+            {
+                throw new ArgumentNullException(nameof(map));
+            }
+
+            return QueryMappedExtensions.ExecuteMappedSegmentsAsync(
+                connection,
+                new CommandDefinition(sql, param, transaction, commandTimeout, commandType, CommandFlags.Buffered, cancellationToken),
+                new[] { typeof(TFirst), typeof(TSecond), typeof(TThird) },
+                new Type[] { null, null, null },
+                values => map((TFirst)values[0], (TSecond)values[1], (TThird)values[2]),
+                splitOn,
+                this);
+        }
+
+        /// <summary>
+        /// Asynchronously executes a query and materializes three profiled segments using this runtime.
+        /// </summary>
+        [RequiresUnreferencedCode(QueryMappedApiAnnotations.RequiresUnreferencedCodeMessage)]
+        [RequiresDynamicCode(QueryMappedApiAnnotations.RequiresDynamicCodeMessage)]
+        public Task<IEnumerable<TReturn>> QueryMappedAsync<
+            [DynamicallyAccessedMembers(QueryMappedApiAnnotations.MaterializedEntityMemberTypes)] TFirst,
+            [DynamicallyAccessedMembers(QueryMappedApiAnnotations.MaterializedEntityMemberTypes)] TSecond,
+            [DynamicallyAccessedMembers(QueryMappedApiAnnotations.MaterializedEntityMemberTypes)] TThird,
+            TReturn,
+            TFirstProfile,
+            TSecondProfile,
+            TThirdProfile>(
+            IDbConnection connection,
+            string sql,
+            Func<TFirst, TSecond, TThird, TReturn> map,
+            object param = null,
+            IDbTransaction transaction = null,
+            int? commandTimeout = null,
+            CommandType? commandType = null,
+            string splitOn = null,
+            CancellationToken cancellationToken = default)
+            where TFirst : class
+            where TSecond : class
+            where TThird : class
+            where TFirstProfile : IMappingProfile
+            where TSecondProfile : IMappingProfile
+            where TThirdProfile : IMappingProfile
+        {
+            if (sql == null)
+            {
+                throw new ArgumentNullException(nameof(sql));
+            }
+
+            if (map == null)
+            {
+                throw new ArgumentNullException(nameof(map));
+            }
+
+            return QueryMappedExtensions.ExecuteMappedSegmentsAsync(
+                connection,
+                new CommandDefinition(sql, param, transaction, commandTimeout, commandType, CommandFlags.Buffered, cancellationToken),
+                new[] { typeof(TFirst), typeof(TSecond), typeof(TThird) },
+                new[] { typeof(TFirstProfile), typeof(TSecondProfile), typeof(TThirdProfile) },
+                values => map((TFirst)values[0], (TSecond)values[1], (TThird)values[2]),
+                splitOn,
+                this);
+        }
+
+        /// <summary>
+        /// Executes a query and materializes three profiled segments using this runtime.
+        /// </summary>
+        [RequiresUnreferencedCode(QueryMappedApiAnnotations.RequiresUnreferencedCodeMessage)]
+        [RequiresDynamicCode(QueryMappedApiAnnotations.RequiresDynamicCodeMessage)]
+        public IEnumerable<TReturn> QueryMapped<
+            [DynamicallyAccessedMembers(QueryMappedApiAnnotations.MaterializedEntityMemberTypes)] TFirst,
+            [DynamicallyAccessedMembers(QueryMappedApiAnnotations.MaterializedEntityMemberTypes)] TSecond,
+            [DynamicallyAccessedMembers(QueryMappedApiAnnotations.MaterializedEntityMemberTypes)] TThird,
+            TReturn,
+            TFirstProfile,
+            TSecondProfile,
+            TThirdProfile>(
+            IDbConnection connection,
+            string sql,
+            Func<TFirst, TSecond, TThird, TReturn> map,
+            object param = null,
+            IDbTransaction transaction = null,
+            int? commandTimeout = null,
+            CommandType? commandType = null,
+            string splitOn = null)
+            where TFirst : class
+            where TSecond : class
+            where TThird : class
+            where TFirstProfile : IMappingProfile
+            where TSecondProfile : IMappingProfile
+            where TThirdProfile : IMappingProfile
+        {
+            if (sql == null)
+            {
+                throw new ArgumentNullException(nameof(sql));
+            }
+
+            return QueryMappedExtensions.ExecuteMapped<TFirst, TSecond, TThird, TReturn>(
+                connection,
+                new CommandDefinition(sql, param, transaction, commandTimeout, commandType),
+                map,
+                splitOn,
+                typeof(TFirstProfile),
+                typeof(TSecondProfile),
+                typeof(TThirdProfile),
+                this);
+        }
+
+        /// <summary>
         /// Executes a query, splits each row at <paramref name="splitOn"/>, materializes two profiled segments using this runtime and composes the return value.
         /// </summary>
         [RequiresUnreferencedCode(QueryMappedApiAnnotations.RequiresUnreferencedCodeMessage)]

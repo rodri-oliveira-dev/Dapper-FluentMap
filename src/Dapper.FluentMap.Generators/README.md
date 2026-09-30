@@ -19,4 +19,4 @@ FluentMapper.Initialize(config =>
 });
 ```
 
-Generated registration avoids reflection-based assembly scanning for maps in the current compilation. It does not scan referenced assemblies, execute map constructors during generation, parse SQL or replace `FluentMapper.Validate()`. Missing, additional or duplicate-column shapes continue to use the runtime fallback, or fail deterministically when strict generated materialization is enabled.
+Generated registration avoids reflection-based assembly scanning for maps in the current compilation. It does not scan referenced assemblies, execute map constructors during generation, parse SQL or replace `FluentMapper.Validate()`. Explicit delegate `ConstructUsing(...)` factories remain runtime-only and produce `DFM011`; strict generated materialization rejects those shapes rather than using a hidden fallback. Missing, mapped-additional or duplicate-column shapes likewise fail deterministically in strict mode.

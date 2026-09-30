@@ -335,6 +335,176 @@ CREATE TABLE write_conversion_boundary_entities (
             }
         }
 
+        [Fact]
+        public void InsertMappedAndUpdateMappedShouldExecuteWriteConverters()
+        {
+            PreTest();
+            SQLitePCL.Batteries_V2.Init();
+
+            FluentMapper.Initialize(config =>
+            {
+                config.AddMap(new WriteConvertedEntityMap());
+                config.ForDommel();
+            });
+
+            using (var connection = OpenConnection())
+            {
+                connection.Execute(@"
+CREATE TABLE write_converted_entities (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL,
+    insert_excluded TEXT,
+    update_excluded TEXT,
+    default_value TEXT DEFAULT 'database-default',
+    computed_value TEXT
+);");
+
+                var logs = CaptureDommelLogs();
+                var entity = new WriteConvertedEntity
+                {
+                    Code = "insert",
+                    InsertExcluded = "must-not-insert",
+                    UpdateExcluded = "insert-only",
+                    DefaultValue = "must-use-default",
+                    ComputedValue = "must-not-write"
+                };
+
+                var id = Convert.ToInt32(connection.InsertMapped(entity));
+                var insertSql = logs.Last(log => log.IndexOf("insert into", StringComparison.OrdinalIgnoreCase) >= 0);
+                AssertSqlDoesNotContain(insertSql, "insert_excluded", "default_value", "computed_value");
+                var inserted = connection.QuerySingle<WriteConvertedRow>(@"
+SELECT id AS Id, code AS Code, insert_excluded AS InsertExcluded,
+       update_excluded AS UpdateExcluded, default_value AS DefaultValue,
+       computed_value AS ComputedValue
+FROM write_converted_entities WHERE id = @id;", new { id });
+
+                Assert.Equal("db:insert", inserted.Code);
+                Assert.Null(inserted.InsertExcluded);
+                Assert.Equal("db:insert-only", inserted.UpdateExcluded);
+                Assert.Equal("database-default", inserted.DefaultValue);
+                Assert.Null(inserted.ComputedValue);
+
+                entity.Id = id;
+                entity.Code = "update";
+                entity.InsertExcluded = "update-only";
+                entity.UpdateExcluded = "must-not-update";
+
+                Assert.True(connection.UpdateMapped(entity));
+
+                var updated = connection.QuerySingle<WriteConvertedRow>(@"
+SELECT id AS Id, code AS Code, insert_excluded AS InsertExcluded,
+       update_excluded AS UpdateExcluded, default_value AS DefaultValue,
+       computed_value AS ComputedValue
+FROM write_converted_entities WHERE id = @id;", new { id });
+                Assert.Equal("db:update", updated.Code);
+                Assert.Equal("db:update-only", updated.InsertExcluded);
+                Assert.Equal("db:insert-only", updated.UpdateExcluded);
+                Assert.Equal("db:must-use-default", updated.DefaultValue);
+                Assert.Null(updated.ComputedValue);
+            }
+        }
+
+        [Fact]
+        public void WriteConverterFailureShouldIncludeDommelOperationAndPropertyContext()
+        {
+            PreTest();
+            SQLitePCL.Batteries_V2.Init();
+
+            FluentMapper.Initialize(config =>
+            {
+                config.AddMap(new WriteConversionBoundaryEntityMap());
+                config.ForDommel();
+            });
+
+            using (var connection = OpenConnection())
+            {
+                connection.Execute(@"
+CREATE TABLE write_conversion_boundary_entities (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL
+);");
+
+                var exception = Assert.Throws<FluentMapConfigurationException>(() =>
+                    connection.InsertMapped(new WriteConversionBoundaryEntity { Code = "reject" }));
+
+                Assert.Contains("INSERT", exception.Message);
+                Assert.Contains(typeof(WriteConversionBoundaryEntity).FullName, exception.Message);
+                Assert.Contains(nameof(WriteConversionBoundaryEntity.Code), exception.Message);
+                Assert.Contains("code", exception.Message);
+                Assert.IsType<InvalidOperationException>(exception.InnerException);
+                Assert.Equal(0, connection.QuerySingle<int>("SELECT COUNT(*) FROM write_conversion_boundary_entities;"));
+            }
+        }
+
+        [Fact]
+        public void ConverterOutputShouldThenUseDapperTypeHandler()
+        {
+            PreTest();
+            SQLitePCL.Batteries_V2.Init();
+            SqlMapper.AddTypeHandler(new ConvertedCodeTypeHandler());
+
+            FluentMapper.Initialize(config =>
+            {
+                config.AddMap(new TypeHandledWriteEntityMap());
+                config.ForDommel();
+            });
+
+            using (var connection = OpenConnection())
+            {
+                connection.Execute(@"
+CREATE TABLE type_handled_write_entities (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL
+);");
+
+                var id = Convert.ToInt32(connection.InsertMapped(new TypeHandledWriteEntity { Code = "value" }));
+
+                Assert.Equal(
+                    "handler:converted:value",
+                    connection.QuerySingle<string>(
+                        "SELECT code FROM type_handled_write_entities WHERE id = @id;",
+                        new { id }));
+            }
+        }
+
+        [Fact]
+        public async System.Threading.Tasks.Task AsyncMappedWritesShouldApplyWriteConverters()
+        {
+            PreTest();
+            SQLitePCL.Batteries_V2.Init();
+
+            FluentMapper.Initialize(config =>
+            {
+                config.AddMap(new WriteConversionBoundarySuccessEntityMap());
+                config.ForDommel();
+            });
+
+            using (var connection = OpenConnection())
+            {
+                connection.Execute(@"
+CREATE TABLE write_conversion_boundary_entities (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL
+);");
+                var entity = new WriteConversionBoundaryEntity { Code = "async-insert" };
+                var id = Convert.ToInt32(await connection.InsertMappedAsync(
+                    entity,
+                    cancellationToken: TestContext.Current.CancellationToken));
+
+                entity.Id = id;
+                entity.Code = "async-update";
+                Assert.True(await connection.UpdateMappedAsync(
+                    entity,
+                    cancellationToken: TestContext.Current.CancellationToken));
+
+                Assert.Equal(
+                    "db:async-update",
+                    connection.QuerySingle<string>(
+                        "SELECT code FROM write_conversion_boundary_entities WHERE id = @id;",
+                        new { id }));
+            }
+        }
+
         private static void PreTest()
         {
             FluentMapper.EntityMaps.Clear();
@@ -539,6 +709,104 @@ WHERE id = @id;", new { id });
             public string ConvertToDatabase(string value)
             {
                 throw new InvalidOperationException("Dommel does not execute property write converters in this stage.");
+            }
+        }
+
+        private sealed class WriteConversionBoundarySuccessEntityMap : DommelEntityMap<WriteConversionBoundaryEntity>
+        {
+            public WriteConversionBoundarySuccessEntityMap()
+            {
+                ToTable("write_conversion_boundary_entities");
+                Map(entity => entity.Id).ToColumn("id").IsIdentity();
+                Map(entity => entity.Code)
+                    .ToColumn("code")
+                    .ConvertToDatabaseUsing<string, string>(value => "db:" + value);
+            }
+        }
+
+        private sealed class WriteConvertedEntity
+        {
+            public int Id { get; set; }
+
+            public string Code { get; set; }
+
+            public string InsertExcluded { get; set; }
+
+            public string UpdateExcluded { get; set; }
+
+            public string DefaultValue { get; set; }
+
+            public string ComputedValue { get; set; }
+        }
+
+        private sealed class WriteConvertedEntityMap : DommelEntityMap<WriteConvertedEntity>
+        {
+            public WriteConvertedEntityMap()
+            {
+                ToTable("write_converted_entities");
+                Map(entity => entity.Id).ToColumn("id").IsIdentity();
+                Map(entity => entity.Code).ToColumn("code").ConvertToDatabaseUsing<string, string>(value => "db:" + value);
+                Map(entity => entity.InsertExcluded).ToColumn("insert_excluded").ExcludeFromInsert().ConvertToDatabaseUsing<string, string>(value => "db:" + value);
+                Map(entity => entity.UpdateExcluded).ToColumn("update_excluded").ExcludeFromUpdate().ConvertToDatabaseUsing<string, string>(value => "db:" + value);
+                Map(entity => entity.DefaultValue).ToColumn("default_value").DatabaseDefaultOnInsert().ConvertToDatabaseUsing<string, string>(value => "db:" + value);
+                Map(entity => entity.ComputedValue).ToColumn("computed_value").Computed();
+            }
+        }
+
+        private sealed class WriteConvertedRow
+        {
+            public int Id { get; set; }
+
+            public string Code { get; set; }
+
+            public string InsertExcluded { get; set; }
+
+            public string UpdateExcluded { get; set; }
+
+            public string DefaultValue { get; set; }
+
+            public string ComputedValue { get; set; }
+        }
+
+        private sealed class TypeHandledWriteEntity
+        {
+            public int Id { get; set; }
+
+            public string Code { get; set; }
+        }
+
+        private sealed class TypeHandledWriteEntityMap : DommelEntityMap<TypeHandledWriteEntity>
+        {
+            public TypeHandledWriteEntityMap()
+            {
+                ToTable("type_handled_write_entities");
+                Map(entity => entity.Id).ToColumn("id").IsIdentity();
+                Map(entity => entity.Code)
+                    .ToColumn("code")
+                    .ConvertToDatabaseUsing<string, ConvertedCode>(value => new ConvertedCode("converted:" + value));
+            }
+        }
+
+        private sealed class ConvertedCode
+        {
+            public ConvertedCode(string value)
+            {
+                Value = value;
+            }
+
+            public string Value { get; }
+        }
+
+        private sealed class ConvertedCodeTypeHandler : SqlMapper.TypeHandler<ConvertedCode>
+        {
+            public override ConvertedCode Parse(object value)
+            {
+                return new ConvertedCode(Convert.ToString(value));
+            }
+
+            public override void SetValue(System.Data.IDbDataParameter parameter, ConvertedCode value)
+            {
+                parameter.Value = "handler:" + value.Value;
             }
         }
     }
