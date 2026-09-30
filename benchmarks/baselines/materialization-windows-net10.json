@@ -3,6 +3,8 @@
   "runtime": ".NET 10",
   "operatingSystem": "Windows",
   "job": "ShortRun",
+  "calibrationRuns": 2,
+  "calibrationNote": "Initial Windows ShortRun measurements showed material timing variance while allocations remained stable; thresholds are report-only pending scheduled hosted-runner history.",
   "timeRegressionThresholdPercent": 35,
   "allocationRegressionThresholdPercent": 15,
   "reportOnly": true,

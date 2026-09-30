@@ -53,7 +53,7 @@ Antes de alterar as versões dos pacotes FluentMap:
 - execute a suíte de testes existente antes e depois da atualização;
 - identifique se a aplicação usa Dommel, `Ignore()` para colunas geradas pelo banco, assembly scanning, implementações customizadas de `TypeHandler<T>` do Dapper, trimming ou Native AOT.
 
-As faixas suportadas atualmente ficam documentadas em [COMPATIBILITY.md](COMPATIBILITY.md). No momento deste guia:
+As faixas suportadas atualmente ficam documentadas em [COMPATIBILITY.md](COMPATIBILITY.md). Os valores do Dapper são governados por `eng/compatibility-contract.json` e validados contra metadata de pacote e CI. No momento deste guia:
 
 ```text
 Dapper [2.1.79,3.0.0)
@@ -356,6 +356,8 @@ config.AddGeneratedMappings();
 Isso pode substituir registro manual para maps elegíveis da compilação atual. Não faz scan de assemblies referenciados e não elimina a necessidade de validação em runtime.
 
 Materializadores gerados são uma otimização. Casos não suportados usam materialização runtime como fallback, exceto quando o modo estrito de materialização gerada é habilitado explicitamente.
+
+Queries strict generated podem usar `GeneratedParameters` para comandos parametrizados. Cada valor possui um `DbType` explícito; objetos anônimos e outros bags de parâmetros arbitrários continuam não suportados, para que o modo estrito não introduza descoberta de parâmetros por reflection. Colunas reordenadas e colunas adicionais não mapeadas seguras podem permanecer no caminho gerado; colunas obrigatórias ausentes, nomes duplicados/ambíguos ou colunas adicionais mapeadas falham deterministicamente.
 
 ## Isolamento de Configuração
 
