@@ -273,7 +273,7 @@ namespace Dapper.FluentMap
         /// <typeparam name="TEntity">The entity type to materialize.</typeparam>
         /// <param name="connection">The database connection.</param>
         /// <param name="sql">The SQL query to execute.</param>
-        /// <param name="param">Optional query parameters.</param>
+        /// <param name="param">Optional <see cref="GeneratedParameters"/>. Arbitrary parameter objects are rejected before command execution.</param>
         /// <param name="transaction">Optional transaction.</param>
         /// <param name="commandTimeout">Optional command timeout.</param>
         /// <param name="commandType">Optional command type.</param>
@@ -281,6 +281,7 @@ namespace Dapper.FluentMap
         /// <exception cref="T:Dapper.FluentMap.FluentMapConfigurationException">
         /// Thrown when the runtime cannot resolve a generated materializer for the entity, profile and result-column shape.
         /// </exception>
+        /// <exception cref="NotSupportedException">Thrown when <paramref name="param"/> is not <see langword="null"/> or a <see cref="GeneratedParameters"/> instance.</exception>
         public IEnumerable<TEntity> QueryGeneratedMapped<TEntity>(
             IDbConnection connection,
             string sql,
@@ -295,14 +296,12 @@ namespace Dapper.FluentMap
                 throw new ArgumentNullException(nameof(sql));
             }
 
-            if (param != null)
-            {
-                throw new NotSupportedException("Strict generated materialization does not support dynamic parameter objects. Use a parameterless command or a non-strict query API.");
-            }
+            var generatedParameters = ValidateGeneratedParameters<TEntity>(param, profileType: null);
 
             return QueryMappedExtensions.ExecuteGeneratedMapped<TEntity>(
                 connection,
                 sql,
+                generatedParameters,
                 transaction,
                 commandTimeout,
                 commandType,
@@ -317,7 +316,7 @@ namespace Dapper.FluentMap
         /// <typeparam name="TProfile">The mapping profile marker type to use.</typeparam>
         /// <param name="connection">The database connection.</param>
         /// <param name="sql">The SQL query to execute.</param>
-        /// <param name="param">Optional query parameters.</param>
+        /// <param name="param">Optional <see cref="GeneratedParameters"/>. Arbitrary parameter objects are rejected before command execution.</param>
         /// <param name="transaction">Optional transaction.</param>
         /// <param name="commandTimeout">Optional command timeout.</param>
         /// <param name="commandType">Optional command type.</param>
@@ -325,6 +324,7 @@ namespace Dapper.FluentMap
         /// <exception cref="T:Dapper.FluentMap.FluentMapConfigurationException">
         /// Thrown when the runtime cannot resolve a generated materializer for the entity, profile and result-column shape.
         /// </exception>
+        /// <exception cref="NotSupportedException">Thrown when <paramref name="param"/> is not <see langword="null"/> or a <see cref="GeneratedParameters"/> instance.</exception>
         public IEnumerable<TEntity> QueryGeneratedMapped<TEntity, TProfile>(
             IDbConnection connection,
             string sql,
@@ -340,14 +340,12 @@ namespace Dapper.FluentMap
                 throw new ArgumentNullException(nameof(sql));
             }
 
-            if (param != null)
-            {
-                throw new NotSupportedException("Strict generated materialization does not support dynamic parameter objects. Use a parameterless command or a non-strict query API.");
-            }
+            var generatedParameters = ValidateGeneratedParameters<TEntity>(param, typeof(TProfile));
 
             return QueryMappedExtensions.ExecuteGeneratedMapped<TEntity>(
                 connection,
                 sql,
+                generatedParameters,
                 transaction,
                 commandTimeout,
                 commandType,
@@ -384,6 +382,28 @@ namespace Dapper.FluentMap
             where TProfile : IMappingProfile
         {
             return QueryGeneratedMapped<TEntity, TProfile>(connection, sql, param, transaction, commandTimeout, commandType).Single();
+        }
+
+        private static GeneratedParameters ValidateGeneratedParameters<TEntity>(object param, Type profileType)
+            where TEntity : class
+        {
+            if (param == null)
+            {
+                return null;
+            }
+
+            if (param is GeneratedParameters generatedParameters)
+            {
+                return generatedParameters;
+            }
+
+            var profileContext = profileType == null
+                ? "default profile"
+                : $"profile '{profileType.FullName}'";
+            throw new NotSupportedException(
+                $"Strict generated query parameters for entity '{typeof(TEntity).FullName}' ({profileContext}) must use '{typeof(GeneratedParameters).FullName}'. " +
+                $"Parameter object type '{param.GetType().FullName}' is unsupported because strict mode does not discover parameters through reflection or dynamic code. " +
+                "Use GeneratedParameters with an explicit DbType for every value, or use QueryMapped* for the non-strict runtime path.");
         }
 
         /// <summary>

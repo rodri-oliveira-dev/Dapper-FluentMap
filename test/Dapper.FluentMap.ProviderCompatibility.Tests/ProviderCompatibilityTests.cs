@@ -7,6 +7,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Dapper;
+using Dapper.FluentMap.Configuration;
 using Dapper.FluentMap.Dommel;
 using Dapper.FluentMap.Dommel.Mapping;
 using Dapper.FluentMap.Mapping;
@@ -262,6 +263,46 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
             finally
             {
                 PreTest(typeof(MultipleCustomer));
+            }
+        }
+
+        [Theory]
+        [MemberData(nameof(Providers))]
+        [Trait("Category", "ProviderCompatibility")]
+        public void StrictGeneratedParameterizedQueryShouldSupportSafeAdditionalProviderColumn(string providerName)
+        {
+            var provider = ProviderCase.Create(providerName);
+            provider.SkipIfUnavailable();
+
+            var runtime = new FluentMapConfigurationBuilder()
+                .AddMap(new MultipleCustomerMap())
+                .AddGeneratedMaterializer(
+                    new[]
+                    {
+                        GeneratedMaterializerColumn.Map("customer_id", nameof(MultipleCustomer.Id)),
+                        GeneratedMaterializerColumn.Map("customer_name", nameof(MultipleCustomer.Name))
+                    },
+                    record => new MultipleCustomer
+                    {
+                        Id = Convert.ToInt32(record.GetValue(0)),
+                        Name = Convert.ToString(record.GetValue(1))
+                    })
+                .UseStrictGeneratedMaterialization()
+                .Build()
+                .CreateRuntime();
+            var parameters = new GeneratedParameters()
+                .Add("Id", 22, DbType.Int32)
+                .Add("Name", "Strict Provider", DbType.String, size: 100);
+
+            using (var connection = provider.OpenConnection())
+            {
+                var customer = runtime.QueryGeneratedMappedSingle<MultipleCustomer>(
+                    connection,
+                    "SELECT @Id AS customer_id, @Name AS customer_name, 1 AS provider_trace;",
+                    parameters);
+
+                Assert.Equal(22, customer.Id);
+                Assert.Equal("Strict Provider", customer.Name);
             }
         }
 

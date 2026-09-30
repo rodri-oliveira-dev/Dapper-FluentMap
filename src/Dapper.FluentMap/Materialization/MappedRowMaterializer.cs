@@ -97,7 +97,7 @@ namespace Dapper.FluentMap.Materialization
             throw new FluentMapConfigurationException(
                 "Strict generated materialization is enabled, but FluentMap could not resolve a compatible generated materializer. " +
                 runtime.Registry.DescribeMissingGeneratedMaterializer(typeof(TEntity), profileType, columnNames) +
-                " Register a generated materializer for this exact entity/profile/result-column shape, query the documented generated shape, or disable strict generated materialization for this runtime.");
+                " Register a compatible generated materializer, query a documented generated shape, or use QueryMapped* with strict generated materialization disabled for the non-strict runtime fallback.");
         }
 
         private static string[] GetColumnNames(IDataRecord reader)

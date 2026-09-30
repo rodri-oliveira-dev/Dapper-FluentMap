@@ -68,7 +68,8 @@ public sealed class Startup
             Assert.Contains(".AddMap<global::CustomerMap>()", result.GeneratedSource, StringComparison.Ordinal);
             Assert.Contains(".AddGeneratedMaterializer<global::Customer>(", result.GeneratedSource, StringComparison.Ordinal);
             Assert.Contains("GeneratedMaterializerColumn.Map(\"customer_id\", \"Id\")", result.GeneratedSource, StringComparison.Ordinal);
-            Assert.Contains("entity.Id = Read<int>(record, 0);", result.GeneratedSource, StringComparison.Ordinal);
+            Assert.Contains("entity.Id = Read<int>(record, 0,", result.GeneratedSource, StringComparison.Ordinal);
+            Assert.Contains("Generated materialization failed for entity", result.GeneratedSource, StringComparison.Ordinal);
         }
 
         [Fact]
@@ -98,7 +99,7 @@ public sealed class CustomerMap : EntityMap<Customer>
             Assert.Empty(result.DfmDiagnostics);
             Assert.Contains("GeneratedMaterializerColumn.Map(\"customer_id\", \"Id\")", result.GeneratedSource, StringComparison.Ordinal);
             Assert.Contains("GeneratedMaterializerColumn.Map(\"full_name\", \"FullName\")", result.GeneratedSource, StringComparison.Ordinal);
-            Assert.Contains("entity.FullName = Read<string>(record, 1);", result.GeneratedSource, StringComparison.Ordinal);
+            Assert.Contains("entity.FullName = Read<string>(record, 1,", result.GeneratedSource, StringComparison.Ordinal);
         }
 
         [Fact]
@@ -132,8 +133,8 @@ public sealed class CustomerMap : EntityMap<Customer>
             var result = RunGenerator(source);
 
             Assert.Empty(result.DfmDiagnostics);
-            Assert.Contains("var id = Read<int>(record, 0);", result.GeneratedSource, StringComparison.Ordinal);
-            Assert.Contains("var fullName = Read<string>(record, 1);", result.GeneratedSource, StringComparison.Ordinal);
+            Assert.Contains("var id = Read<int>(record, 0,", result.GeneratedSource, StringComparison.Ordinal);
+            Assert.Contains("var fullName = Read<string>(record, 1,", result.GeneratedSource, StringComparison.Ordinal);
             Assert.Contains("entity = new global::Customer(id, fullName);", result.GeneratedSource, StringComparison.Ordinal);
             Assert.Contains("FluentMapConfigurationException", result.GeneratedSource, StringComparison.Ordinal);
         }
@@ -163,7 +164,7 @@ public sealed class CustomerMap : EntityMap<Customer>
             var result = RunGenerator(source);
 
             Assert.Empty(result.DfmDiagnostics);
-            Assert.Contains("entity.Age = Read<int?>(record, 0);", result.GeneratedSource, StringComparison.Ordinal);
+            Assert.Contains("entity.Age = Read<int?>(record, 0,", result.GeneratedSource, StringComparison.Ordinal);
             Assert.Contains("return default(T);", result.GeneratedSource, StringComparison.Ordinal);
         }
 
@@ -194,7 +195,7 @@ public sealed class CustomerMap : EntityMap<Customer>
             Assert.Empty(result.DfmDiagnostics);
             Assert.Contains("GeneratedMaterializerColumn.Map(\"customer_id\", \"Id\")", result.GeneratedSource, StringComparison.Ordinal);
             Assert.Contains("GeneratedMaterializerColumn.Ignore(\"secret\")", result.GeneratedSource, StringComparison.Ordinal);
-            Assert.Contains("entity.Id = Read<int>(record, 0);", result.GeneratedSource, StringComparison.Ordinal);
+            Assert.Contains("entity.Id = Read<int>(record, 0,", result.GeneratedSource, StringComparison.Ordinal);
             Assert.DoesNotContain("entity.Secret =", result.GeneratedSource, StringComparison.Ordinal);
         }
 
@@ -245,8 +246,8 @@ public sealed class CustomerMap : EntityMap<Customer>
             Assert.Contains("GeneratedMaterializerColumn.Map(\"insert_excluded\", \"InsertExcluded\")", result.GeneratedSource, StringComparison.Ordinal);
             Assert.Contains("GeneratedMaterializerColumn.Map(\"update_excluded\", \"UpdateExcluded\")", result.GeneratedSource, StringComparison.Ordinal);
             Assert.Contains("GeneratedMaterializerColumn.Ignore(\"secret\")", result.GeneratedSource, StringComparison.Ordinal);
-            Assert.Contains("entity.ReadOnlyName = Read<string>(record, 1);", result.GeneratedSource, StringComparison.Ordinal);
-            Assert.Contains("entity.ComputedTotal = Read<decimal>(record, 2);", result.GeneratedSource, StringComparison.Ordinal);
+            Assert.Contains("entity.ReadOnlyName = Read<string>(record, 1,", result.GeneratedSource, StringComparison.Ordinal);
+            Assert.Contains("entity.ComputedTotal = Read<decimal>(record, 2,", result.GeneratedSource, StringComparison.Ordinal);
             Assert.DoesNotContain("entity.Secret =", result.GeneratedSource, StringComparison.Ordinal);
         }
 
@@ -596,7 +597,7 @@ public sealed class CustomerMap : EntityMap<Customer>
             Assert.Contains(".AddGeneratedMaterializer<global::Customer>(", result.GeneratedSource, StringComparison.Ordinal);
             Assert.Contains("GeneratedMaterializerColumn.Map(\"city\", \"Address.City\")", result.GeneratedSource, StringComparison.Ordinal);
             Assert.Contains("if (!record.IsDBNull(0))", result.GeneratedSource, StringComparison.Ordinal);
-            Assert.Contains("node1.City = Read<string>(record, 0);", result.GeneratedSource, StringComparison.Ordinal);
+            Assert.Contains("node1.City = Read<string>(record, 0,", result.GeneratedSource, StringComparison.Ordinal);
             Assert.Contains("entity.Address = null;", result.GeneratedSource, StringComparison.Ordinal);
         }
 
@@ -684,8 +685,8 @@ public sealed class CustomerMap : EntityMap<Customer>
             Assert.Empty(result.DfmDiagnostics);
             Assert.Contains("GeneratedMaterializerColumn.Map(\"rank_level\", \"Rank.Level\")", result.GeneratedSource, StringComparison.Ordinal);
             Assert.Contains("GeneratedMaterializerColumn.Map(\"seniority_level\", \"Seniority.Level\")", result.GeneratedSource, StringComparison.Ordinal);
-            Assert.Contains("node1.Level = Read<int>(record, 0);", result.GeneratedSource, StringComparison.Ordinal);
-            Assert.Contains("node2.Level = Read<int>(record, 1);", result.GeneratedSource, StringComparison.Ordinal);
+            Assert.Contains("node1.Level = Read<int>(record, 0,", result.GeneratedSource, StringComparison.Ordinal);
+            Assert.Contains("node2.Level = Read<int>(record, 1,", result.GeneratedSource, StringComparison.Ordinal);
         }
 
         [Fact]

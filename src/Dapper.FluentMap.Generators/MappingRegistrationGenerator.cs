@@ -752,6 +752,18 @@ namespace Dapper.FluentMap.Generators
                 builder.Append(leaf.TypeName);
                 builder.Append(">(record, ");
                 builder.Append(leaf.Ordinal.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                builder.Append(", ");
+                builder.Append(EscapeStringLiteral(materializer.EntityTypeName));
+                builder.Append(", ");
+                builder.Append(materializer.ProfileTypeName == null
+                    ? "null"
+                    : EscapeStringLiteral(materializer.ProfileTypeName));
+                builder.Append(", ");
+                builder.Append(EscapeStringLiteral(leaf.MemberPath));
+                builder.Append(", ");
+                builder.Append(EscapeStringLiteral(leaf.ColumnName));
+                builder.Append(", ");
+                builder.Append(EscapeStringLiteral(leaf.TypeName));
                 builder.Append(')');
                 return;
             }
@@ -822,7 +834,14 @@ namespace Dapper.FluentMap.Generators
         private static void AppendReadHelper(StringBuilder builder)
         {
             builder.AppendLine();
-            builder.AppendLine("        private static T Read<T>(global::System.Data.IDataRecord record, int ordinal)");
+            builder.AppendLine("        private static T Read<T>(");
+            builder.AppendLine("            global::System.Data.IDataRecord record,");
+            builder.AppendLine("            int ordinal,");
+            builder.AppendLine("            string entityTypeName,");
+            builder.AppendLine("            string profileTypeName,");
+            builder.AppendLine("            string memberPath,");
+            builder.AppendLine("            string columnName,");
+            builder.AppendLine("            string targetTypeName)");
             builder.AppendLine("        {");
             builder.AppendLine("            if (record.IsDBNull(ordinal))");
             builder.AppendLine("            {");
@@ -830,7 +849,21 @@ namespace Dapper.FluentMap.Generators
             builder.AppendLine("            }");
             builder.AppendLine();
             builder.AppendLine("            var value = record.GetValue(ordinal);");
-            builder.AppendLine("            return ConvertValue<T>(value);");
+            builder.AppendLine("            try");
+            builder.AppendLine("            {");
+            builder.AppendLine("                return ConvertValue<T>(value);");
+            builder.AppendLine("            }");
+            builder.AppendLine("            catch (global::System.Exception exception) when (!(exception is global::Dapper.FluentMap.FluentMapConfigurationException))");
+            builder.AppendLine("            {");
+            builder.AppendLine("                var profileContext = profileTypeName == null");
+            builder.AppendLine("                    ? string.Empty");
+            builder.AppendLine("                    : \" Profile: '\" + profileTypeName + \"'.\";");
+            builder.AppendLine("                throw new global::Dapper.FluentMap.FluentMapConfigurationException(");
+            builder.AppendLine("                    \"Generated materialization failed for entity '\" + entityTypeName + \"'.\" + profileContext +");
+            builder.AppendLine("                    \" Member path: '\" + memberPath + \"'. Column: '\" + columnName + \"'. Provider CLR type: '\" + value.GetType().FullName +");
+            builder.AppendLine("                    \"'. Target type: '\" + targetTypeName + \"'. Strict generated materialization does not use runtime reflection fallback.\",");
+            builder.AppendLine("                    exception);");
+            builder.AppendLine("            }");
             builder.AppendLine("        }");
             builder.AppendLine();
             builder.AppendLine("        private static TTarget ReadConverted<TDatabase, TProperty, TTarget>(");

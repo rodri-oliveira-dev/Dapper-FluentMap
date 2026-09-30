@@ -352,6 +352,8 @@ This can replace manual registration for eligible maps in the current compilatio
 
 Generated materializers are an optimization. Unsupported cases fall back to runtime materialization unless strict generated materialization is explicitly enabled.
 
+Strict generated queries can use `GeneratedParameters` for parameterized commands. Each value has an explicit `DbType`; anonymous objects and other arbitrary parameter bags remain unsupported so strict mode does not introduce reflection-based parameter discovery. Safe reordered and unmapped additional result columns can stay on the generated path, while missing, duplicate/ambiguous or mapped additional columns fail deterministically.
+
 ## Configuration Isolation
 
 If your application needs multiple FluentMap configurations in the same process, use immutable configuration and runtime instances:

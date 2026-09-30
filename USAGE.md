@@ -374,10 +374,15 @@ var runtime = new FluentMapConfigurationBuilder()
 
 var customer = runtime.QueryGeneratedMappedSingle<Customer>(
     connection,
-    "SELECT 7 AS customer_id, 'Ada' AS customer_name;");
+    "SELECT @Id AS customer_id, @Name AS customer_name, 'trace' AS trace_id;",
+    new GeneratedParameters()
+        .Add("Id", 7, System.Data.DbType.Int32)
+        .Add("Name", "Ada", System.Data.DbType.String, size: 100));
 ```
 
-Unsupported shapes fail deterministically instead of silently using runtime materialization.
+`GeneratedParameters` binds only explicitly named input values with an explicit `DbType`; it does not inspect anonymous objects. Parameterless commands remain supported. Arbitrary parameter objects fail before the connection is opened, with `QueryMapped*` identified as the non-strict alternative.
+
+Generated materializers accept reordered required columns and additional columns only when the additional names do not resolve to mapped members. Missing required columns, duplicate names, mapped additional columns, incompatible provider values and unsupported nested shapes fail deterministically instead of silently using runtime materialization.
 
 The strict generated path has a narrower supported contract than normal FluentMap-controlled materialization. Review [COMPATIBILITY.md](COMPATIBILITY.md) before using it for trimming or Native AOT deployments.
 

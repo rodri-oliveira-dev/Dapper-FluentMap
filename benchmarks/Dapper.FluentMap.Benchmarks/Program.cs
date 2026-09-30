@@ -31,6 +31,7 @@ public class MaterializationSteadyStateBenchmarks
 
     private SqliteConnection _connection = null!;
     private FluentMapRuntime _runtime = null!;
+    private FluentMapRuntime _strictRuntime = null!;
 
     [GlobalSetup]
     public async Task GlobalSetup()
@@ -47,6 +48,11 @@ public class MaterializationSteadyStateBenchmarks
         _runtime = new FluentMapRuntime(new FluentMapConfigurationBuilder()
             .Configure(configuration => configuration.AddGeneratedMappings())
             .Build());
+        _strictRuntime = new FluentMapConfigurationBuilder()
+            .Configure(configuration => configuration.AddGeneratedMappings())
+            .UseStrictGeneratedMaterialization()
+            .Build()
+            .CreateRuntime();
         _connection = OpenPopulatedConnection();
 
         DapperPure();
@@ -61,6 +67,7 @@ public class MaterializationSteadyStateBenchmarks
         await RuntimeQueryMappedSimpleUnbufferedAsync();
         QueryMappedSimpleReorderedGenerated();
         RuntimeQueryMappedSimpleReorderedGenerated();
+        RuntimeQueryGeneratedSimpleExtraColumn();
         QueryMappedSimpleUnbufferedReorderedGenerated();
         await QueryMappedSimpleUnbufferedAsyncReorderedGenerated();
         QueryMappedImmutableConstructor();
@@ -184,6 +191,15 @@ public class MaterializationSteadyStateBenchmarks
         return _runtime.QueryMapped<QueryMappedSimpleCustomer>(
                 _connection,
                 "SELECT Name AS full_name, Id AS customer_id, Age AS customer_age, Balance AS account_balance, CreatedAt AS created_at FROM BenchmarkRows;")
+            .Count();
+    }
+
+    [Benchmark]
+    public int RuntimeQueryGeneratedSimpleExtraColumn()
+    {
+        return _strictRuntime.QueryGeneratedMapped<QueryMappedSimpleCustomer>(
+                _connection,
+                "SELECT 'trace' AS trace_id, Name AS full_name, Id AS customer_id, Age AS customer_age, Balance AS account_balance, CreatedAt AS created_at FROM BenchmarkRows;")
             .Count();
     }
 

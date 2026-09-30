@@ -77,14 +77,16 @@ Current status:
 | --- | --- |
 | Explicit map registration | Preferred for trimmed and Native AOT applications. |
 | Generated registration | Preferred alternative to assembly scanning for maps in the current compilation. |
-| Strict generated runtime | `UseStrictGeneratedMaterialization()` and `QueryGeneratedMapped*` provide a generated-only path for parameterless commands; unsupported shapes and dynamic parameter objects fail deterministically. |
+| Strict generated runtime | `UseStrictGeneratedMaterialization()` and `QueryGeneratedMapped*` provide a generated-only path for parameterless commands and explicitly typed `GeneratedParameters`; unsupported shapes and arbitrary parameter objects fail deterministically. |
 | Assembly scanning | Reflection-based and annotated as trimming-sensitive. |
 | `QueryMapped*`, `ReadMapped*`, `QueryMultipleMapped`, streaming | Annotated with trimming/dynamic-code warnings because runtime fallback can occur. |
 | Full Native AOT compatibility | Not claimed. |
 
 Trimmed smoke tests cover explicit, generated and DI scenarios. The CI Native AOT lane publishes and runs the strict generated SQLite smoke on `windows-latest`/`win-x64`, treating relevant trimming and AOT warnings as errors. Local Native AOT publishing still requires the Visual C++ linker toolchain and full Native AOT compatibility is not claimed.
 
-Generated materializers accept their exact registered shape and safe permutations when column names are distinct. Missing, additional or duplicate-column shapes remain unsupported and use runtime fallback unless strict generated materialization is enabled. Resolution is based on reader metadata, not SQL parsing.
+Generated materializers accept their exact registered shape, safe permutations and additional reader columns that do not resolve to mapped members. Missing required columns, duplicate/ambiguous names and additional columns that would map to an entity member remain unsupported and use runtime fallback unless strict generated materialization is enabled. Resolution is based on reader metadata, not SQL parsing.
+
+`GeneratedParameters` uses only public ADO.NET parameter contracts and requires an explicit `DbType` for every input. It does not inspect parameter-object members or invoke Dapper's anonymous-object parameter generation. The Native AOT smoke covers generated startup registration, parameter binding, reordered columns, a safe additional column and deterministic strict rejection. This is bounded evidence for the strict path, not a claim of full FluentMap Native AOT compatibility.
 
 ## Global State Limitations
 

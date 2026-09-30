@@ -877,6 +877,7 @@ namespace Dapper.FluentMap
         internal static IEnumerable<TEntity> ExecuteGeneratedMapped<TEntity>(
             IDbConnection connection,
             string sql,
+            GeneratedParameters parameters,
             IDbTransaction transaction,
             int? commandTimeout,
             CommandType? commandType,
@@ -915,6 +916,8 @@ namespace Dapper.FluentMap
                     {
                         command.CommandType = commandType.Value;
                     }
+
+                    parameters?.AddParameters(command);
 
                     using (var reader = command.ExecuteReader())
                     {

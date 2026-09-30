@@ -6,6 +6,14 @@ The historical archived package history is not reconstructed here. This changelo
 
 ## [Unreleased]
 
+### Added
+
+- Added reflection-free `GeneratedParameters` for parameterized strict-generated queries, including provider-matrix and Native AOT smoke coverage.
+
+### Changed
+
+- Generated materializers now accept safe additional unmapped reader columns and provide specific strict diagnostics for missing, duplicate/ambiguous and mapped additional columns.
+
 ## [3.4.0] - 2026-09-27
 
 ### Added

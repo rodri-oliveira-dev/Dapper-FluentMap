@@ -1,4 +1,5 @@
 using System;
+using System.Data;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 #if !AOT_SMOKE_GENERATED && !AOT_SMOKE_DI_GENERATED && !AOT_SMOKE_DI_EXPLICIT
@@ -202,12 +203,46 @@ static void AssertStrictGeneratedQueryMappedMaterializer(FluentMapRuntime runtim
     using var connection = new SqliteConnection("Data Source=:memory:");
     connection.Open();
 
+    if (!runtime.Configuration.GeneratedMaterializers.Any(materializer =>
+            materializer.EntityType == typeof(ReorderedCustomer)))
+    {
+        throw new InvalidOperationException("Generated startup registration did not include the strict smoke entity.");
+    }
+
     var customer = runtime.QueryGeneratedMappedSingle<Customer>(
         connection,
         "SELECT 42 AS customer_id;");
     if (customer.Id != 42)
     {
         throw new InvalidOperationException("Generated flat QueryMapped materializer was not used correctly.");
+    }
+
+    var parameters = new GeneratedParameters()
+        .Add("Id", 43, DbType.Int32)
+        .Add("Name", "Parameterized", DbType.String, size: 64);
+    var parameterized = runtime.QueryGeneratedMappedSingle<ReorderedCustomer>(
+        connection,
+        "SELECT @Id AS customer_id, @Name AS customer_name;",
+        parameters);
+    if (parameterized.Id != 43 || parameterized.Name != "Parameterized")
+    {
+        throw new InvalidOperationException("Parameterized strict generated query was not materialized correctly.");
+    }
+
+    var reordered = runtime.QueryGeneratedMappedSingle<ReorderedCustomer>(
+        connection,
+        "SELECT 'Reordered' AS customer_name, 44 AS customer_id;");
+    if (reordered.Id != 44 || reordered.Name != "Reordered")
+    {
+        throw new InvalidOperationException("Reordered strict generated shape was not materialized correctly.");
+    }
+
+    var additional = runtime.QueryGeneratedMappedSingle<ReorderedCustomer>(
+        connection,
+        "SELECT 'trace' AS trace_id, 45 AS customer_id, 'Additional' AS customer_name;");
+    if (additional.Id != 45 || additional.Name != "Additional")
+    {
+        throw new InvalidOperationException("Safe additional-column strict generated shape was not materialized correctly.");
     }
 
     var valueObjectCustomer = runtime.QueryGeneratedMappedSingle<ValueObjectCustomer>(
@@ -255,6 +290,22 @@ public sealed class CustomerMap : EntityMap<Customer>
     public CustomerMap()
     {
         Map(customer => customer.Id).ToColumn("customer_id");
+    }
+}
+
+public sealed class ReorderedCustomer
+{
+    public int Id { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+}
+
+public sealed class ReorderedCustomerMap : EntityMap<ReorderedCustomer>
+{
+    public ReorderedCustomerMap()
+    {
+        Map(customer => customer.Id).ToColumn("customer_id");
+        Map(customer => customer.Name).ToColumn("customer_name");
     }
 }
 
