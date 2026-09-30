@@ -69,6 +69,10 @@ Provider support is split into certification levels:
 
 Provider certification requires real integration tests against that provider and database. A Dommel SQL builder being registered is not the same as provider certification.
 
+## Experimental Compatibility Canaries
+
+The scheduled/manual `Compatibility Canary` workflow checks the supported Dapper minimum/current lanes, resolves a newer Dapper stable or prerelease when one exists, and compiles/runs SQLite evidence against the latest resolvable stable provider clients. These lanes are early-warning experiments only: they neither expand nor reduce the certified matrix above. A canary result becomes a support claim only after the pinned required matrix, documentation and package contract are intentionally updated and reviewed.
+
 ## AOT And Trimming
 
 Current status:
@@ -125,6 +129,8 @@ The fork preserves the main historical source-compatible API surface where possi
 The fork also adds public APIs for profiles, naming policies, generated materializers, persistence metadata, property converters, query helpers, immutable configuration, isolated runtime and DI.
 
 The maintained 3.x line follows Semantic Versioning. See the GitHub releases page for the current stable version. Public compatibility remains governed by SemVer and the package/API boundaries listed above.
+
+Checked-in `PublicAPI.Shipped.txt`/`PublicAPI.Unshipped.txt` files govern every shipped assembly and include nullable annotations. See [MAINTAINING.md](MAINTAINING.md) for the approval and release process.
 
 ## Unsupported Environments Or Claims
 

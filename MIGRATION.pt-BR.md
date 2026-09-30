@@ -344,6 +344,9 @@ Overloads `QueryMapped<TFirst,TSecond,TThird,TReturn>` com três entradas agora 
 
 ## Registro Gerado
 
+Os assemblies públicos agora carregam anotações de nullable reference types. As assinaturas CLR e a compatibilidade binária não mudam, mas consumidores com nullable habilitado podem receber warnings mais precisos: parâmetros/transações opcionais e metadados opcionais são nullable, e argumentos filhos de multi-mapping são nullable porque um segmento contendo apenas `NULL` é entregue como `null`. Trate os novos warnings como orientação de contrato; não desabilite a análise nullable globalmente para ocultá-los.
+
+
 Instale `FluentMap.Generators` e chame:
 
 ```csharp

@@ -26,7 +26,7 @@ namespace Dapper.FluentMap
         /// <param name="size">The optional provider parameter size.</param>
         /// <returns>This parameter collection.</returns>
         /// <exception cref="ArgumentException">Thrown when <paramref name="name"/> is empty or duplicated, or <paramref name="size"/> is negative.</exception>
-        public GeneratedParameters Add(string name, object value, DbType dbType, int? size = null)
+        public GeneratedParameters Add(string name, object? value, DbType dbType, int? size = null)
         {
             if (string.IsNullOrWhiteSpace(name))
             {

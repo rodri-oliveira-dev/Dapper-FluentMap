@@ -158,6 +158,7 @@ Consulte [COMPATIBILITY.md](COMPATIBILITY.md) para:
 - [Compatibilidade](COMPATIBILITY.md)
 - [Changelog](CHANGELOG.md)
 - [Suporte](SUPPORT.md)
+- [Governança para mantenedores](MAINTAINING.md)
 - [English](README.md)
 
 ## Contribuição

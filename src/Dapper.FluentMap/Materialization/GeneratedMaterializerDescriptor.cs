@@ -75,7 +75,7 @@ namespace Dapper.FluentMap.Materialization
         /// <summary>
         /// Gets the mapping profile type, or <see langword="null"/> for the default map.
         /// </summary>
-        public Type ProfileType { get; }
+        public Type? ProfileType { get; }
 
         /// <summary>
         /// Gets the ordered column shape and member bindings expected by the materializer.

@@ -29,10 +29,10 @@ namespace Dapper.FluentMap.Dommel
         /// <param name="entity">The entity to insert.</param>
         /// <param name="transaction">Optional transaction.</param>
         /// <returns>The scalar value returned by the provider-specific Dommel insert statement.</returns>
-        public static object InsertMapped<TEntity>(
+        public static object? InsertMapped<TEntity>(
             this IDbConnection connection,
             TEntity entity,
-            IDbTransaction transaction = null)
+            IDbTransaction? transaction = null)
             where TEntity : class
         {
             var command = CreateInsertCommand(connection, entity, transaction, CancellationToken.None);
@@ -42,15 +42,15 @@ namespace Dapper.FluentMap.Dommel
         /// <summary>
         /// Asynchronously inserts an entity using Dommel mapping and persistence metadata, applying configured property write converters.
         /// </summary>
-        public static Task<object> InsertMappedAsync<TEntity>(
+        public static async Task<object?> InsertMappedAsync<TEntity>(
             this IDbConnection connection,
             TEntity entity,
-            IDbTransaction transaction = null,
+            IDbTransaction? transaction = null,
             CancellationToken cancellationToken = default)
             where TEntity : class
         {
             var command = CreateInsertCommand(connection, entity, transaction, cancellationToken);
-            return connection.ExecuteScalarAsync<object>(command);
+            return await connection.ExecuteScalarAsync<object>(command).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -60,7 +60,7 @@ namespace Dapper.FluentMap.Dommel
         public static bool UpdateMapped<TEntity>(
             this IDbConnection connection,
             TEntity entity,
-            IDbTransaction transaction = null)
+            IDbTransaction? transaction = null)
             where TEntity : class
         {
             var command = CreateUpdateCommand(connection, entity, transaction, CancellationToken.None);
@@ -74,7 +74,7 @@ namespace Dapper.FluentMap.Dommel
         public static async Task<bool> UpdateMappedAsync<TEntity>(
             this IDbConnection connection,
             TEntity entity,
-            IDbTransaction transaction = null,
+            IDbTransaction? transaction = null,
             CancellationToken cancellationToken = default)
             where TEntity : class
         {

@@ -344,6 +344,9 @@ Three-input `QueryMapped<TFirst,TSecond,TThird,TReturn>` overloads now complemen
 
 ## Generated Registration
 
+Public assemblies now carry nullable reference annotations. CLR signatures and binary compatibility are unchanged, but nullable-enabled consumers may receive more accurate compiler warnings: optional query parameters/transactions and optional metadata are nullable, and multi-mapping child arguments are nullable because an all-`NULL` segment is passed as `null`. Treat new warnings as contract guidance; do not disable nullable analysis globally to hide them.
+
+
 Install `FluentMap.Generators` and call:
 
 ```csharp

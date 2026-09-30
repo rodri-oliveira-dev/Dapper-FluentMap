@@ -140,3 +140,14 @@ dotnet_diagnostic.CA1859.severity = suggestion
 dotnet_diagnostic.CA1860.severity = suggestion
 dotnet_diagnostic.CA1861.severity = suggestion
 dotnet_diagnostic.CA1862.severity = suggestion
+
+# Checked-in API files are the approval record for shipped package surfaces.
+dotnet_public_api_analyzer.require_api_files = true
+dotnet_public_api_analyzer.enable_nullability = true
+dotnet_diagnostic.RS0016.severity = error
+dotnet_diagnostic.RS0017.severity = error
+dotnet_diagnostic.RS0024.severity = error
+dotnet_diagnostic.RS0025.severity = error
+# Existing overload families intentionally retain their historical optional
+# parameters; snapshots, rather than RS0026, govern future changes.
+dotnet_diagnostic.RS0026.severity = none

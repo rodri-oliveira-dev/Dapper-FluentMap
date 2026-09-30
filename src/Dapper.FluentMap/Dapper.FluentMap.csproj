@@ -6,6 +6,7 @@
     <VersionPrefix>$(FluentMapPackageVersionPrefix)</VersionPrefix>
     <TargetFramework>netstandard2.0</TargetFramework>
     <LangVersion>8.0</LangVersion>
+    <Nullable>annotations</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <PackageTags>dapper;fluent-mapping;mapping;micro-orm;database;sql;poco;fluentmap</PackageTags>
     <EnablePackageValidation>true</EnablePackageValidation>
@@ -14,5 +15,6 @@
   <ItemGroup>
     <PackageReference Include="Dapper" Version="$(DapperPackageVersion)" />
     <PackageReference Include="Microsoft.Bcl.AsyncInterfaces" Version="10.0.12" />
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="$(PublicApiAnalyzersVersion)" PrivateAssets="all" />
   </ItemGroup>
 </Project>

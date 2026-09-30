@@ -5,6 +5,8 @@
     <Description>Dommel integration for Dapper.FluentMap that configures Dommel table, key, generated-column, and persistence metadata through fluent mappings.</Description>
     <VersionPrefix>$(FluentMapPackageVersionPrefix)</VersionPrefix>
     <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>8.0</LangVersion>
+    <Nullable>annotations</Nullable>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <PackageTags>dapper;dommel;fluent-mapping;mapping;crud;database;sql;fluentmap</PackageTags>
     <EnablePackageValidation>true</EnablePackageValidation>
@@ -14,5 +16,6 @@
     <ProjectReference Include="..\Dapper.FluentMap\Dapper.FluentMap.csproj" />
     <PackageReference Include="Dapper" Version="$(DapperPackageVersion)" />
     <PackageReference Include="Dommel" Version="$(DommelPackageVersion)" />
+    <PackageReference Include="Microsoft.CodeAnalysis.PublicApiAnalyzers" Version="$(PublicApiAnalyzersVersion)" PrivateAssets="all" />
   </ItemGroup>
 </Project>

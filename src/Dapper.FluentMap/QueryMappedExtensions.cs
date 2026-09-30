@@ -35,8 +35,8 @@ namespace Dapper.FluentMap
             TEntity>(
             this IDbConnection connection,
             string sql,
-            object param = null,
-            IDbTransaction transaction = null,
+            object? param = null,
+            IDbTransaction? transaction = null,
             int? commandTimeout = null,
             CommandType? commandType = null)
             where TEntity : class
@@ -76,8 +76,8 @@ namespace Dapper.FluentMap
             TProfile>(
             this IDbConnection connection,
             string sql,
-            object param = null,
-            IDbTransaction transaction = null,
+            object? param = null,
+            IDbTransaction? transaction = null,
             int? commandTimeout = null,
             CommandType? commandType = null)
             where TEntity : class
@@ -152,8 +152,8 @@ namespace Dapper.FluentMap
             TEntity>(
             this IDbConnection connection,
             string sql,
-            object param = null,
-            IDbTransaction transaction = null,
+            object? param = null,
+            IDbTransaction? transaction = null,
             int? commandTimeout = null,
             CommandType? commandType = null)
             where TEntity : class
@@ -193,8 +193,8 @@ namespace Dapper.FluentMap
             TProfile>(
             this IDbConnection connection,
             string sql,
-            object param = null,
-            IDbTransaction transaction = null,
+            object? param = null,
+            IDbTransaction? transaction = null,
             int? commandTimeout = null,
             CommandType? commandType = null)
             where TEntity : class
@@ -303,8 +303,8 @@ namespace Dapper.FluentMap
             TEntity>(
             this DbConnection connection,
             string sql,
-            object param = null,
-            IDbTransaction transaction = null,
+            object? param = null,
+            IDbTransaction? transaction = null,
             int? commandTimeout = null,
             CommandType? commandType = null,
             CancellationToken cancellationToken = default)
@@ -377,8 +377,8 @@ namespace Dapper.FluentMap
             TProfile>(
             this DbConnection connection,
             string sql,
-            object param = null,
-            IDbTransaction transaction = null,
+            object? param = null,
+            IDbTransaction? transaction = null,
             int? commandTimeout = null,
             CommandType? commandType = null,
             CancellationToken cancellationToken = default)
@@ -469,8 +469,8 @@ namespace Dapper.FluentMap
             TEntity>(
             this IDbConnection connection,
             string sql,
-            object param = null,
-            IDbTransaction transaction = null,
+            object? param = null,
+            IDbTransaction? transaction = null,
             int? commandTimeout = null,
             CommandType? commandType = null)
             where TEntity : class
@@ -498,8 +498,8 @@ namespace Dapper.FluentMap
             TProfile>(
             this IDbConnection connection,
             string sql,
-            object param = null,
-            IDbTransaction transaction = null,
+            object? param = null,
+            IDbTransaction? transaction = null,
             int? commandTimeout = null,
             CommandType? commandType = null)
             where TEntity : class
@@ -528,8 +528,8 @@ namespace Dapper.FluentMap
             TProfile>(
             this IDbConnection connection,
             string sql,
-            object param = null,
-            IDbTransaction transaction = null,
+            object? param = null,
+            IDbTransaction? transaction = null,
             int? commandTimeout = null,
             CommandType? commandType = null)
             where TEntity : class
@@ -587,8 +587,8 @@ namespace Dapper.FluentMap
             TProfile>(
             this IDbConnection connection,
             string sql,
-            object param = null,
-            IDbTransaction transaction = null,
+            object? param = null,
+            IDbTransaction? transaction = null,
             int? commandTimeout = null,
             CommandType? commandType = null)
             where TEntity : class
@@ -630,9 +630,9 @@ namespace Dapper.FluentMap
             TReturn>(
             this IDbConnection connection,
             string sql,
-            Func<TFirst, TSecond, TReturn> map,
-            object param = null,
-            IDbTransaction transaction = null,
+            Func<TFirst, TSecond?, TReturn> map,
+            object? param = null,
+            IDbTransaction? transaction = null,
             int? commandTimeout = null,
             CommandType? commandType = null,
             string splitOn = "Id")
@@ -664,7 +664,7 @@ namespace Dapper.FluentMap
             TReturn>(
             this IDbConnection connection,
             CommandDefinition command,
-            Func<TFirst, TSecond, TReturn> map,
+            Func<TFirst, TSecond?, TReturn> map,
             string splitOn = "Id")
             where TFirst : class
             where TSecond : class
@@ -696,12 +696,12 @@ namespace Dapper.FluentMap
             TReturn>(
             this IDbConnection connection,
             string sql,
-            Func<TFirst, TSecond, TThird, TReturn> map,
-            object param = null,
-            IDbTransaction transaction = null,
+            Func<TFirst, TSecond?, TThird?, TReturn> map,
+            object? param = null,
+            IDbTransaction? transaction = null,
             int? commandTimeout = null,
             CommandType? commandType = null,
-            string splitOn = null)
+            string? splitOn = null)
             where TFirst : class
             where TSecond : class
             where TThird : class
@@ -730,8 +730,8 @@ namespace Dapper.FluentMap
             TReturn>(
             this IDbConnection connection,
             CommandDefinition command,
-            Func<TFirst, TSecond, TThird, TReturn> map,
-            string splitOn = null)
+            Func<TFirst, TSecond?, TThird?, TReturn> map,
+            string? splitOn = null)
             where TFirst : class
             where TSecond : class
             where TThird : class
@@ -755,12 +755,12 @@ namespace Dapper.FluentMap
             TThirdProfile>(
             this IDbConnection connection,
             string sql,
-            Func<TFirst, TSecond, TThird, TReturn> map,
-            object param = null,
-            IDbTransaction transaction = null,
+            Func<TFirst, TSecond?, TThird?, TReturn> map,
+            object? param = null,
+            IDbTransaction? transaction = null,
             int? commandTimeout = null,
             CommandType? commandType = null,
-            string splitOn = null)
+            string? splitOn = null)
             where TFirst : class
             where TSecond : class
             where TThird : class
@@ -799,7 +799,7 @@ namespace Dapper.FluentMap
             TThirdProfile>(
             this IDbConnection connection,
             CommandDefinition command,
-            Func<TFirst, TSecond, TThird, TReturn> map,
+            Func<TFirst, TSecond?, TThird?, TReturn> map,
             string splitOn)
             where TFirst : class
             where TSecond : class
@@ -831,12 +831,12 @@ namespace Dapper.FluentMap
             TReturn>(
             this IDbConnection connection,
             string sql,
-            Func<TFirst, TSecond, TThird, TReturn> map,
-            object param = null,
-            IDbTransaction transaction = null,
+            Func<TFirst, TSecond?, TThird?, TReturn> map,
+            object? param = null,
+            IDbTransaction? transaction = null,
             int? commandTimeout = null,
             CommandType? commandType = null,
-            string splitOn = null,
+            string? splitOn = null,
             CancellationToken cancellationToken = default)
             where TFirst : class
             where TSecond : class
@@ -874,7 +874,7 @@ namespace Dapper.FluentMap
             TReturn>(
             this IDbConnection connection,
             CommandDefinition command,
-            Func<TFirst, TSecond, TThird, TReturn> map,
+            Func<TFirst, TSecond?, TThird?, TReturn> map,
             string splitOn)
             where TFirst : class
             where TSecond : class
@@ -910,12 +910,12 @@ namespace Dapper.FluentMap
             TThirdProfile>(
             this IDbConnection connection,
             string sql,
-            Func<TFirst, TSecond, TThird, TReturn> map,
-            object param = null,
-            IDbTransaction transaction = null,
+            Func<TFirst, TSecond?, TThird?, TReturn> map,
+            object? param = null,
+            IDbTransaction? transaction = null,
             int? commandTimeout = null,
             CommandType? commandType = null,
-            string splitOn = null,
+            string? splitOn = null,
             CancellationToken cancellationToken = default)
             where TFirst : class
             where TSecond : class
@@ -959,7 +959,7 @@ namespace Dapper.FluentMap
             TThirdProfile>(
             this IDbConnection connection,
             CommandDefinition command,
-            Func<TFirst, TSecond, TThird, TReturn> map,
+            Func<TFirst, TSecond?, TThird?, TReturn> map,
             string splitOn)
             where TFirst : class
             where TSecond : class
@@ -1012,9 +1012,9 @@ namespace Dapper.FluentMap
             TSecondProfile>(
             this IDbConnection connection,
             string sql,
-            Func<TFirst, TSecond, TReturn> map,
-            object param = null,
-            IDbTransaction transaction = null,
+            Func<TFirst, TSecond?, TReturn> map,
+            object? param = null,
+            IDbTransaction? transaction = null,
             int? commandTimeout = null,
             CommandType? commandType = null,
             string splitOn = "Id")
@@ -1050,7 +1050,7 @@ namespace Dapper.FluentMap
             TSecondProfile>(
             this IDbConnection connection,
             CommandDefinition command,
-            Func<TFirst, TSecond, TReturn> map,
+            Func<TFirst, TSecond?, TReturn> map,
             string splitOn = "Id")
             where TFirst : class
             where TSecond : class
@@ -1082,8 +1082,8 @@ namespace Dapper.FluentMap
         public static MappedGridReader QueryMultipleMapped(
             this IDbConnection connection,
             string sql,
-            object param = null,
-            IDbTransaction transaction = null,
+            object? param = null,
+            IDbTransaction? transaction = null,
             int? commandTimeout = null,
             CommandType? commandType = null)
         {
@@ -1125,8 +1125,8 @@ namespace Dapper.FluentMap
         public static Task<MappedGridReader> QueryMultipleMappedAsync(
             this DbConnection connection,
             string sql,
-            object param = null,
-            IDbTransaction transaction = null,
+            object? param = null,
+            IDbTransaction? transaction = null,
             int? commandTimeout = null,
             CommandType? commandType = null,
             CancellationToken cancellationToken = default)
@@ -1254,7 +1254,7 @@ namespace Dapper.FluentMap
             TReturn>(
             IDbConnection connection,
             CommandDefinition command,
-            Func<TFirst, TSecond, TReturn> map,
+            Func<TFirst, TSecond?, TReturn> map,
             string splitOn,
             Type firstProfileType,
             Type secondProfileType,
@@ -1284,7 +1284,7 @@ namespace Dapper.FluentMap
             TReturn>(
             IDbConnection connection,
             CommandDefinition command,
-            Func<TFirst, TSecond, TThird, TReturn> map,
+            Func<TFirst, TSecond?, TThird?, TReturn> map,
             string splitOn,
             Type firstProfileType,
             Type secondProfileType,

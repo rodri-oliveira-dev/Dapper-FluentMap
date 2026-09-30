@@ -209,7 +209,7 @@ namespace Dapper.FluentMap.Configuration
         /// <summary>
         /// Gets the selected mapping profile type.
         /// </summary>
-        public Type ProfileType { get; }
+        public Type? ProfileType { get; }
 
         /// <summary>
         /// Gets the concrete map type that produced this profile configuration.

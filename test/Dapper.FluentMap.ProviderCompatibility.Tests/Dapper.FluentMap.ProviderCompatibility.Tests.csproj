@@ -2,14 +2,18 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <IsPackable>false</IsPackable>
+    <SqlClientPackageVersion Condition="'$(SqlClientPackageVersion)' == ''">7.1.0</SqlClientPackageVersion>
+    <SqliteClientPackageVersion Condition="'$(SqliteClientPackageVersion)' == ''">10.0.12</SqliteClientPackageVersion>
+    <MySqlConnectorPackageVersion Condition="'$(MySqlConnectorPackageVersion)' == ''">2.6.2</MySqlConnectorPackageVersion>
+    <NpgsqlPackageVersion Condition="'$(NpgsqlPackageVersion)' == ''">10.0.3</NpgsqlPackageVersion>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Dapper.FluentMap\Dapper.FluentMap.csproj" />
     <ProjectReference Include="..\..\src\Dapper.FluentMap.Dommel\Dapper.FluentMap.Dommel.csproj" />
-    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.1.0" />
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.12" />
-    <PackageReference Include="MySqlConnector" Version="2.6.2" />
-    <PackageReference Include="Npgsql" Version="10.0.3" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="$(SqlClientPackageVersion)" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="$(SqliteClientPackageVersion)" />
+    <PackageReference Include="MySqlConnector" Version="$(MySqlConnectorPackageVersion)" />
+    <PackageReference Include="Npgsql" Version="$(NpgsqlPackageVersion)" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.5" PrivateAssets="all" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
     <PackageReference Include="xunit.v3" Version="4.0.1" />

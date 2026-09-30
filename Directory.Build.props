@@ -7,6 +7,7 @@
     <DapperLatestStableVersion>2.1.89</DapperLatestStableVersion>
     <DapperPackageVersion Condition="'$(DapperPackageVersion)' == ''">[$(DapperMinimumSupportedVersion),3.0.0)</DapperPackageVersion>
     <DommelPackageVersion Condition="'$(DommelPackageVersion)' == ''">[3.5.3,4.0.0)</DommelPackageVersion>
+    <PublicApiAnalyzersVersion>5.6.0</PublicApiAnalyzersVersion>
   </PropertyGroup>
 
   <PropertyGroup>

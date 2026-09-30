@@ -162,12 +162,12 @@ namespace Dapper.FluentMap.Mapping
         /// <summary>
         /// Gets the read converter descriptor, or <see langword="null"/> when no read converter is configured.
         /// </summary>
-        public PropertyConverterMetadata ReadConverter { get; }
+        public PropertyConverterMetadata? ReadConverter { get; }
 
         /// <summary>
         /// Gets the write converter descriptor, or <see langword="null"/> when no write converter is configured.
         /// </summary>
-        public PropertyConverterMetadata WriteConverter { get; }
+        public PropertyConverterMetadata? WriteConverter { get; }
 
         internal PropertyConversionMetadata WithReadConverter(PropertyConverterMetadata converter)
         {

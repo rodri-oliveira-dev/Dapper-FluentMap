@@ -358,7 +358,7 @@ public class MaterializationSteadyStateBenchmarks
     {
         return _connection.QueryMapped<BenchmarkJoinCustomer, BenchmarkJoinOrder, int>(
                 "SELECT Id AS customer_id, Name AS customer_name, Id AS order_id, Balance AS order_total FROM BenchmarkRows;",
-                (customer, order) => customer.Id + order.Id,
+                (customer, order) => customer.Id + (order?.Id ?? 0),
                 splitOn: "order_id")
             .Count();
     }
@@ -368,7 +368,7 @@ public class MaterializationSteadyStateBenchmarks
     {
         return _connection.QueryMapped<BenchmarkJoinCustomer, BenchmarkJoinOrder, BenchmarkJoinShipment, int>(
                 "SELECT Id AS customer_id, Name AS customer_name, Id AS order_id, Balance AS order_total, Id AS shipment_id, City AS shipment_status FROM BenchmarkRows;",
-                (customer, order, shipment) => customer.Id + order.Id + shipment.Id,
+                (customer, order, shipment) => customer.Id + (order?.Id ?? 0) + (shipment?.Id ?? 0),
                 splitOn: "order_id,shipment_id")
             .Count();
     }
