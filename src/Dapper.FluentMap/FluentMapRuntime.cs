@@ -256,18 +256,14 @@ namespace Dapper.FluentMap
                 throw new ArgumentNullException(nameof(sql));
             }
 
-            if (map == null)
-            {
-                throw new ArgumentNullException(nameof(map));
-            }
-
-            return QueryMappedExtensions.ExecuteMappedSegmentsAsync(
+            return QueryMappedExtensions.ExecuteMappedAsync<TFirst, TSecond, TThird, TReturn>(
                 connection,
                 new CommandDefinition(sql, param, transaction, commandTimeout, commandType, CommandFlags.Buffered, cancellationToken),
-                new[] { typeof(TFirst), typeof(TSecond), typeof(TThird) },
-                new Type[] { null, null, null },
-                values => map((TFirst)values[0], (TSecond)values[1], (TThird)values[2]),
+                map,
                 splitOn,
+                null,
+                null,
+                null,
                 this);
         }
 
@@ -305,18 +301,14 @@ namespace Dapper.FluentMap
                 throw new ArgumentNullException(nameof(sql));
             }
 
-            if (map == null)
-            {
-                throw new ArgumentNullException(nameof(map));
-            }
-
-            return QueryMappedExtensions.ExecuteMappedSegmentsAsync(
+            return QueryMappedExtensions.ExecuteMappedAsync<TFirst, TSecond, TThird, TReturn>(
                 connection,
                 new CommandDefinition(sql, param, transaction, commandTimeout, commandType, CommandFlags.Buffered, cancellationToken),
-                new[] { typeof(TFirst), typeof(TSecond), typeof(TThird) },
-                new[] { typeof(TFirstProfile), typeof(TSecondProfile), typeof(TThirdProfile) },
-                values => map((TFirst)values[0], (TSecond)values[1], (TThird)values[2]),
+                map,
                 splitOn,
+                typeof(TFirstProfile),
+                typeof(TSecondProfile),
+                typeof(TThirdProfile),
                 this);
         }
 

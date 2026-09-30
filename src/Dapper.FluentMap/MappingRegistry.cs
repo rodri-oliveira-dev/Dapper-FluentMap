@@ -381,11 +381,10 @@ namespace Dapper.FluentMap
                 return true;
             }
 
-            if (TryCreateCompatibleGeneratedMaterializer(
+            if (TryCreateRuntimeCompatibleGeneratedMaterializer(
                 type,
                 profileType,
                 columnNames,
-                requireExplicitMapping: false,
                 out entry))
             {
                 _generatedMaterializerResolutionCache.TryAdd(cacheKey, entry);
@@ -419,11 +418,10 @@ namespace Dapper.FluentMap
                 return true;
             }
 
-            if (TryCreateCompatibleGeneratedMaterializer(
+            if (TryCreateStrictCompatibleGeneratedMaterializer(
                 type,
                 profileType,
                 columnNames,
-                requireExplicitMapping: true,
                 out entry))
             {
                 materializer = entry.Materialize;
@@ -451,11 +449,43 @@ namespace Dapper.FluentMap
             return true;
         }
 
+        private bool TryCreateRuntimeCompatibleGeneratedMaterializer(
+            Type type,
+            Type profileType,
+            string[] columnNames,
+            out GeneratedMaterializerEntry reorderedEntry)
+        {
+            var defaultTypeMap = new DefaultTypeMap(type);
+            return TryCreateCompatibleGeneratedMaterializer(
+                type,
+                profileType,
+                columnNames,
+                columns => GeneratedMaterializerMatchesEffectiveMapping(type, profileType, columns),
+                columnName => defaultTypeMap.GetMember(columnName) != null,
+                out reorderedEntry);
+        }
+
+        private bool TryCreateStrictCompatibleGeneratedMaterializer(
+            Type type,
+            Type profileType,
+            string[] columnNames,
+            out GeneratedMaterializerEntry reorderedEntry)
+        {
+            return TryCreateCompatibleGeneratedMaterializer(
+                type,
+                profileType,
+                columnNames,
+                columns => GeneratedMaterializerMatchesExplicitMapping(type, profileType, columns),
+                defaultMemberResolver: null,
+                out reorderedEntry);
+        }
+
         private bool TryCreateCompatibleGeneratedMaterializer(
             Type type,
             Type profileType,
             string[] columnNames,
-            bool requireExplicitMapping,
+            Func<IReadOnlyList<GeneratedMaterializerColumn>, bool> mappingMatches,
+            Func<string, bool> defaultMemberResolver,
             out GeneratedMaterializerEntry reorderedEntry)
         {
             reorderedEntry = null;
@@ -479,10 +509,8 @@ namespace Dapper.FluentMap
                         profileType,
                         generatedColumnNames,
                         columnNames,
-                        includeDapperDefaultMappings: !requireExplicitMapping) ||
-                    !(requireExplicitMapping
-                        ? GeneratedMaterializerMatchesExplicitMapping(type, profileType, candidate.Value.Columns)
-                        : GeneratedMaterializerMatchesEffectiveMapping(type, profileType, candidate.Value.Columns)))
+                        defaultMemberResolver) ||
+                    !mappingMatches(candidate.Value.Columns))
                 {
                     continue;
                 }
@@ -560,7 +588,7 @@ namespace Dapper.FluentMap
                     profileType,
                     candidate.Key.ColumnNames,
                     columnNames,
-                    includeDapperDefaultMappings: false);
+                    defaultMemberResolver: null);
                 if (unsafeAdditionalColumns.Count > 0)
                 {
                     return $"Entity '{type.FullName}' ({profileContext}) requested result columns {requestedShape} contain additional columns that resolve to mapped members and cannot be ignored safely: {FormatColumnShape(unsafeAdditionalColumns)}.";
@@ -894,14 +922,14 @@ namespace Dapper.FluentMap
             Type profileType,
             IReadOnlyList<string> generatedColumnNames,
             IEnumerable<string> requestedColumnNames,
-            bool includeDapperDefaultMappings)
+            Func<string, bool> defaultMemberResolver)
         {
             return GetUnsafeAdditionalColumns(
                 type,
                 profileType,
                 generatedColumnNames,
                 requestedColumnNames,
-                includeDapperDefaultMappings).Count == 0;
+                defaultMemberResolver).Count == 0;
         }
 
         private List<string> GetUnsafeAdditionalColumns(
@@ -909,11 +937,10 @@ namespace Dapper.FluentMap
             Type profileType,
             IReadOnlyList<string> generatedColumnNames,
             IEnumerable<string> requestedColumnNames,
-            bool includeDapperDefaultMappings)
+            Func<string, bool> defaultMemberResolver)
         {
             var generated = new HashSet<string>(generatedColumnNames, StringComparer.Ordinal);
             var explicitPropertyMaps = GetExplicitPropertyMaps(type, profileType);
-            var defaultTypeMap = includeDapperDefaultMappings ? new DefaultTypeMap(type) : null;
             var unsafeColumns = new List<string>();
 
             foreach (var columnName in requestedColumnNames.Where(columnName => !generated.Contains(columnName)))
@@ -924,7 +951,7 @@ namespace Dapper.FluentMap
                     string.Equals(map.PropertyInfo.Name, columnName, StringComparison.OrdinalIgnoreCase));
                 if ((fluentMap != null && !fluentMap.Ignored) ||
                     matchesMappedMemberName ||
-                    (fluentMap == null && defaultTypeMap != null && defaultTypeMap.GetMember(columnName) != null))
+                    (fluentMap == null && defaultMemberResolver != null && defaultMemberResolver(columnName)))
                 {
                     unsafeColumns.Add(columnName);
                 }

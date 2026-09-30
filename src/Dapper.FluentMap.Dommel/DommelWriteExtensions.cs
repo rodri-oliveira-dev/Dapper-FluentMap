@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Data;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -110,6 +111,10 @@ namespace Dapper.FluentMap.Dommel
             return new CommandDefinition(sql, parameters, transaction, cancellationToken: cancellationToken);
         }
 
+        [SuppressMessage(
+            "Security",
+            "S2077:Formatting SQL queries is security-sensitive",
+            Justification = "Only provider-quoted table and column identifiers are composed here; every entity value remains a Dapper parameter.")]
         private static CommandDefinition CreateUpdateCommand<TEntity>(
             IDbConnection connection,
             TEntity entity,
@@ -161,6 +166,7 @@ namespace Dapper.FluentMap.Dommel
                 var conversion = propertyMap == null
                     ? PropertyConversionMetadata.Default
                     : PropertyMapConversion.GetConversion(propertyMap);
+                var columnName = propertyMap == null ? property.Name : propertyMap.ColumnName;
 
                 if (conversion.HasWriteConverter && value != null)
                 {
@@ -171,7 +177,7 @@ namespace Dapper.FluentMap.Dommel
                     catch (Exception exception)
                     {
                         throw new FluentMapConfigurationException(
-                            $"Write converter failed during Dommel {operation} for entity '{entityType.FullName}', property '{property.Name}', column '{propertyMap.ColumnName}', converter '{conversion.WriteConverter.ConverterType.FullName}'. The original property value was not written.",
+                            $"Write converter failed during Dommel {operation} for entity '{entityType.FullName}', property '{property.Name}', column '{columnName}', converter '{conversion.WriteConverter.ConverterType.FullName}'. The original property value was not written.",
                             exception);
                     }
                 }

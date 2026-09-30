@@ -847,18 +847,14 @@ namespace Dapper.FluentMap
                 throw new ArgumentNullException(nameof(sql));
             }
 
-            if (map == null)
-            {
-                throw new ArgumentNullException(nameof(map));
-            }
-
-            return ExecuteMappedSegmentsAsync(
+            return ExecuteMappedAsync<TFirst, TSecond, TThird, TReturn>(
                 connection,
                 new CommandDefinition(sql, param, transaction, commandTimeout, commandType, CommandFlags.Buffered, cancellationToken),
-                new[] { typeof(TFirst), typeof(TSecond), typeof(TThird) },
-                new Type[] { null, null, null },
-                values => map((TFirst)values[0], (TSecond)values[1], (TThird)values[2]),
+                map,
                 splitOn,
+                null,
+                null,
+                null,
                 FluentMapper.Runtime);
         }
 
@@ -880,18 +876,14 @@ namespace Dapper.FluentMap
             where TSecond : class
             where TThird : class
         {
-            if (map == null)
-            {
-                throw new ArgumentNullException(nameof(map));
-            }
-
-            return ExecuteMappedSegmentsAsync(
+            return ExecuteMappedAsync<TFirst, TSecond, TThird, TReturn>(
                 connection,
                 command,
-                new[] { typeof(TFirst), typeof(TSecond), typeof(TThird) },
-                new Type[] { null, null, null },
-                values => map((TFirst)values[0], (TSecond)values[1], (TThird)values[2]),
+                map,
                 splitOn,
+                null,
+                null,
+                null,
                 FluentMapper.Runtime);
         }
 
@@ -929,18 +921,14 @@ namespace Dapper.FluentMap
                 throw new ArgumentNullException(nameof(sql));
             }
 
-            if (map == null)
-            {
-                throw new ArgumentNullException(nameof(map));
-            }
-
-            return ExecuteMappedSegmentsAsync(
+            return ExecuteMappedAsync<TFirst, TSecond, TThird, TReturn>(
                 connection,
                 new CommandDefinition(sql, param, transaction, commandTimeout, commandType, CommandFlags.Buffered, cancellationToken),
-                new[] { typeof(TFirst), typeof(TSecond), typeof(TThird) },
-                new[] { typeof(TFirstProfile), typeof(TSecondProfile), typeof(TThirdProfile) },
-                values => map((TFirst)values[0], (TSecond)values[1], (TThird)values[2]),
+                map,
                 splitOn,
+                typeof(TFirstProfile),
+                typeof(TSecondProfile),
+                typeof(TThirdProfile),
                 FluentMapper.Runtime);
         }
 
@@ -968,18 +956,14 @@ namespace Dapper.FluentMap
             where TSecondProfile : IMappingProfile
             where TThirdProfile : IMappingProfile
         {
-            if (map == null)
-            {
-                throw new ArgumentNullException(nameof(map));
-            }
-
-            return ExecuteMappedSegmentsAsync(
+            return ExecuteMappedAsync<TFirst, TSecond, TThird, TReturn>(
                 connection,
                 command,
-                new[] { typeof(TFirst), typeof(TSecond), typeof(TThird) },
-                new[] { typeof(TFirstProfile), typeof(TSecondProfile), typeof(TThirdProfile) },
-                values => map((TFirst)values[0], (TSecond)values[1], (TThird)values[2]),
+                map,
                 splitOn,
+                typeof(TFirstProfile),
+                typeof(TSecondProfile),
+                typeof(TThirdProfile),
                 FluentMapper.Runtime);
         }
 
@@ -1300,6 +1284,38 @@ namespace Dapper.FluentMap
             }
 
             return ExecuteMappedSegments(
+                connection,
+                command,
+                new[] { typeof(TFirst), typeof(TSecond), typeof(TThird) },
+                new[] { firstProfileType, secondProfileType, thirdProfileType },
+                values => map((TFirst)values[0], (TSecond)values[1], (TThird)values[2]),
+                splitOn,
+                runtime);
+        }
+
+        internal static Task<IEnumerable<TReturn>> ExecuteMappedAsync<
+            [DynamicallyAccessedMembers(QueryMappedApiAnnotations.MaterializedEntityMemberTypes)] TFirst,
+            [DynamicallyAccessedMembers(QueryMappedApiAnnotations.MaterializedEntityMemberTypes)] TSecond,
+            [DynamicallyAccessedMembers(QueryMappedApiAnnotations.MaterializedEntityMemberTypes)] TThird,
+            TReturn>(
+            IDbConnection connection,
+            CommandDefinition command,
+            Func<TFirst, TSecond?, TThird?, TReturn> map,
+            string splitOn,
+            Type firstProfileType,
+            Type secondProfileType,
+            Type thirdProfileType,
+            FluentMapRuntime runtime)
+            where TFirst : class
+            where TSecond : class
+            where TThird : class
+        {
+            if (map == null)
+            {
+                throw new ArgumentNullException(nameof(map));
+            }
+
+            return ExecuteMappedSegmentsAsync(
                 connection,
                 command,
                 new[] { typeof(TFirst), typeof(TSecond), typeof(TThird) },
