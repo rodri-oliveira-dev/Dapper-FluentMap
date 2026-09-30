@@ -18,6 +18,8 @@ The `FluentMap.*` PackageIds are NuGet distribution identities. Assemblies and n
 
 ## Dapper
 
+The machine-readable source of truth is `eng/compatibility-contract.json`. CI verifies this document, package properties, compatibility lanes, migration guidance and produced NuGet dependency metadata against that contract.
+
 Current package range:
 
 ```text

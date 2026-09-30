@@ -66,6 +66,10 @@ namespace Dapper.FluentMap.GeneratedRegistration.Tests
                     Assert.Equal(8, internalCustomer.Id);
                     Assert.Equal(9, derived.Id);
                     Assert.Equal("Lovelace", derived.Name);
+                    var inheritedId = FluentMapper.Explain<GeneratedDerivedCustomer>()
+                        .Members.Single(member => member.MemberPath == nameof(GeneratedBaseCustomer.Id));
+                    Assert.Equal(typeof(GeneratedBaseCustomer), inheritedId.PropertyInfo.DeclaringType);
+                    Assert.Equal(typeof(GeneratedBaseCustomer), inheritedId.PropertyInfo.ReflectedType);
                     Assert.Equal(10, immutable.Id);
                     Assert.Equal("Grace", immutable.Name);
                     Assert.Equal(12, queryMappedImmutable.Id);

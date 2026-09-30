@@ -53,6 +53,10 @@ jobs:
         shell: pwsh
         run: ./eng/test-release-governance.ps1
 
+      - name: Validate compatibility contract consistency
+        shell: pwsh
+        run: ./eng/test-compatibility-consistency.ps1
+
       - name: Validate Dependabot configuration
         run: check-jsonschema --builtin-schema vendor.dependabot .github/dependabot.yml
 
@@ -375,6 +379,12 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           ./eng/validate-package-metadata.ps1 -PackageDirectory './artifacts/packages'
+
+      - name: Validate packaged compatibility contract
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./eng/validate-compatibility-consistency.ps1 -PackageDirectory './artifacts/packages'
 
       - name: Validate package artifact set
         shell: pwsh

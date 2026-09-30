@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "1.0",
+  "dapper": {
+    "minimumSupportedVersion": "2.1.79",
+    "latestStableVersion": "2.1.89",
+    "packageRange": "[2.1.79,3.0.0)"
+  }
+}
