@@ -847,6 +847,1861 @@ function Invoke-ReleaseSbomScenario {
   }
 }
 
+function Invoke-RollbackScenario {
+  $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) "fluentmap-rollback-test-$([System.Guid]::NewGuid())"
+  $oldRequestLog = $env:MOCK_ROLLBACK_REQUEST_LOG
+
+  try {
+    New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
+    $requestLog = Join-Path $tempRoot 'requests.log'
+    New-Item -ItemType File -Force -Path $requestLog | Out-Null
+    $env:MOCK_ROLLBACK_REQUEST_LOG = $requestLog
+
+    function global:Invoke-WebRequest {
+      param(
+        [string]$Uri,
+        [string]$Method,
+        [hashtable]$Headers,
+        [switch]$SkipHttpErrorCheck
+      )
+
+      Add-Content -LiteralPath $env:MOCK_ROLLBACK_REQUEST_LOG -Value "$Method $Uri"
+
+      if ($Method -eq 'GET' -and $Uri -match '/releases/tags/') {
+        return [pscustomobject]@{
+          StatusCode = 200
+          Content = '{"id":4242}'
+        }
+      }
+
+      if ($Method -eq 'DELETE' -and $Uri -match '/releases/4242
+$recoveryWorkflow = Get-Content -Raw -LiteralPath (Join-Path $repoRoot '.github/workflows/release-recovery-missing-nuget.yml')
+
+Invoke-Test 'release SBOM is generated from governed package artifacts' {
+  $result = Invoke-ReleaseSbomScenario
+  Assert-True ($result.SpdxVersion -eq 'SPDX-2.3') 'release SBOM must use SPDX 2.3.'
+  Assert-True ($result.PackageName -eq 'A') 'release SBOM must describe the package identity.'
+  Assert-True ($result.PackageVersion -eq '3.1.2') 'release SBOM must describe the package version.'
+  Assert-True ($result.PackageHash -eq $result.SbomHash) 'release SBOM package checksum must match the final .nupkg.'
+  Assert-True ($result.RootSpdxId -in $result.DocumentDescribes) 'release SBOM must list the release package in documentDescribes.'
+}
+
+Invoke-Test 'recovery preserves an existing valid release SBOM' {
+  $result = Invoke-ReleaseSbomScenario -PreserveExisting
+  Assert-True ($result.PackageHash -eq $result.SbomHash) 'preserved release SBOM must remain bound to the final .nupkg.'
+}
+
+Invoke-Test 'release and recovery workflows carry and attest the release SBOM' {
+  foreach ($expected in @(
+      'Generate release SBOM',
+      'release.sbom.spdx.json',
+      'Attest release SBOM',
+      'sbom-path: ./artifacts/release-metadata/release.sbom.spdx.json'
+    )) {
+    Assert-Contains $releaseWorkflow $expected "normal release workflow must contain '$expected'."
+  }
+
+  foreach ($expected in @(
+      'Generate or preserve release SBOM',
+      '-PreserveExisting',
+      'release.sbom.spdx.json',
+      'Attest recovered release SBOM',
+      'sbom-path: ./artifacts/release-metadata/release.sbom.spdx.json'
+    )) {
+    Assert-Contains $recoveryWorkflow $expected "recovery workflow must contain '$expected'."
+  }
+}
+
+Invoke-Test 'release and recovery share a non-cancelling release lock' {
+  Assert-Contains $releaseWorkflow 'group: release' 'normal release must use the shared release lock.'
+  Assert-Contains $recoveryWorkflow 'group: release' 'recovery must use the shared release lock.'
+  Assert-Contains $releaseWorkflow 'cancel-in-progress: false' 'normal release must not cancel in-progress release mutations.'
+  Assert-Contains $recoveryWorkflow 'cancel-in-progress: false' 'recovery must not cancel in-progress release mutations.'
+}
+
+Invoke-Test 'rollback removes partial GitHub Release but retains release tag' {
+  $result = Invoke-RollbackScenario
+  Assert-True $result.Succeeded "rollback scenario failed: $($result.Output)"
+  Assert-True (@($result.Requests | Where-Object { $_ -match '^GET .*/releases/tags/v9\.9\.9-test\.1
+  foreach ($expected in @(
+      'source_type',
+      'source_ref',
+      'Resolve release source',
+      'steps.source.outputs.resolved_version',
+      'steps.source.outputs.resolved_commit',
+      'original_release_run_id',
+      'gh run download',
+      'Recover and verify NuGet.org packages',
+      'Recover and verify GitHub Packages',
+      'Restore or verify release tag',
+      'Create or update GitHub Release',
+      'gh release delete-asset',
+      'gh release edit',
+      '--draft=false',
+      '--prerelease=false',
+      'recovery-attestation.json',
+      'validatedCommit',
+      'GitHub Release metadata and assets: exact governed state',
+      'Attest recovered release artifacts',
+      'Attest recovered release SBOM',
+      'release.sbom.spdx.json',
+      'Release recovery completed and governed release state reconciled.'
+    )) {
+    Assert-Contains $recoveryWorkflow $expected "recovery workflow must contain '$expected'."
+  }
+
+  Assert-Contains $recoveryWorkflow 'Refusing to move the tag' 'recovery must fail closed when the release tag points to the wrong commit.'
+  Assert-Contains $recoveryWorkflow 'asset set does not match governed artifacts' 'recovery must fail closed when GitHub Release assets differ from governed artifacts.'
+  Assert-Contains $recoveryWorkflow 'metadata does not match governed state' 'recovery must fail closed when GitHub Release metadata differs from governed state.'
+  Assert-Contains $recoveryWorkflow 'source=rebuild' 'recovery must expose deterministic rebuild fallback when original artifacts are unavailable.'
+  Assert-Contains $recoveryWorkflow 'headSha' 'recovery must validate that original artifacts came from the requested commit.'
+  Assert-True ($recoveryWorkflow.IndexOf('validated_commit:', [System.StringComparison]::Ordinal) -lt 0) 'validated_commit must not remain an operator-facing workflow input.'
+}
+
+Invoke-Test 'branch source resolves valid main version' {
+  $result = Invoke-ResolveSourceScenario -SourceType branch -SourceRef main -Version '3.1.2'
+  Assert-True $result.Succeeded "source resolution failed: $($result.Output)"
+  Assert-True ($result.Outputs['source_type'] -eq 'branch') 'source_type output should be branch.'
+  Assert-True ($result.Outputs['resolved_version'] -eq '3.1.2') 'branch mode should use the explicit version.'
+  Assert-True ($result.Outputs['resolved_commit'] -eq $result.MainCommit) 'branch mode should resolve origin/main HEAD.'
+  Assert-True ($result.Outputs['resolved_ref'] -eq 'refs/heads/main') 'branch mode should normalize the branch ref.'
+  Assert-True ($result.Outputs['resolved_branch'] -eq 'main') 'branch mode should expose the resolved branch.'
+}
+
+Invoke-Test 'branch source requires version' {
+  $result = Invoke-ResolveSourceScenario -SourceType branch -SourceRef main -Version ''
+  Assert-True (-not $result.Succeeded) 'branch mode without version should fail.'
+  Assert-Contains $result.Output 'Release source resolution failed' 'missing branch version diagnostic should come from source resolution.'
+}
+
+Invoke-Test 'branch source rejects invalid semantic version' {
+  $result = Invoke-ResolveSourceScenario -SourceType branch -SourceRef main -Version '3.1'
+  Assert-True (-not $result.Succeeded) 'invalid branch SemVer should fail.'
+  Assert-Contains $result.Output 'Invalid semantic version' 'invalid SemVer diagnostic should be clear.'
+}
+
+Invoke-Test 'branch source rejects disallowed branch' {
+  $result = Invoke-ResolveSourceScenario -SourceType branch -SourceRef develop -Version '3.1.2' -AddDevelopBranch
+  Assert-True (-not $result.Succeeded) 'non-main branch source should fail.'
+  Assert-Contains $result.Output 'Release source resolution failed' 'disallowed branch diagnostic should come from source resolution.'
+}
+
+Invoke-Test 'branch source rejects missing branch' {
+  $result = Invoke-ResolveSourceScenario -SourceType branch -SourceRef main -Version '3.1.2' -SkipPushMain
+  Assert-True (-not $result.Succeeded) 'recovery started outside main should fail closed.'
+  Assert-Contains $result.Output "Branch 'main' does not exist" 'missing branch diagnostic should be clear.'
+}
+
+Invoke-Test 'tag source derives version from release tag' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.1.2' -Tags @{ 'v3.1.2' = 'lightweight' }
+  Assert-True $result.Succeeded "tag source resolution failed: $($result.Output)"
+  Assert-True ($result.Outputs['source_type'] -eq 'tag') 'source_type output should be tag.'
+  Assert-True ($result.Outputs['resolved_version'] -eq '3.1.2') 'tag mode should derive the package version by removing only the leading v.'
+  Assert-True ($result.Outputs['resolved_commit'] -eq $result.MainCommit) 'tag mode should peel the tag to the target commit.'
+  Assert-True ($result.Outputs['resolved_ref'] -eq 'refs/tags/v3.1.2') 'tag mode should normalize the tag ref.'
+  Assert-True ($result.Outputs['resolved_tag'] -eq 'v3.1.2') 'tag mode should expose the resolved tag.'
+}
+
+Invoke-Test 'tag source supports prerelease tags' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.2.0-rc.1' -Tags @{ 'v3.2.0-rc.1' = 'lightweight' }
+  Assert-True $result.Succeeded "prerelease tag source resolution failed: $($result.Output)"
+  Assert-True ($result.Outputs['resolved_version'] -eq '3.2.0-rc.1') 'prerelease tag should derive the prerelease package version.'
+}
+
+Invoke-Test 'tag source peels annotated tag to commit' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.2.0-rc.1' -Tags @{ 'v3.2.0-rc.1' = 'annotated' }
+  Assert-True $result.Succeeded "annotated tag source resolution failed: $($result.Output)"
+  Assert-True ($result.Outputs['resolved_commit'] -eq $result.MainCommit) 'annotated tag should peel to the underlying commit, not the tag object.'
+}
+
+Invoke-Test 'tag source peels lightweight tag to commit' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.1.2' -Tags @{ 'v3.1.2' = 'lightweight' }
+  Assert-True $result.Succeeded "lightweight tag source resolution failed: $($result.Output)"
+  Assert-True ($result.Outputs['resolved_commit'] -eq $result.MainCommit) 'lightweight tag should resolve to its target commit.'
+}
+
+Invoke-Test 'tag source rejects missing tag' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.1.2'
+  Assert-True (-not $result.Succeeded) 'missing tag should fail.'
+  Assert-Contains $result.Output "does not exist on remote" 'missing tag diagnostic should be clear.'
+}
+
+Invoke-Test 'tag source rejects malformed tag' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.1' -Tags @{ 'v3.1' = 'lightweight' }
+  Assert-True (-not $result.Succeeded) 'malformed tag should fail.'
+  Assert-Contains $result.Output 'Invalid semantic version' 'malformed tag diagnostic should validate the derived version.'
+}
+
+Invoke-Test 'tag source requires v prefix' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef '3.1.2' -Tags @{ '3.1.2' = 'lightweight' }
+  Assert-True (-not $result.Succeeded) 'tag without v prefix should fail.'
+  Assert-Contains $result.Output 'v<SemVer>' 'missing v prefix diagnostic should be clear.'
+}
+
+Invoke-Test 'tag source rejects invalid release version' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v2.9.9' -Tags @{ 'v2.9.9' = 'lightweight' }
+  Assert-True (-not $result.Succeeded) 'tag below the release major floor should fail.'
+  Assert-Contains $result.Output 'major version 3 or later' 'major-version diagnostic should be preserved.'
+}
+
+Invoke-Test 'tag source keeps v3.0.0 immutable' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.0.0' -Tags @{ 'v3.0.0' = 'lightweight' }
+  Assert-True (-not $result.Succeeded) 'v3.0.0 tag recovery should fail.'
+  Assert-Contains $result.Output '3.0.0 is immutable' 'immutable 3.0.0 diagnostic should be preserved.'
+}
+
+Invoke-Test 'tag source rejects explicit version input' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.1.2' -Version '3.1.3' -Tags @{ 'v3.1.2' = 'lightweight' }
+  Assert-True (-not $result.Succeeded) 'tag mode with explicit version should fail.'
+  Assert-Contains $result.Output 'Release source resolution failed' 'tag-mode version diagnostic should come from source resolution.'
+}
+
+Invoke-Test 'release artifact validation rejects tag-derived version mismatch' {
+  $result = Invoke-ReleaseArtifactValidationScenario -ExpectedVersion '3.1.2' -ArtifactVersion '3.2.0'
+  Assert-True (-not $result.Succeeded) 'artifact version mismatch should fail.'
+  Assert-Contains $result.Output 'A.3.1.2.nupkg' 'artifact version mismatch diagnostic should include the expected versioned package file.'
+}
+
+Invoke-Test 'release artifact validation rejects resolved commit mismatch' {
+  $result = Invoke-ReleaseArtifactValidationScenario `
+    -ExpectedCommit '1111111111111111111111111111111111111111' `
+    -ArtifactCommit '2222222222222222222222222222222222222222'
+  Assert-True (-not $result.Succeeded) 'artifact commit mismatch should fail.'
+}
+
+Invoke-Test 'original release artifact can match resolved tag identity' {
+  $result = Invoke-ReleaseArtifactValidationScenario `
+    -ExpectedVersion '3.1.2' `
+    -ArtifactVersion '3.1.2' `
+    -ExpectedCommit '1111111111111111111111111111111111111111' `
+    -ArtifactCommit '1111111111111111111111111111111111111111'
+  Assert-True $result.Succeeded "matching tag-derived artifact identity should pass: $($result.Output)"
+}
+
+Invoke-Test 'original release artifact can match resolved branch identity' {
+  $result = Invoke-ReleaseArtifactValidationScenario `
+    -ExpectedVersion '3.1.3' `
+    -ArtifactVersion '3.1.3' `
+    -ExpectedCommit '3333333333333333333333333333333333333333' `
+    -ArtifactCommit '3333333333333333333333333333333333333333'
+  Assert-True $result.Succeeded "matching branch-derived artifact identity should pass: $($result.Output)"
+}
+
+Invoke-Test 'release checksum verification accepts a complete artifact set' {
+  $result = Invoke-ChecksumScenario
+  Assert-True $result.Succeeded "checksum verification failed: $($result.Output)"
+}
+
+Invoke-Test 'release checksum verification rejects artifact hash mismatch' {
+  $result = Invoke-ChecksumScenario -CorruptPackageHash
+  Assert-True (-not $result.Succeeded) 'checksum mismatch should fail.'
+  Assert-Contains $result.Output 'Checksum mismatch for' 'checksum mismatch diagnostic should explain the failure.'
+  Assert-Contains $result.Output 'A.1.2.3.nupkg' 'checksum mismatch diagnostic should identify the package artifact.'
+}
+
+$twoPackages = @(
+  [ordered]@{ project = 'A'; projectPath = 'src/A/A.csproj'; packageId = 'A'; assetKind = 'library'; symbols = $true },
+  [ordered]@{ project = 'B'; projectPath = 'src/B/B.csproj'; packageId = 'B'; assetKind = 'library'; symbols = $false }
+)
+
+Invoke-Test 'NuGet.org recovery publishes all missing primary packages and symbol packages' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('404', '200')
+    B = @('404', '200')
+  }
+
+  Assert-True $result.Succeeded "publish script failed: $($result.Output)"
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'A.9.9.9-test.1.nupkg|*--no-symbols*' }).Count -eq 1) 'A primary package should be pushed with --no-symbols.'
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'B.9.9.9-test.1.nupkg|*--no-symbols*' }).Count -eq 1) 'B primary package should be pushed with --no-symbols.'
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'A.9.9.9-test.1.snupkg|*--skip-duplicate*' }).Count -eq 1) 'A symbol package should be pushed separately with duplicate-safe tooling semantics.'
+}
+
+Invoke-Test 'NuGet.org recovery validates and skips identical existing packages' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('200')
+    B = @('404', '200')
+  }
+
+  Assert-True $result.Succeeded "publish script failed: $($result.Output)"
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'A.9.9.9-test.1.nupkg|*' }).Count -eq 0) 'Existing identical A primary package should not be pushed.'
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'B.9.9.9-test.1.nupkg|*' }).Count -eq 1) 'Missing B primary package should be pushed.'
+}
+
+Invoke-Test 'NuGet.org recovery fails closed on existing artifact mismatch' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('200')
+    B = @('404', '200')
+  } -DifferentRemotePackages @('A')
+
+  Assert-True (-not $result.Succeeded) 'artifact mismatch should fail.'
+  Assert-Contains $result.Output 'does not match the local artifact' 'artifact mismatch diagnostic should be precise.'
+}
+
+Invoke-Test 'NuGet.org recovery validates all existing packages before first push' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('404')
+    B = @('200')
+  } -DifferentRemotePackages @('B')
+
+  Assert-True (-not $result.Succeeded) 'later existing package mismatch should fail before publication.'
+  Assert-Contains $result.Output 'does not match the local artifact' 'artifact mismatch diagnostic should be precise.'
+  Assert-True (@($result.PushLog).Count -eq 0) 'No package should be pushed before every existing package has passed content preflight.'
+}
+
+Invoke-Test 'NuGet.org async indexing does not block submission of remaining primary packages' {
+  $fivePackages = @(
+    [ordered]@{ project = 'A'; projectPath = 'src/A/A.csproj'; packageId = 'A'; assetKind = 'library'; symbols = $true },
+    [ordered]@{ project = 'B'; projectPath = 'src/B/B.csproj'; packageId = 'B'; assetKind = 'library'; symbols = $false },
+    [ordered]@{ project = 'C'; projectPath = 'src/C/C.csproj'; packageId = 'C'; assetKind = 'library'; symbols = $false },
+    [ordered]@{ project = 'D'; projectPath = 'src/D/D.csproj'; packageId = 'D'; assetKind = 'library'; symbols = $false },
+    [ordered]@{ project = 'E'; projectPath = 'src/E/E.csproj'; packageId = 'E'; assetKind = 'library'; symbols = $false }
+  )
+
+  $result = Invoke-PublishScenario -Packages $fivePackages -StatusSequences @{
+    A = @('404', '404', '200')
+    B = @('404', '200')
+    C = @('404', '200')
+    D = @('404', '200')
+    E = @('404', '200')
+  }
+
+  Assert-True $result.Succeeded "publish script failed: $($result.Output)"
+  foreach ($id in @('A', 'B', 'C', 'D', 'E')) {
+    Assert-True (@($result.PushLog | Where-Object { $_ -like "$id.9.9.9-test.1.nupkg|*" }).Count -eq 1) "$id should be submitted before final convergence can fail or wait."
+  }
+
+  $firstDownloadIndex = [Array]::IndexOf([string[]]$result.EventLog, 'curl-download:a')
+  Assert-True ($firstDownloadIndex -gt 0) 'Convergence download should occur only after publication status checks.'
+  Assert-Contains $result.Output 'indexing still pending for A' 'pending indexing diagnostic should identify the package that has not converged.'
+}
+
+Invoke-Test 'NuGet.org final convergence times out with precise missing identities' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('404')
+    B = @('404')
+  } -MaxAttempts 2
+
+  Assert-True (-not $result.Succeeded) 'convergence timeout should fail.'
+  Assert-Contains $result.Output 'Still missing from the Flat Container: A, B' 'timeout should list the exact missing package IDs.'
+}
+
+Invoke-Test 'NuGet.org unexpected HTTP status fails closed' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('503')
+    B = @('404', '200')
+  }
+
+  Assert-True (-not $result.Succeeded) 'unexpected HTTP status should fail.'
+  Assert-Contains $result.Output 'Unexpected NuGet.org response HTTP 503 for A' 'unexpected status diagnostic should include package and status.'
+}
+
+Invoke-Test 'symbol-enabled package is not considered recovered solely by primary visibility' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('200')
+    B = @('200')
+  }
+
+  Assert-True $result.Succeeded "publish script failed: $($result.Output)"
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'A.9.9.9-test.1.snupkg|*--skip-duplicate*' }).Count -eq 1) 'Visible primary package must still trigger independent symbol package recovery.'
+  Assert-Contains $result.Output 'does not expose a public content-comparison endpoint for .snupkg artifacts' 'symbol limitation should be logged.'
+}
+
+Invoke-Test 'GitHub Packages recovery validates and skips identical existing packages' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -Registry GitHubPackages -StatusSequences @{
+    A = @('200')
+    B = @('404', '200')
+  }
+
+  Assert-True $result.Succeeded "GitHub Packages recovery failed: $($result.Output)"
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'A.9.9.9-test.1.nupkg|*' }).Count -eq 0) 'Existing identical GitHub Packages artifact should not be pushed.'
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'B.9.9.9-test.1.nupkg|*' }).Count -eq 1) 'Missing GitHub Packages artifact should be pushed.'
+  Assert-Contains $result.Output 'GitHub Packages: validated existing A 9.9.9-test.1 against local artifact content' 'existing GitHub Packages artifact should be content-compared.'
+}
+
+Invoke-Test 'GitHub Packages recovery fails closed on existing artifact mismatch' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -Registry GitHubPackages -StatusSequences @{
+    A = @('200')
+    B = @('404', '200')
+  } -DifferentRemotePackages @('A')
+
+  Assert-True (-not $result.Succeeded) 'GitHub Packages artifact mismatch should fail.'
+  Assert-Contains $result.Output 'does not match the local artifact' 'GitHub Packages mismatch diagnostic should be precise.'
+  Assert-True (@($result.PushLog).Count -eq 0) 'GitHub Packages recovery should not publish missing packages after an existing package mismatch.'
+}
+
+if ($failures.Count -gt 0) {
+  throw "Release governance tests failed:`n$($failures -join [Environment]::NewLine)"
+}
+
+Write-Host "Release governance tests passed."
+) {
+        return [pscustomobject]@{
+          StatusCode = 204
+          Content = ''
+        }
+      }
+
+      throw "Unexpected rollback request: $Method $Uri"
+    }
+
+    $exitCode = 0
+    $output = @(
+      try {
+        & (Join-Path $repoRoot 'eng/rollback-release.ps1') `
+          -Version '9.9.9-test.1' `
+          -ReleaseTag 'v9.9.9-test.1' `
+          -Repository 'rodri-oliveira-dev/Dapper-FluentMap' `
+          -GitHubToken 'test-token' 2>&1
+      }
+      catch {
+        $exitCode = 1
+        $_
+      }
+    )
+
+    return [pscustomobject]@{
+      Succeeded = $exitCode -eq 0
+      Output = ($output | Out-String)
+      Requests = if (Test-Path -LiteralPath $requestLog) { @(Get-Content -LiteralPath $requestLog) } else { @() }
+    }
+  }
+  finally {
+    Remove-Item function:\Invoke-WebRequest -ErrorAction SilentlyContinue
+    $env:MOCK_ROLLBACK_REQUEST_LOG = $oldRequestLog
+    if (Test-Path -LiteralPath $tempRoot) {
+      Remove-Item -LiteralPath $tempRoot -Recurse -Force
+    }
+  }
+}
+
+$releaseWorkflow = Get-Content -Raw -LiteralPath (Join-Path $repoRoot '.github/workflows/release.yml')
+$recoveryWorkflow = Get-Content -Raw -LiteralPath (Join-Path $repoRoot '.github/workflows/release-recovery-missing-nuget.yml')
+
+Invoke-Test 'release SBOM is generated from governed package artifacts' {
+  $result = Invoke-ReleaseSbomScenario
+  Assert-True ($result.SpdxVersion -eq 'SPDX-2.3') 'release SBOM must use SPDX 2.3.'
+  Assert-True ($result.PackageName -eq 'A') 'release SBOM must describe the package identity.'
+  Assert-True ($result.PackageVersion -eq '3.1.2') 'release SBOM must describe the package version.'
+  Assert-True ($result.PackageHash -eq $result.SbomHash) 'release SBOM package checksum must match the final .nupkg.'
+  Assert-True ($result.RootSpdxId -in $result.DocumentDescribes) 'release SBOM must list the release package in documentDescribes.'
+}
+
+Invoke-Test 'recovery preserves an existing valid release SBOM' {
+  $result = Invoke-ReleaseSbomScenario -PreserveExisting
+  Assert-True ($result.PackageHash -eq $result.SbomHash) 'preserved release SBOM must remain bound to the final .nupkg.'
+}
+
+Invoke-Test 'release and recovery workflows carry and attest the release SBOM' {
+  foreach ($expected in @(
+      'Generate release SBOM',
+      'release.sbom.spdx.json',
+      'Attest release SBOM',
+      'sbom-path: ./artifacts/release-metadata/release.sbom.spdx.json'
+    )) {
+    Assert-Contains $releaseWorkflow $expected "normal release workflow must contain '$expected'."
+  }
+
+  foreach ($expected in @(
+      'Generate or preserve release SBOM',
+      '-PreserveExisting',
+      'release.sbom.spdx.json',
+      'Attest recovered release SBOM',
+      'sbom-path: ./artifacts/release-metadata/release.sbom.spdx.json'
+    )) {
+    Assert-Contains $recoveryWorkflow $expected "recovery workflow must contain '$expected'."
+  }
+}
+
+Invoke-Test 'release and recovery share a non-cancelling release lock' {
+  Assert-Contains $releaseWorkflow 'group: release' 'normal release must use the shared release lock.'
+  Assert-Contains $recoveryWorkflow 'group: release' 'recovery must use the shared release lock.'
+  Assert-Contains $releaseWorkflow 'cancel-in-progress: false' 'normal release must not cancel in-progress release mutations.'
+  Assert-Contains $recoveryWorkflow 'cancel-in-progress: false' 'recovery must not cancel in-progress release mutations.'
+}
+
+Invoke-Test 'recovery workflow reconciles governed release state' {
+  foreach ($expected in @(
+      'source_type',
+      'source_ref',
+      'Resolve release source',
+      'steps.source.outputs.resolved_version',
+      'steps.source.outputs.resolved_commit',
+      'original_release_run_id',
+      'gh run download',
+      'Recover and verify NuGet.org packages',
+      'Recover and verify GitHub Packages',
+      'Restore or verify release tag',
+      'Create or update GitHub Release',
+      'gh release delete-asset',
+      'gh release edit',
+      '--draft=false',
+      '--prerelease=false',
+      'recovery-attestation.json',
+      'validatedCommit',
+      'GitHub Release metadata and assets: exact governed state',
+      'Attest recovered release artifacts',
+      'Attest recovered release SBOM',
+      'release.sbom.spdx.json',
+      'Release recovery completed and governed release state reconciled.'
+    )) {
+    Assert-Contains $recoveryWorkflow $expected "recovery workflow must contain '$expected'."
+  }
+
+  Assert-Contains $recoveryWorkflow 'Refusing to move the tag' 'recovery must fail closed when the release tag points to the wrong commit.'
+  Assert-Contains $recoveryWorkflow 'asset set does not match governed artifacts' 'recovery must fail closed when GitHub Release assets differ from governed artifacts.'
+  Assert-Contains $recoveryWorkflow 'metadata does not match governed state' 'recovery must fail closed when GitHub Release metadata differs from governed state.'
+  Assert-Contains $recoveryWorkflow 'source=rebuild' 'recovery must expose deterministic rebuild fallback when original artifacts are unavailable.'
+  Assert-Contains $recoveryWorkflow 'headSha' 'recovery must validate that original artifacts came from the requested commit.'
+  Assert-True ($recoveryWorkflow.IndexOf('validated_commit:', [System.StringComparison]::Ordinal) -lt 0) 'validated_commit must not remain an operator-facing workflow input.'
+}
+
+Invoke-Test 'branch source resolves valid main version' {
+  $result = Invoke-ResolveSourceScenario -SourceType branch -SourceRef main -Version '3.1.2'
+  Assert-True $result.Succeeded "source resolution failed: $($result.Output)"
+  Assert-True ($result.Outputs['source_type'] -eq 'branch') 'source_type output should be branch.'
+  Assert-True ($result.Outputs['resolved_version'] -eq '3.1.2') 'branch mode should use the explicit version.'
+  Assert-True ($result.Outputs['resolved_commit'] -eq $result.MainCommit) 'branch mode should resolve origin/main HEAD.'
+  Assert-True ($result.Outputs['resolved_ref'] -eq 'refs/heads/main') 'branch mode should normalize the branch ref.'
+  Assert-True ($result.Outputs['resolved_branch'] -eq 'main') 'branch mode should expose the resolved branch.'
+}
+
+Invoke-Test 'branch source requires version' {
+  $result = Invoke-ResolveSourceScenario -SourceType branch -SourceRef main -Version ''
+  Assert-True (-not $result.Succeeded) 'branch mode without version should fail.'
+  Assert-Contains $result.Output 'Release source resolution failed' 'missing branch version diagnostic should come from source resolution.'
+}
+
+Invoke-Test 'branch source rejects invalid semantic version' {
+  $result = Invoke-ResolveSourceScenario -SourceType branch -SourceRef main -Version '3.1'
+  Assert-True (-not $result.Succeeded) 'invalid branch SemVer should fail.'
+  Assert-Contains $result.Output 'Invalid semantic version' 'invalid SemVer diagnostic should be clear.'
+}
+
+Invoke-Test 'branch source rejects disallowed branch' {
+  $result = Invoke-ResolveSourceScenario -SourceType branch -SourceRef develop -Version '3.1.2' -AddDevelopBranch
+  Assert-True (-not $result.Succeeded) 'non-main branch source should fail.'
+  Assert-Contains $result.Output 'Release source resolution failed' 'disallowed branch diagnostic should come from source resolution.'
+}
+
+Invoke-Test 'branch source rejects missing branch' {
+  $result = Invoke-ResolveSourceScenario -SourceType branch -SourceRef main -Version '3.1.2' -SkipPushMain
+  Assert-True (-not $result.Succeeded) 'recovery started outside main should fail closed.'
+  Assert-Contains $result.Output "Branch 'main' does not exist" 'missing branch diagnostic should be clear.'
+}
+
+Invoke-Test 'tag source derives version from release tag' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.1.2' -Tags @{ 'v3.1.2' = 'lightweight' }
+  Assert-True $result.Succeeded "tag source resolution failed: $($result.Output)"
+  Assert-True ($result.Outputs['source_type'] -eq 'tag') 'source_type output should be tag.'
+  Assert-True ($result.Outputs['resolved_version'] -eq '3.1.2') 'tag mode should derive the package version by removing only the leading v.'
+  Assert-True ($result.Outputs['resolved_commit'] -eq $result.MainCommit) 'tag mode should peel the tag to the target commit.'
+  Assert-True ($result.Outputs['resolved_ref'] -eq 'refs/tags/v3.1.2') 'tag mode should normalize the tag ref.'
+  Assert-True ($result.Outputs['resolved_tag'] -eq 'v3.1.2') 'tag mode should expose the resolved tag.'
+}
+
+Invoke-Test 'tag source supports prerelease tags' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.2.0-rc.1' -Tags @{ 'v3.2.0-rc.1' = 'lightweight' }
+  Assert-True $result.Succeeded "prerelease tag source resolution failed: $($result.Output)"
+  Assert-True ($result.Outputs['resolved_version'] -eq '3.2.0-rc.1') 'prerelease tag should derive the prerelease package version.'
+}
+
+Invoke-Test 'tag source peels annotated tag to commit' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.2.0-rc.1' -Tags @{ 'v3.2.0-rc.1' = 'annotated' }
+  Assert-True $result.Succeeded "annotated tag source resolution failed: $($result.Output)"
+  Assert-True ($result.Outputs['resolved_commit'] -eq $result.MainCommit) 'annotated tag should peel to the underlying commit, not the tag object.'
+}
+
+Invoke-Test 'tag source peels lightweight tag to commit' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.1.2' -Tags @{ 'v3.1.2' = 'lightweight' }
+  Assert-True $result.Succeeded "lightweight tag source resolution failed: $($result.Output)"
+  Assert-True ($result.Outputs['resolved_commit'] -eq $result.MainCommit) 'lightweight tag should resolve to its target commit.'
+}
+
+Invoke-Test 'tag source rejects missing tag' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.1.2'
+  Assert-True (-not $result.Succeeded) 'missing tag should fail.'
+  Assert-Contains $result.Output "does not exist on remote" 'missing tag diagnostic should be clear.'
+}
+
+Invoke-Test 'tag source rejects malformed tag' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.1' -Tags @{ 'v3.1' = 'lightweight' }
+  Assert-True (-not $result.Succeeded) 'malformed tag should fail.'
+  Assert-Contains $result.Output 'Invalid semantic version' 'malformed tag diagnostic should validate the derived version.'
+}
+
+Invoke-Test 'tag source requires v prefix' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef '3.1.2' -Tags @{ '3.1.2' = 'lightweight' }
+  Assert-True (-not $result.Succeeded) 'tag without v prefix should fail.'
+  Assert-Contains $result.Output 'v<SemVer>' 'missing v prefix diagnostic should be clear.'
+}
+
+Invoke-Test 'tag source rejects invalid release version' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v2.9.9' -Tags @{ 'v2.9.9' = 'lightweight' }
+  Assert-True (-not $result.Succeeded) 'tag below the release major floor should fail.'
+  Assert-Contains $result.Output 'major version 3 or later' 'major-version diagnostic should be preserved.'
+}
+
+Invoke-Test 'tag source keeps v3.0.0 immutable' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.0.0' -Tags @{ 'v3.0.0' = 'lightweight' }
+  Assert-True (-not $result.Succeeded) 'v3.0.0 tag recovery should fail.'
+  Assert-Contains $result.Output '3.0.0 is immutable' 'immutable 3.0.0 diagnostic should be preserved.'
+}
+
+Invoke-Test 'tag source rejects explicit version input' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.1.2' -Version '3.1.3' -Tags @{ 'v3.1.2' = 'lightweight' }
+  Assert-True (-not $result.Succeeded) 'tag mode with explicit version should fail.'
+  Assert-Contains $result.Output 'Release source resolution failed' 'tag-mode version diagnostic should come from source resolution.'
+}
+
+Invoke-Test 'release artifact validation rejects tag-derived version mismatch' {
+  $result = Invoke-ReleaseArtifactValidationScenario -ExpectedVersion '3.1.2' -ArtifactVersion '3.2.0'
+  Assert-True (-not $result.Succeeded) 'artifact version mismatch should fail.'
+  Assert-Contains $result.Output 'A.3.1.2.nupkg' 'artifact version mismatch diagnostic should include the expected versioned package file.'
+}
+
+Invoke-Test 'release artifact validation rejects resolved commit mismatch' {
+  $result = Invoke-ReleaseArtifactValidationScenario `
+    -ExpectedCommit '1111111111111111111111111111111111111111' `
+    -ArtifactCommit '2222222222222222222222222222222222222222'
+  Assert-True (-not $result.Succeeded) 'artifact commit mismatch should fail.'
+}
+
+Invoke-Test 'original release artifact can match resolved tag identity' {
+  $result = Invoke-ReleaseArtifactValidationScenario `
+    -ExpectedVersion '3.1.2' `
+    -ArtifactVersion '3.1.2' `
+    -ExpectedCommit '1111111111111111111111111111111111111111' `
+    -ArtifactCommit '1111111111111111111111111111111111111111'
+  Assert-True $result.Succeeded "matching tag-derived artifact identity should pass: $($result.Output)"
+}
+
+Invoke-Test 'original release artifact can match resolved branch identity' {
+  $result = Invoke-ReleaseArtifactValidationScenario `
+    -ExpectedVersion '3.1.3' `
+    -ArtifactVersion '3.1.3' `
+    -ExpectedCommit '3333333333333333333333333333333333333333' `
+    -ArtifactCommit '3333333333333333333333333333333333333333'
+  Assert-True $result.Succeeded "matching branch-derived artifact identity should pass: $($result.Output)"
+}
+
+Invoke-Test 'release checksum verification accepts a complete artifact set' {
+  $result = Invoke-ChecksumScenario
+  Assert-True $result.Succeeded "checksum verification failed: $($result.Output)"
+}
+
+Invoke-Test 'release checksum verification rejects artifact hash mismatch' {
+  $result = Invoke-ChecksumScenario -CorruptPackageHash
+  Assert-True (-not $result.Succeeded) 'checksum mismatch should fail.'
+  Assert-Contains $result.Output 'Checksum mismatch for' 'checksum mismatch diagnostic should explain the failure.'
+  Assert-Contains $result.Output 'A.1.2.3.nupkg' 'checksum mismatch diagnostic should identify the package artifact.'
+}
+
+$twoPackages = @(
+  [ordered]@{ project = 'A'; projectPath = 'src/A/A.csproj'; packageId = 'A'; assetKind = 'library'; symbols = $true },
+  [ordered]@{ project = 'B'; projectPath = 'src/B/B.csproj'; packageId = 'B'; assetKind = 'library'; symbols = $false }
+)
+
+Invoke-Test 'NuGet.org recovery publishes all missing primary packages and symbol packages' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('404', '200')
+    B = @('404', '200')
+  }
+
+  Assert-True $result.Succeeded "publish script failed: $($result.Output)"
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'A.9.9.9-test.1.nupkg|*--no-symbols*' }).Count -eq 1) 'A primary package should be pushed with --no-symbols.'
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'B.9.9.9-test.1.nupkg|*--no-symbols*' }).Count -eq 1) 'B primary package should be pushed with --no-symbols.'
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'A.9.9.9-test.1.snupkg|*--skip-duplicate*' }).Count -eq 1) 'A symbol package should be pushed separately with duplicate-safe tooling semantics.'
+}
+
+Invoke-Test 'NuGet.org recovery validates and skips identical existing packages' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('200')
+    B = @('404', '200')
+  }
+
+  Assert-True $result.Succeeded "publish script failed: $($result.Output)"
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'A.9.9.9-test.1.nupkg|*' }).Count -eq 0) 'Existing identical A primary package should not be pushed.'
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'B.9.9.9-test.1.nupkg|*' }).Count -eq 1) 'Missing B primary package should be pushed.'
+}
+
+Invoke-Test 'NuGet.org recovery fails closed on existing artifact mismatch' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('200')
+    B = @('404', '200')
+  } -DifferentRemotePackages @('A')
+
+  Assert-True (-not $result.Succeeded) 'artifact mismatch should fail.'
+  Assert-Contains $result.Output 'does not match the local artifact' 'artifact mismatch diagnostic should be precise.'
+}
+
+Invoke-Test 'NuGet.org recovery validates all existing packages before first push' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('404')
+    B = @('200')
+  } -DifferentRemotePackages @('B')
+
+  Assert-True (-not $result.Succeeded) 'later existing package mismatch should fail before publication.'
+  Assert-Contains $result.Output 'does not match the local artifact' 'artifact mismatch diagnostic should be precise.'
+  Assert-True (@($result.PushLog).Count -eq 0) 'No package should be pushed before every existing package has passed content preflight.'
+}
+
+Invoke-Test 'NuGet.org async indexing does not block submission of remaining primary packages' {
+  $fivePackages = @(
+    [ordered]@{ project = 'A'; projectPath = 'src/A/A.csproj'; packageId = 'A'; assetKind = 'library'; symbols = $true },
+    [ordered]@{ project = 'B'; projectPath = 'src/B/B.csproj'; packageId = 'B'; assetKind = 'library'; symbols = $false },
+    [ordered]@{ project = 'C'; projectPath = 'src/C/C.csproj'; packageId = 'C'; assetKind = 'library'; symbols = $false },
+    [ordered]@{ project = 'D'; projectPath = 'src/D/D.csproj'; packageId = 'D'; assetKind = 'library'; symbols = $false },
+    [ordered]@{ project = 'E'; projectPath = 'src/E/E.csproj'; packageId = 'E'; assetKind = 'library'; symbols = $false }
+  )
+
+  $result = Invoke-PublishScenario -Packages $fivePackages -StatusSequences @{
+    A = @('404', '404', '200')
+    B = @('404', '200')
+    C = @('404', '200')
+    D = @('404', '200')
+    E = @('404', '200')
+  }
+
+  Assert-True $result.Succeeded "publish script failed: $($result.Output)"
+  foreach ($id in @('A', 'B', 'C', 'D', 'E')) {
+    Assert-True (@($result.PushLog | Where-Object { $_ -like "$id.9.9.9-test.1.nupkg|*" }).Count -eq 1) "$id should be submitted before final convergence can fail or wait."
+  }
+
+  $firstDownloadIndex = [Array]::IndexOf([string[]]$result.EventLog, 'curl-download:a')
+  Assert-True ($firstDownloadIndex -gt 0) 'Convergence download should occur only after publication status checks.'
+  Assert-Contains $result.Output 'indexing still pending for A' 'pending indexing diagnostic should identify the package that has not converged.'
+}
+
+Invoke-Test 'NuGet.org final convergence times out with precise missing identities' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('404')
+    B = @('404')
+  } -MaxAttempts 2
+
+  Assert-True (-not $result.Succeeded) 'convergence timeout should fail.'
+  Assert-Contains $result.Output 'Still missing from the Flat Container: A, B' 'timeout should list the exact missing package IDs.'
+}
+
+Invoke-Test 'NuGet.org unexpected HTTP status fails closed' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('503')
+    B = @('404', '200')
+  }
+
+  Assert-True (-not $result.Succeeded) 'unexpected HTTP status should fail.'
+  Assert-Contains $result.Output 'Unexpected NuGet.org response HTTP 503 for A' 'unexpected status diagnostic should include package and status.'
+}
+
+Invoke-Test 'symbol-enabled package is not considered recovered solely by primary visibility' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('200')
+    B = @('200')
+  }
+
+  Assert-True $result.Succeeded "publish script failed: $($result.Output)"
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'A.9.9.9-test.1.snupkg|*--skip-duplicate*' }).Count -eq 1) 'Visible primary package must still trigger independent symbol package recovery.'
+  Assert-Contains $result.Output 'does not expose a public content-comparison endpoint for .snupkg artifacts' 'symbol limitation should be logged.'
+}
+
+Invoke-Test 'GitHub Packages recovery validates and skips identical existing packages' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -Registry GitHubPackages -StatusSequences @{
+    A = @('200')
+    B = @('404', '200')
+  }
+
+  Assert-True $result.Succeeded "GitHub Packages recovery failed: $($result.Output)"
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'A.9.9.9-test.1.nupkg|*' }).Count -eq 0) 'Existing identical GitHub Packages artifact should not be pushed.'
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'B.9.9.9-test.1.nupkg|*' }).Count -eq 1) 'Missing GitHub Packages artifact should be pushed.'
+  Assert-Contains $result.Output 'GitHub Packages: validated existing A 9.9.9-test.1 against local artifact content' 'existing GitHub Packages artifact should be content-compared.'
+}
+
+Invoke-Test 'GitHub Packages recovery fails closed on existing artifact mismatch' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -Registry GitHubPackages -StatusSequences @{
+    A = @('200')
+    B = @('404', '200')
+  } -DifferentRemotePackages @('A')
+
+  Assert-True (-not $result.Succeeded) 'GitHub Packages artifact mismatch should fail.'
+  Assert-Contains $result.Output 'does not match the local artifact' 'GitHub Packages mismatch diagnostic should be precise.'
+  Assert-True (@($result.PushLog).Count -eq 0) 'GitHub Packages recovery should not publish missing packages after an existing package mismatch.'
+}
+
+if ($failures.Count -gt 0) {
+  throw "Release governance tests failed:`n$($failures -join [Environment]::NewLine)"
+}
+
+Write-Host "Release governance tests passed."
+ }).Count -eq 1) 'rollback must look up the partial GitHub Release by tag.'
+  Assert-True (@($result.Requests | Where-Object { $_ -match '^DELETE .*/releases/4242
+  foreach ($expected in @(
+      'source_type',
+      'source_ref',
+      'Resolve release source',
+      'steps.source.outputs.resolved_version',
+      'steps.source.outputs.resolved_commit',
+      'original_release_run_id',
+      'gh run download',
+      'Recover and verify NuGet.org packages',
+      'Recover and verify GitHub Packages',
+      'Restore or verify release tag',
+      'Create or update GitHub Release',
+      'gh release delete-asset',
+      'gh release edit',
+      '--draft=false',
+      '--prerelease=false',
+      'recovery-attestation.json',
+      'validatedCommit',
+      'GitHub Release metadata and assets: exact governed state',
+      'Attest recovered release artifacts',
+      'Attest recovered release SBOM',
+      'release.sbom.spdx.json',
+      'Release recovery completed and governed release state reconciled.'
+    )) {
+    Assert-Contains $recoveryWorkflow $expected "recovery workflow must contain '$expected'."
+  }
+
+  Assert-Contains $recoveryWorkflow 'Refusing to move the tag' 'recovery must fail closed when the release tag points to the wrong commit.'
+  Assert-Contains $recoveryWorkflow 'asset set does not match governed artifacts' 'recovery must fail closed when GitHub Release assets differ from governed artifacts.'
+  Assert-Contains $recoveryWorkflow 'metadata does not match governed state' 'recovery must fail closed when GitHub Release metadata differs from governed state.'
+  Assert-Contains $recoveryWorkflow 'source=rebuild' 'recovery must expose deterministic rebuild fallback when original artifacts are unavailable.'
+  Assert-Contains $recoveryWorkflow 'headSha' 'recovery must validate that original artifacts came from the requested commit.'
+  Assert-True ($recoveryWorkflow.IndexOf('validated_commit:', [System.StringComparison]::Ordinal) -lt 0) 'validated_commit must not remain an operator-facing workflow input.'
+}
+
+Invoke-Test 'branch source resolves valid main version' {
+  $result = Invoke-ResolveSourceScenario -SourceType branch -SourceRef main -Version '3.1.2'
+  Assert-True $result.Succeeded "source resolution failed: $($result.Output)"
+  Assert-True ($result.Outputs['source_type'] -eq 'branch') 'source_type output should be branch.'
+  Assert-True ($result.Outputs['resolved_version'] -eq '3.1.2') 'branch mode should use the explicit version.'
+  Assert-True ($result.Outputs['resolved_commit'] -eq $result.MainCommit) 'branch mode should resolve origin/main HEAD.'
+  Assert-True ($result.Outputs['resolved_ref'] -eq 'refs/heads/main') 'branch mode should normalize the branch ref.'
+  Assert-True ($result.Outputs['resolved_branch'] -eq 'main') 'branch mode should expose the resolved branch.'
+}
+
+Invoke-Test 'branch source requires version' {
+  $result = Invoke-ResolveSourceScenario -SourceType branch -SourceRef main -Version ''
+  Assert-True (-not $result.Succeeded) 'branch mode without version should fail.'
+  Assert-Contains $result.Output 'Release source resolution failed' 'missing branch version diagnostic should come from source resolution.'
+}
+
+Invoke-Test 'branch source rejects invalid semantic version' {
+  $result = Invoke-ResolveSourceScenario -SourceType branch -SourceRef main -Version '3.1'
+  Assert-True (-not $result.Succeeded) 'invalid branch SemVer should fail.'
+  Assert-Contains $result.Output 'Invalid semantic version' 'invalid SemVer diagnostic should be clear.'
+}
+
+Invoke-Test 'branch source rejects disallowed branch' {
+  $result = Invoke-ResolveSourceScenario -SourceType branch -SourceRef develop -Version '3.1.2' -AddDevelopBranch
+  Assert-True (-not $result.Succeeded) 'non-main branch source should fail.'
+  Assert-Contains $result.Output 'Release source resolution failed' 'disallowed branch diagnostic should come from source resolution.'
+}
+
+Invoke-Test 'branch source rejects missing branch' {
+  $result = Invoke-ResolveSourceScenario -SourceType branch -SourceRef main -Version '3.1.2' -SkipPushMain
+  Assert-True (-not $result.Succeeded) 'recovery started outside main should fail closed.'
+  Assert-Contains $result.Output "Branch 'main' does not exist" 'missing branch diagnostic should be clear.'
+}
+
+Invoke-Test 'tag source derives version from release tag' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.1.2' -Tags @{ 'v3.1.2' = 'lightweight' }
+  Assert-True $result.Succeeded "tag source resolution failed: $($result.Output)"
+  Assert-True ($result.Outputs['source_type'] -eq 'tag') 'source_type output should be tag.'
+  Assert-True ($result.Outputs['resolved_version'] -eq '3.1.2') 'tag mode should derive the package version by removing only the leading v.'
+  Assert-True ($result.Outputs['resolved_commit'] -eq $result.MainCommit) 'tag mode should peel the tag to the target commit.'
+  Assert-True ($result.Outputs['resolved_ref'] -eq 'refs/tags/v3.1.2') 'tag mode should normalize the tag ref.'
+  Assert-True ($result.Outputs['resolved_tag'] -eq 'v3.1.2') 'tag mode should expose the resolved tag.'
+}
+
+Invoke-Test 'tag source supports prerelease tags' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.2.0-rc.1' -Tags @{ 'v3.2.0-rc.1' = 'lightweight' }
+  Assert-True $result.Succeeded "prerelease tag source resolution failed: $($result.Output)"
+  Assert-True ($result.Outputs['resolved_version'] -eq '3.2.0-rc.1') 'prerelease tag should derive the prerelease package version.'
+}
+
+Invoke-Test 'tag source peels annotated tag to commit' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.2.0-rc.1' -Tags @{ 'v3.2.0-rc.1' = 'annotated' }
+  Assert-True $result.Succeeded "annotated tag source resolution failed: $($result.Output)"
+  Assert-True ($result.Outputs['resolved_commit'] -eq $result.MainCommit) 'annotated tag should peel to the underlying commit, not the tag object.'
+}
+
+Invoke-Test 'tag source peels lightweight tag to commit' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.1.2' -Tags @{ 'v3.1.2' = 'lightweight' }
+  Assert-True $result.Succeeded "lightweight tag source resolution failed: $($result.Output)"
+  Assert-True ($result.Outputs['resolved_commit'] -eq $result.MainCommit) 'lightweight tag should resolve to its target commit.'
+}
+
+Invoke-Test 'tag source rejects missing tag' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.1.2'
+  Assert-True (-not $result.Succeeded) 'missing tag should fail.'
+  Assert-Contains $result.Output "does not exist on remote" 'missing tag diagnostic should be clear.'
+}
+
+Invoke-Test 'tag source rejects malformed tag' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.1' -Tags @{ 'v3.1' = 'lightweight' }
+  Assert-True (-not $result.Succeeded) 'malformed tag should fail.'
+  Assert-Contains $result.Output 'Invalid semantic version' 'malformed tag diagnostic should validate the derived version.'
+}
+
+Invoke-Test 'tag source requires v prefix' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef '3.1.2' -Tags @{ '3.1.2' = 'lightweight' }
+  Assert-True (-not $result.Succeeded) 'tag without v prefix should fail.'
+  Assert-Contains $result.Output 'v<SemVer>' 'missing v prefix diagnostic should be clear.'
+}
+
+Invoke-Test 'tag source rejects invalid release version' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v2.9.9' -Tags @{ 'v2.9.9' = 'lightweight' }
+  Assert-True (-not $result.Succeeded) 'tag below the release major floor should fail.'
+  Assert-Contains $result.Output 'major version 3 or later' 'major-version diagnostic should be preserved.'
+}
+
+Invoke-Test 'tag source keeps v3.0.0 immutable' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.0.0' -Tags @{ 'v3.0.0' = 'lightweight' }
+  Assert-True (-not $result.Succeeded) 'v3.0.0 tag recovery should fail.'
+  Assert-Contains $result.Output '3.0.0 is immutable' 'immutable 3.0.0 diagnostic should be preserved.'
+}
+
+Invoke-Test 'tag source rejects explicit version input' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.1.2' -Version '3.1.3' -Tags @{ 'v3.1.2' = 'lightweight' }
+  Assert-True (-not $result.Succeeded) 'tag mode with explicit version should fail.'
+  Assert-Contains $result.Output 'Release source resolution failed' 'tag-mode version diagnostic should come from source resolution.'
+}
+
+Invoke-Test 'release artifact validation rejects tag-derived version mismatch' {
+  $result = Invoke-ReleaseArtifactValidationScenario -ExpectedVersion '3.1.2' -ArtifactVersion '3.2.0'
+  Assert-True (-not $result.Succeeded) 'artifact version mismatch should fail.'
+  Assert-Contains $result.Output 'A.3.1.2.nupkg' 'artifact version mismatch diagnostic should include the expected versioned package file.'
+}
+
+Invoke-Test 'release artifact validation rejects resolved commit mismatch' {
+  $result = Invoke-ReleaseArtifactValidationScenario `
+    -ExpectedCommit '1111111111111111111111111111111111111111' `
+    -ArtifactCommit '2222222222222222222222222222222222222222'
+  Assert-True (-not $result.Succeeded) 'artifact commit mismatch should fail.'
+}
+
+Invoke-Test 'original release artifact can match resolved tag identity' {
+  $result = Invoke-ReleaseArtifactValidationScenario `
+    -ExpectedVersion '3.1.2' `
+    -ArtifactVersion '3.1.2' `
+    -ExpectedCommit '1111111111111111111111111111111111111111' `
+    -ArtifactCommit '1111111111111111111111111111111111111111'
+  Assert-True $result.Succeeded "matching tag-derived artifact identity should pass: $($result.Output)"
+}
+
+Invoke-Test 'original release artifact can match resolved branch identity' {
+  $result = Invoke-ReleaseArtifactValidationScenario `
+    -ExpectedVersion '3.1.3' `
+    -ArtifactVersion '3.1.3' `
+    -ExpectedCommit '3333333333333333333333333333333333333333' `
+    -ArtifactCommit '3333333333333333333333333333333333333333'
+  Assert-True $result.Succeeded "matching branch-derived artifact identity should pass: $($result.Output)"
+}
+
+Invoke-Test 'release checksum verification accepts a complete artifact set' {
+  $result = Invoke-ChecksumScenario
+  Assert-True $result.Succeeded "checksum verification failed: $($result.Output)"
+}
+
+Invoke-Test 'release checksum verification rejects artifact hash mismatch' {
+  $result = Invoke-ChecksumScenario -CorruptPackageHash
+  Assert-True (-not $result.Succeeded) 'checksum mismatch should fail.'
+  Assert-Contains $result.Output 'Checksum mismatch for' 'checksum mismatch diagnostic should explain the failure.'
+  Assert-Contains $result.Output 'A.1.2.3.nupkg' 'checksum mismatch diagnostic should identify the package artifact.'
+}
+
+$twoPackages = @(
+  [ordered]@{ project = 'A'; projectPath = 'src/A/A.csproj'; packageId = 'A'; assetKind = 'library'; symbols = $true },
+  [ordered]@{ project = 'B'; projectPath = 'src/B/B.csproj'; packageId = 'B'; assetKind = 'library'; symbols = $false }
+)
+
+Invoke-Test 'NuGet.org recovery publishes all missing primary packages and symbol packages' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('404', '200')
+    B = @('404', '200')
+  }
+
+  Assert-True $result.Succeeded "publish script failed: $($result.Output)"
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'A.9.9.9-test.1.nupkg|*--no-symbols*' }).Count -eq 1) 'A primary package should be pushed with --no-symbols.'
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'B.9.9.9-test.1.nupkg|*--no-symbols*' }).Count -eq 1) 'B primary package should be pushed with --no-symbols.'
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'A.9.9.9-test.1.snupkg|*--skip-duplicate*' }).Count -eq 1) 'A symbol package should be pushed separately with duplicate-safe tooling semantics.'
+}
+
+Invoke-Test 'NuGet.org recovery validates and skips identical existing packages' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('200')
+    B = @('404', '200')
+  }
+
+  Assert-True $result.Succeeded "publish script failed: $($result.Output)"
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'A.9.9.9-test.1.nupkg|*' }).Count -eq 0) 'Existing identical A primary package should not be pushed.'
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'B.9.9.9-test.1.nupkg|*' }).Count -eq 1) 'Missing B primary package should be pushed.'
+}
+
+Invoke-Test 'NuGet.org recovery fails closed on existing artifact mismatch' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('200')
+    B = @('404', '200')
+  } -DifferentRemotePackages @('A')
+
+  Assert-True (-not $result.Succeeded) 'artifact mismatch should fail.'
+  Assert-Contains $result.Output 'does not match the local artifact' 'artifact mismatch diagnostic should be precise.'
+}
+
+Invoke-Test 'NuGet.org recovery validates all existing packages before first push' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('404')
+    B = @('200')
+  } -DifferentRemotePackages @('B')
+
+  Assert-True (-not $result.Succeeded) 'later existing package mismatch should fail before publication.'
+  Assert-Contains $result.Output 'does not match the local artifact' 'artifact mismatch diagnostic should be precise.'
+  Assert-True (@($result.PushLog).Count -eq 0) 'No package should be pushed before every existing package has passed content preflight.'
+}
+
+Invoke-Test 'NuGet.org async indexing does not block submission of remaining primary packages' {
+  $fivePackages = @(
+    [ordered]@{ project = 'A'; projectPath = 'src/A/A.csproj'; packageId = 'A'; assetKind = 'library'; symbols = $true },
+    [ordered]@{ project = 'B'; projectPath = 'src/B/B.csproj'; packageId = 'B'; assetKind = 'library'; symbols = $false },
+    [ordered]@{ project = 'C'; projectPath = 'src/C/C.csproj'; packageId = 'C'; assetKind = 'library'; symbols = $false },
+    [ordered]@{ project = 'D'; projectPath = 'src/D/D.csproj'; packageId = 'D'; assetKind = 'library'; symbols = $false },
+    [ordered]@{ project = 'E'; projectPath = 'src/E/E.csproj'; packageId = 'E'; assetKind = 'library'; symbols = $false }
+  )
+
+  $result = Invoke-PublishScenario -Packages $fivePackages -StatusSequences @{
+    A = @('404', '404', '200')
+    B = @('404', '200')
+    C = @('404', '200')
+    D = @('404', '200')
+    E = @('404', '200')
+  }
+
+  Assert-True $result.Succeeded "publish script failed: $($result.Output)"
+  foreach ($id in @('A', 'B', 'C', 'D', 'E')) {
+    Assert-True (@($result.PushLog | Where-Object { $_ -like "$id.9.9.9-test.1.nupkg|*" }).Count -eq 1) "$id should be submitted before final convergence can fail or wait."
+  }
+
+  $firstDownloadIndex = [Array]::IndexOf([string[]]$result.EventLog, 'curl-download:a')
+  Assert-True ($firstDownloadIndex -gt 0) 'Convergence download should occur only after publication status checks.'
+  Assert-Contains $result.Output 'indexing still pending for A' 'pending indexing diagnostic should identify the package that has not converged.'
+}
+
+Invoke-Test 'NuGet.org final convergence times out with precise missing identities' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('404')
+    B = @('404')
+  } -MaxAttempts 2
+
+  Assert-True (-not $result.Succeeded) 'convergence timeout should fail.'
+  Assert-Contains $result.Output 'Still missing from the Flat Container: A, B' 'timeout should list the exact missing package IDs.'
+}
+
+Invoke-Test 'NuGet.org unexpected HTTP status fails closed' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('503')
+    B = @('404', '200')
+  }
+
+  Assert-True (-not $result.Succeeded) 'unexpected HTTP status should fail.'
+  Assert-Contains $result.Output 'Unexpected NuGet.org response HTTP 503 for A' 'unexpected status diagnostic should include package and status.'
+}
+
+Invoke-Test 'symbol-enabled package is not considered recovered solely by primary visibility' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('200')
+    B = @('200')
+  }
+
+  Assert-True $result.Succeeded "publish script failed: $($result.Output)"
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'A.9.9.9-test.1.snupkg|*--skip-duplicate*' }).Count -eq 1) 'Visible primary package must still trigger independent symbol package recovery.'
+  Assert-Contains $result.Output 'does not expose a public content-comparison endpoint for .snupkg artifacts' 'symbol limitation should be logged.'
+}
+
+Invoke-Test 'GitHub Packages recovery validates and skips identical existing packages' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -Registry GitHubPackages -StatusSequences @{
+    A = @('200')
+    B = @('404', '200')
+  }
+
+  Assert-True $result.Succeeded "GitHub Packages recovery failed: $($result.Output)"
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'A.9.9.9-test.1.nupkg|*' }).Count -eq 0) 'Existing identical GitHub Packages artifact should not be pushed.'
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'B.9.9.9-test.1.nupkg|*' }).Count -eq 1) 'Missing GitHub Packages artifact should be pushed.'
+  Assert-Contains $result.Output 'GitHub Packages: validated existing A 9.9.9-test.1 against local artifact content' 'existing GitHub Packages artifact should be content-compared.'
+}
+
+Invoke-Test 'GitHub Packages recovery fails closed on existing artifact mismatch' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -Registry GitHubPackages -StatusSequences @{
+    A = @('200')
+    B = @('404', '200')
+  } -DifferentRemotePackages @('A')
+
+  Assert-True (-not $result.Succeeded) 'GitHub Packages artifact mismatch should fail.'
+  Assert-Contains $result.Output 'does not match the local artifact' 'GitHub Packages mismatch diagnostic should be precise.'
+  Assert-True (@($result.PushLog).Count -eq 0) 'GitHub Packages recovery should not publish missing packages after an existing package mismatch.'
+}
+
+if ($failures.Count -gt 0) {
+  throw "Release governance tests failed:`n$($failures -join [Environment]::NewLine)"
+}
+
+Write-Host "Release governance tests passed."
+) {
+        return [pscustomobject]@{
+          StatusCode = 204
+          Content = ''
+        }
+      }
+
+      throw "Unexpected rollback request: $Method $Uri"
+    }
+
+    $exitCode = 0
+    $output = @(
+      try {
+        & (Join-Path $repoRoot 'eng/rollback-release.ps1') `
+          -Version '9.9.9-test.1' `
+          -ReleaseTag 'v9.9.9-test.1' `
+          -Repository 'rodri-oliveira-dev/Dapper-FluentMap' `
+          -GitHubToken 'test-token' 2>&1
+      }
+      catch {
+        $exitCode = 1
+        $_
+      }
+    )
+
+    return [pscustomobject]@{
+      Succeeded = $exitCode -eq 0
+      Output = ($output | Out-String)
+      Requests = if (Test-Path -LiteralPath $requestLog) { @(Get-Content -LiteralPath $requestLog) } else { @() }
+    }
+  }
+  finally {
+    Remove-Item function:\Invoke-WebRequest -ErrorAction SilentlyContinue
+    $env:MOCK_ROLLBACK_REQUEST_LOG = $oldRequestLog
+    if (Test-Path -LiteralPath $tempRoot) {
+      Remove-Item -LiteralPath $tempRoot -Recurse -Force
+    }
+  }
+}
+
+$releaseWorkflow = Get-Content -Raw -LiteralPath (Join-Path $repoRoot '.github/workflows/release.yml')
+$recoveryWorkflow = Get-Content -Raw -LiteralPath (Join-Path $repoRoot '.github/workflows/release-recovery-missing-nuget.yml')
+
+Invoke-Test 'release SBOM is generated from governed package artifacts' {
+  $result = Invoke-ReleaseSbomScenario
+  Assert-True ($result.SpdxVersion -eq 'SPDX-2.3') 'release SBOM must use SPDX 2.3.'
+  Assert-True ($result.PackageName -eq 'A') 'release SBOM must describe the package identity.'
+  Assert-True ($result.PackageVersion -eq '3.1.2') 'release SBOM must describe the package version.'
+  Assert-True ($result.PackageHash -eq $result.SbomHash) 'release SBOM package checksum must match the final .nupkg.'
+  Assert-True ($result.RootSpdxId -in $result.DocumentDescribes) 'release SBOM must list the release package in documentDescribes.'
+}
+
+Invoke-Test 'recovery preserves an existing valid release SBOM' {
+  $result = Invoke-ReleaseSbomScenario -PreserveExisting
+  Assert-True ($result.PackageHash -eq $result.SbomHash) 'preserved release SBOM must remain bound to the final .nupkg.'
+}
+
+Invoke-Test 'release and recovery workflows carry and attest the release SBOM' {
+  foreach ($expected in @(
+      'Generate release SBOM',
+      'release.sbom.spdx.json',
+      'Attest release SBOM',
+      'sbom-path: ./artifacts/release-metadata/release.sbom.spdx.json'
+    )) {
+    Assert-Contains $releaseWorkflow $expected "normal release workflow must contain '$expected'."
+  }
+
+  foreach ($expected in @(
+      'Generate or preserve release SBOM',
+      '-PreserveExisting',
+      'release.sbom.spdx.json',
+      'Attest recovered release SBOM',
+      'sbom-path: ./artifacts/release-metadata/release.sbom.spdx.json'
+    )) {
+    Assert-Contains $recoveryWorkflow $expected "recovery workflow must contain '$expected'."
+  }
+}
+
+Invoke-Test 'release and recovery share a non-cancelling release lock' {
+  Assert-Contains $releaseWorkflow 'group: release' 'normal release must use the shared release lock.'
+  Assert-Contains $recoveryWorkflow 'group: release' 'recovery must use the shared release lock.'
+  Assert-Contains $releaseWorkflow 'cancel-in-progress: false' 'normal release must not cancel in-progress release mutations.'
+  Assert-Contains $recoveryWorkflow 'cancel-in-progress: false' 'recovery must not cancel in-progress release mutations.'
+}
+
+Invoke-Test 'recovery workflow reconciles governed release state' {
+  foreach ($expected in @(
+      'source_type',
+      'source_ref',
+      'Resolve release source',
+      'steps.source.outputs.resolved_version',
+      'steps.source.outputs.resolved_commit',
+      'original_release_run_id',
+      'gh run download',
+      'Recover and verify NuGet.org packages',
+      'Recover and verify GitHub Packages',
+      'Restore or verify release tag',
+      'Create or update GitHub Release',
+      'gh release delete-asset',
+      'gh release edit',
+      '--draft=false',
+      '--prerelease=false',
+      'recovery-attestation.json',
+      'validatedCommit',
+      'GitHub Release metadata and assets: exact governed state',
+      'Attest recovered release artifacts',
+      'Attest recovered release SBOM',
+      'release.sbom.spdx.json',
+      'Release recovery completed and governed release state reconciled.'
+    )) {
+    Assert-Contains $recoveryWorkflow $expected "recovery workflow must contain '$expected'."
+  }
+
+  Assert-Contains $recoveryWorkflow 'Refusing to move the tag' 'recovery must fail closed when the release tag points to the wrong commit.'
+  Assert-Contains $recoveryWorkflow 'asset set does not match governed artifacts' 'recovery must fail closed when GitHub Release assets differ from governed artifacts.'
+  Assert-Contains $recoveryWorkflow 'metadata does not match governed state' 'recovery must fail closed when GitHub Release metadata differs from governed state.'
+  Assert-Contains $recoveryWorkflow 'source=rebuild' 'recovery must expose deterministic rebuild fallback when original artifacts are unavailable.'
+  Assert-Contains $recoveryWorkflow 'headSha' 'recovery must validate that original artifacts came from the requested commit.'
+  Assert-True ($recoveryWorkflow.IndexOf('validated_commit:', [System.StringComparison]::Ordinal) -lt 0) 'validated_commit must not remain an operator-facing workflow input.'
+}
+
+Invoke-Test 'branch source resolves valid main version' {
+  $result = Invoke-ResolveSourceScenario -SourceType branch -SourceRef main -Version '3.1.2'
+  Assert-True $result.Succeeded "source resolution failed: $($result.Output)"
+  Assert-True ($result.Outputs['source_type'] -eq 'branch') 'source_type output should be branch.'
+  Assert-True ($result.Outputs['resolved_version'] -eq '3.1.2') 'branch mode should use the explicit version.'
+  Assert-True ($result.Outputs['resolved_commit'] -eq $result.MainCommit) 'branch mode should resolve origin/main HEAD.'
+  Assert-True ($result.Outputs['resolved_ref'] -eq 'refs/heads/main') 'branch mode should normalize the branch ref.'
+  Assert-True ($result.Outputs['resolved_branch'] -eq 'main') 'branch mode should expose the resolved branch.'
+}
+
+Invoke-Test 'branch source requires version' {
+  $result = Invoke-ResolveSourceScenario -SourceType branch -SourceRef main -Version ''
+  Assert-True (-not $result.Succeeded) 'branch mode without version should fail.'
+  Assert-Contains $result.Output 'Release source resolution failed' 'missing branch version diagnostic should come from source resolution.'
+}
+
+Invoke-Test 'branch source rejects invalid semantic version' {
+  $result = Invoke-ResolveSourceScenario -SourceType branch -SourceRef main -Version '3.1'
+  Assert-True (-not $result.Succeeded) 'invalid branch SemVer should fail.'
+  Assert-Contains $result.Output 'Invalid semantic version' 'invalid SemVer diagnostic should be clear.'
+}
+
+Invoke-Test 'branch source rejects disallowed branch' {
+  $result = Invoke-ResolveSourceScenario -SourceType branch -SourceRef develop -Version '3.1.2' -AddDevelopBranch
+  Assert-True (-not $result.Succeeded) 'non-main branch source should fail.'
+  Assert-Contains $result.Output 'Release source resolution failed' 'disallowed branch diagnostic should come from source resolution.'
+}
+
+Invoke-Test 'branch source rejects missing branch' {
+  $result = Invoke-ResolveSourceScenario -SourceType branch -SourceRef main -Version '3.1.2' -SkipPushMain
+  Assert-True (-not $result.Succeeded) 'recovery started outside main should fail closed.'
+  Assert-Contains $result.Output "Branch 'main' does not exist" 'missing branch diagnostic should be clear.'
+}
+
+Invoke-Test 'tag source derives version from release tag' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.1.2' -Tags @{ 'v3.1.2' = 'lightweight' }
+  Assert-True $result.Succeeded "tag source resolution failed: $($result.Output)"
+  Assert-True ($result.Outputs['source_type'] -eq 'tag') 'source_type output should be tag.'
+  Assert-True ($result.Outputs['resolved_version'] -eq '3.1.2') 'tag mode should derive the package version by removing only the leading v.'
+  Assert-True ($result.Outputs['resolved_commit'] -eq $result.MainCommit) 'tag mode should peel the tag to the target commit.'
+  Assert-True ($result.Outputs['resolved_ref'] -eq 'refs/tags/v3.1.2') 'tag mode should normalize the tag ref.'
+  Assert-True ($result.Outputs['resolved_tag'] -eq 'v3.1.2') 'tag mode should expose the resolved tag.'
+}
+
+Invoke-Test 'tag source supports prerelease tags' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.2.0-rc.1' -Tags @{ 'v3.2.0-rc.1' = 'lightweight' }
+  Assert-True $result.Succeeded "prerelease tag source resolution failed: $($result.Output)"
+  Assert-True ($result.Outputs['resolved_version'] -eq '3.2.0-rc.1') 'prerelease tag should derive the prerelease package version.'
+}
+
+Invoke-Test 'tag source peels annotated tag to commit' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.2.0-rc.1' -Tags @{ 'v3.2.0-rc.1' = 'annotated' }
+  Assert-True $result.Succeeded "annotated tag source resolution failed: $($result.Output)"
+  Assert-True ($result.Outputs['resolved_commit'] -eq $result.MainCommit) 'annotated tag should peel to the underlying commit, not the tag object.'
+}
+
+Invoke-Test 'tag source peels lightweight tag to commit' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.1.2' -Tags @{ 'v3.1.2' = 'lightweight' }
+  Assert-True $result.Succeeded "lightweight tag source resolution failed: $($result.Output)"
+  Assert-True ($result.Outputs['resolved_commit'] -eq $result.MainCommit) 'lightweight tag should resolve to its target commit.'
+}
+
+Invoke-Test 'tag source rejects missing tag' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.1.2'
+  Assert-True (-not $result.Succeeded) 'missing tag should fail.'
+  Assert-Contains $result.Output "does not exist on remote" 'missing tag diagnostic should be clear.'
+}
+
+Invoke-Test 'tag source rejects malformed tag' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.1' -Tags @{ 'v3.1' = 'lightweight' }
+  Assert-True (-not $result.Succeeded) 'malformed tag should fail.'
+  Assert-Contains $result.Output 'Invalid semantic version' 'malformed tag diagnostic should validate the derived version.'
+}
+
+Invoke-Test 'tag source requires v prefix' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef '3.1.2' -Tags @{ '3.1.2' = 'lightweight' }
+  Assert-True (-not $result.Succeeded) 'tag without v prefix should fail.'
+  Assert-Contains $result.Output 'v<SemVer>' 'missing v prefix diagnostic should be clear.'
+}
+
+Invoke-Test 'tag source rejects invalid release version' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v2.9.9' -Tags @{ 'v2.9.9' = 'lightweight' }
+  Assert-True (-not $result.Succeeded) 'tag below the release major floor should fail.'
+  Assert-Contains $result.Output 'major version 3 or later' 'major-version diagnostic should be preserved.'
+}
+
+Invoke-Test 'tag source keeps v3.0.0 immutable' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.0.0' -Tags @{ 'v3.0.0' = 'lightweight' }
+  Assert-True (-not $result.Succeeded) 'v3.0.0 tag recovery should fail.'
+  Assert-Contains $result.Output '3.0.0 is immutable' 'immutable 3.0.0 diagnostic should be preserved.'
+}
+
+Invoke-Test 'tag source rejects explicit version input' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.1.2' -Version '3.1.3' -Tags @{ 'v3.1.2' = 'lightweight' }
+  Assert-True (-not $result.Succeeded) 'tag mode with explicit version should fail.'
+  Assert-Contains $result.Output 'Release source resolution failed' 'tag-mode version diagnostic should come from source resolution.'
+}
+
+Invoke-Test 'release artifact validation rejects tag-derived version mismatch' {
+  $result = Invoke-ReleaseArtifactValidationScenario -ExpectedVersion '3.1.2' -ArtifactVersion '3.2.0'
+  Assert-True (-not $result.Succeeded) 'artifact version mismatch should fail.'
+  Assert-Contains $result.Output 'A.3.1.2.nupkg' 'artifact version mismatch diagnostic should include the expected versioned package file.'
+}
+
+Invoke-Test 'release artifact validation rejects resolved commit mismatch' {
+  $result = Invoke-ReleaseArtifactValidationScenario `
+    -ExpectedCommit '1111111111111111111111111111111111111111' `
+    -ArtifactCommit '2222222222222222222222222222222222222222'
+  Assert-True (-not $result.Succeeded) 'artifact commit mismatch should fail.'
+}
+
+Invoke-Test 'original release artifact can match resolved tag identity' {
+  $result = Invoke-ReleaseArtifactValidationScenario `
+    -ExpectedVersion '3.1.2' `
+    -ArtifactVersion '3.1.2' `
+    -ExpectedCommit '1111111111111111111111111111111111111111' `
+    -ArtifactCommit '1111111111111111111111111111111111111111'
+  Assert-True $result.Succeeded "matching tag-derived artifact identity should pass: $($result.Output)"
+}
+
+Invoke-Test 'original release artifact can match resolved branch identity' {
+  $result = Invoke-ReleaseArtifactValidationScenario `
+    -ExpectedVersion '3.1.3' `
+    -ArtifactVersion '3.1.3' `
+    -ExpectedCommit '3333333333333333333333333333333333333333' `
+    -ArtifactCommit '3333333333333333333333333333333333333333'
+  Assert-True $result.Succeeded "matching branch-derived artifact identity should pass: $($result.Output)"
+}
+
+Invoke-Test 'release checksum verification accepts a complete artifact set' {
+  $result = Invoke-ChecksumScenario
+  Assert-True $result.Succeeded "checksum verification failed: $($result.Output)"
+}
+
+Invoke-Test 'release checksum verification rejects artifact hash mismatch' {
+  $result = Invoke-ChecksumScenario -CorruptPackageHash
+  Assert-True (-not $result.Succeeded) 'checksum mismatch should fail.'
+  Assert-Contains $result.Output 'Checksum mismatch for' 'checksum mismatch diagnostic should explain the failure.'
+  Assert-Contains $result.Output 'A.1.2.3.nupkg' 'checksum mismatch diagnostic should identify the package artifact.'
+}
+
+$twoPackages = @(
+  [ordered]@{ project = 'A'; projectPath = 'src/A/A.csproj'; packageId = 'A'; assetKind = 'library'; symbols = $true },
+  [ordered]@{ project = 'B'; projectPath = 'src/B/B.csproj'; packageId = 'B'; assetKind = 'library'; symbols = $false }
+)
+
+Invoke-Test 'NuGet.org recovery publishes all missing primary packages and symbol packages' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('404', '200')
+    B = @('404', '200')
+  }
+
+  Assert-True $result.Succeeded "publish script failed: $($result.Output)"
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'A.9.9.9-test.1.nupkg|*--no-symbols*' }).Count -eq 1) 'A primary package should be pushed with --no-symbols.'
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'B.9.9.9-test.1.nupkg|*--no-symbols*' }).Count -eq 1) 'B primary package should be pushed with --no-symbols.'
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'A.9.9.9-test.1.snupkg|*--skip-duplicate*' }).Count -eq 1) 'A symbol package should be pushed separately with duplicate-safe tooling semantics.'
+}
+
+Invoke-Test 'NuGet.org recovery validates and skips identical existing packages' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('200')
+    B = @('404', '200')
+  }
+
+  Assert-True $result.Succeeded "publish script failed: $($result.Output)"
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'A.9.9.9-test.1.nupkg|*' }).Count -eq 0) 'Existing identical A primary package should not be pushed.'
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'B.9.9.9-test.1.nupkg|*' }).Count -eq 1) 'Missing B primary package should be pushed.'
+}
+
+Invoke-Test 'NuGet.org recovery fails closed on existing artifact mismatch' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('200')
+    B = @('404', '200')
+  } -DifferentRemotePackages @('A')
+
+  Assert-True (-not $result.Succeeded) 'artifact mismatch should fail.'
+  Assert-Contains $result.Output 'does not match the local artifact' 'artifact mismatch diagnostic should be precise.'
+}
+
+Invoke-Test 'NuGet.org recovery validates all existing packages before first push' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('404')
+    B = @('200')
+  } -DifferentRemotePackages @('B')
+
+  Assert-True (-not $result.Succeeded) 'later existing package mismatch should fail before publication.'
+  Assert-Contains $result.Output 'does not match the local artifact' 'artifact mismatch diagnostic should be precise.'
+  Assert-True (@($result.PushLog).Count -eq 0) 'No package should be pushed before every existing package has passed content preflight.'
+}
+
+Invoke-Test 'NuGet.org async indexing does not block submission of remaining primary packages' {
+  $fivePackages = @(
+    [ordered]@{ project = 'A'; projectPath = 'src/A/A.csproj'; packageId = 'A'; assetKind = 'library'; symbols = $true },
+    [ordered]@{ project = 'B'; projectPath = 'src/B/B.csproj'; packageId = 'B'; assetKind = 'library'; symbols = $false },
+    [ordered]@{ project = 'C'; projectPath = 'src/C/C.csproj'; packageId = 'C'; assetKind = 'library'; symbols = $false },
+    [ordered]@{ project = 'D'; projectPath = 'src/D/D.csproj'; packageId = 'D'; assetKind = 'library'; symbols = $false },
+    [ordered]@{ project = 'E'; projectPath = 'src/E/E.csproj'; packageId = 'E'; assetKind = 'library'; symbols = $false }
+  )
+
+  $result = Invoke-PublishScenario -Packages $fivePackages -StatusSequences @{
+    A = @('404', '404', '200')
+    B = @('404', '200')
+    C = @('404', '200')
+    D = @('404', '200')
+    E = @('404', '200')
+  }
+
+  Assert-True $result.Succeeded "publish script failed: $($result.Output)"
+  foreach ($id in @('A', 'B', 'C', 'D', 'E')) {
+    Assert-True (@($result.PushLog | Where-Object { $_ -like "$id.9.9.9-test.1.nupkg|*" }).Count -eq 1) "$id should be submitted before final convergence can fail or wait."
+  }
+
+  $firstDownloadIndex = [Array]::IndexOf([string[]]$result.EventLog, 'curl-download:a')
+  Assert-True ($firstDownloadIndex -gt 0) 'Convergence download should occur only after publication status checks.'
+  Assert-Contains $result.Output 'indexing still pending for A' 'pending indexing diagnostic should identify the package that has not converged.'
+}
+
+Invoke-Test 'NuGet.org final convergence times out with precise missing identities' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('404')
+    B = @('404')
+  } -MaxAttempts 2
+
+  Assert-True (-not $result.Succeeded) 'convergence timeout should fail.'
+  Assert-Contains $result.Output 'Still missing from the Flat Container: A, B' 'timeout should list the exact missing package IDs.'
+}
+
+Invoke-Test 'NuGet.org unexpected HTTP status fails closed' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('503')
+    B = @('404', '200')
+  }
+
+  Assert-True (-not $result.Succeeded) 'unexpected HTTP status should fail.'
+  Assert-Contains $result.Output 'Unexpected NuGet.org response HTTP 503 for A' 'unexpected status diagnostic should include package and status.'
+}
+
+Invoke-Test 'symbol-enabled package is not considered recovered solely by primary visibility' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('200')
+    B = @('200')
+  }
+
+  Assert-True $result.Succeeded "publish script failed: $($result.Output)"
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'A.9.9.9-test.1.snupkg|*--skip-duplicate*' }).Count -eq 1) 'Visible primary package must still trigger independent symbol package recovery.'
+  Assert-Contains $result.Output 'does not expose a public content-comparison endpoint for .snupkg artifacts' 'symbol limitation should be logged.'
+}
+
+Invoke-Test 'GitHub Packages recovery validates and skips identical existing packages' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -Registry GitHubPackages -StatusSequences @{
+    A = @('200')
+    B = @('404', '200')
+  }
+
+  Assert-True $result.Succeeded "GitHub Packages recovery failed: $($result.Output)"
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'A.9.9.9-test.1.nupkg|*' }).Count -eq 0) 'Existing identical GitHub Packages artifact should not be pushed.'
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'B.9.9.9-test.1.nupkg|*' }).Count -eq 1) 'Missing GitHub Packages artifact should be pushed.'
+  Assert-Contains $result.Output 'GitHub Packages: validated existing A 9.9.9-test.1 against local artifact content' 'existing GitHub Packages artifact should be content-compared.'
+}
+
+Invoke-Test 'GitHub Packages recovery fails closed on existing artifact mismatch' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -Registry GitHubPackages -StatusSequences @{
+    A = @('200')
+    B = @('404', '200')
+  } -DifferentRemotePackages @('A')
+
+  Assert-True (-not $result.Succeeded) 'GitHub Packages artifact mismatch should fail.'
+  Assert-Contains $result.Output 'does not match the local artifact' 'GitHub Packages mismatch diagnostic should be precise.'
+  Assert-True (@($result.PushLog).Count -eq 0) 'GitHub Packages recovery should not publish missing packages after an existing package mismatch.'
+}
+
+if ($failures.Count -gt 0) {
+  throw "Release governance tests failed:`n$($failures -join [Environment]::NewLine)"
+}
+
+Write-Host "Release governance tests passed."
+ }).Count -eq 1) 'rollback must remove the partial GitHub Release.'
+  Assert-True (@($result.Requests | Where-Object { $_ -match '^DELETE .*/git/refs/tags/' }).Count -eq 0) 'rollback must never delete the validated release tag.'
+  Assert-Contains $result.Output 'Git tag: retained v9.9.9-test.1' 'rollback must explicitly report that the release tag is retained.'
+}
+
+Invoke-Test 'release workflow does not request release tag deletion during rollback' {
+  Assert-True ($releaseWorkflow.IndexOf('-DeleteReleaseTag', [System.StringComparison]::Ordinal) -lt 0) 'release workflow must not pass -DeleteReleaseTag to rollback-release.ps1.'
+}
+
+Invoke-Test 'recovery workflow reconciles governed release state' {
+  foreach ($expected in @(
+      'source_type',
+      'source_ref',
+      'Resolve release source',
+      'steps.source.outputs.resolved_version',
+      'steps.source.outputs.resolved_commit',
+      'original_release_run_id',
+      'gh run download',
+      'Recover and verify NuGet.org packages',
+      'Recover and verify GitHub Packages',
+      'Restore or verify release tag',
+      'Create or update GitHub Release',
+      'gh release delete-asset',
+      'gh release edit',
+      '--draft=false',
+      '--prerelease=false',
+      'recovery-attestation.json',
+      'validatedCommit',
+      'GitHub Release metadata and assets: exact governed state',
+      'Attest recovered release artifacts',
+      'Attest recovered release SBOM',
+      'release.sbom.spdx.json',
+      'Release recovery completed and governed release state reconciled.'
+    )) {
+    Assert-Contains $recoveryWorkflow $expected "recovery workflow must contain '$expected'."
+  }
+
+  Assert-Contains $recoveryWorkflow 'Refusing to move the tag' 'recovery must fail closed when the release tag points to the wrong commit.'
+  Assert-Contains $recoveryWorkflow 'asset set does not match governed artifacts' 'recovery must fail closed when GitHub Release assets differ from governed artifacts.'
+  Assert-Contains $recoveryWorkflow 'metadata does not match governed state' 'recovery must fail closed when GitHub Release metadata differs from governed state.'
+  Assert-Contains $recoveryWorkflow 'source=rebuild' 'recovery must expose deterministic rebuild fallback when original artifacts are unavailable.'
+  Assert-Contains $recoveryWorkflow 'headSha' 'recovery must validate that original artifacts came from the requested commit.'
+  Assert-True ($recoveryWorkflow.IndexOf('validated_commit:', [System.StringComparison]::Ordinal) -lt 0) 'validated_commit must not remain an operator-facing workflow input.'
+}
+
+Invoke-Test 'branch source resolves valid main version' {
+  $result = Invoke-ResolveSourceScenario -SourceType branch -SourceRef main -Version '3.1.2'
+  Assert-True $result.Succeeded "source resolution failed: $($result.Output)"
+  Assert-True ($result.Outputs['source_type'] -eq 'branch') 'source_type output should be branch.'
+  Assert-True ($result.Outputs['resolved_version'] -eq '3.1.2') 'branch mode should use the explicit version.'
+  Assert-True ($result.Outputs['resolved_commit'] -eq $result.MainCommit) 'branch mode should resolve origin/main HEAD.'
+  Assert-True ($result.Outputs['resolved_ref'] -eq 'refs/heads/main') 'branch mode should normalize the branch ref.'
+  Assert-True ($result.Outputs['resolved_branch'] -eq 'main') 'branch mode should expose the resolved branch.'
+}
+
+Invoke-Test 'branch source requires version' {
+  $result = Invoke-ResolveSourceScenario -SourceType branch -SourceRef main -Version ''
+  Assert-True (-not $result.Succeeded) 'branch mode without version should fail.'
+  Assert-Contains $result.Output 'Release source resolution failed' 'missing branch version diagnostic should come from source resolution.'
+}
+
+Invoke-Test 'branch source rejects invalid semantic version' {
+  $result = Invoke-ResolveSourceScenario -SourceType branch -SourceRef main -Version '3.1'
+  Assert-True (-not $result.Succeeded) 'invalid branch SemVer should fail.'
+  Assert-Contains $result.Output 'Invalid semantic version' 'invalid SemVer diagnostic should be clear.'
+}
+
+Invoke-Test 'branch source rejects disallowed branch' {
+  $result = Invoke-ResolveSourceScenario -SourceType branch -SourceRef develop -Version '3.1.2' -AddDevelopBranch
+  Assert-True (-not $result.Succeeded) 'non-main branch source should fail.'
+  Assert-Contains $result.Output 'Release source resolution failed' 'disallowed branch diagnostic should come from source resolution.'
+}
+
+Invoke-Test 'branch source rejects missing branch' {
+  $result = Invoke-ResolveSourceScenario -SourceType branch -SourceRef main -Version '3.1.2' -SkipPushMain
+  Assert-True (-not $result.Succeeded) 'recovery started outside main should fail closed.'
+  Assert-Contains $result.Output "Branch 'main' does not exist" 'missing branch diagnostic should be clear.'
+}
+
+Invoke-Test 'tag source derives version from release tag' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.1.2' -Tags @{ 'v3.1.2' = 'lightweight' }
+  Assert-True $result.Succeeded "tag source resolution failed: $($result.Output)"
+  Assert-True ($result.Outputs['source_type'] -eq 'tag') 'source_type output should be tag.'
+  Assert-True ($result.Outputs['resolved_version'] -eq '3.1.2') 'tag mode should derive the package version by removing only the leading v.'
+  Assert-True ($result.Outputs['resolved_commit'] -eq $result.MainCommit) 'tag mode should peel the tag to the target commit.'
+  Assert-True ($result.Outputs['resolved_ref'] -eq 'refs/tags/v3.1.2') 'tag mode should normalize the tag ref.'
+  Assert-True ($result.Outputs['resolved_tag'] -eq 'v3.1.2') 'tag mode should expose the resolved tag.'
+}
+
+Invoke-Test 'tag source supports prerelease tags' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.2.0-rc.1' -Tags @{ 'v3.2.0-rc.1' = 'lightweight' }
+  Assert-True $result.Succeeded "prerelease tag source resolution failed: $($result.Output)"
+  Assert-True ($result.Outputs['resolved_version'] -eq '3.2.0-rc.1') 'prerelease tag should derive the prerelease package version.'
+}
+
+Invoke-Test 'tag source peels annotated tag to commit' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.2.0-rc.1' -Tags @{ 'v3.2.0-rc.1' = 'annotated' }
+  Assert-True $result.Succeeded "annotated tag source resolution failed: $($result.Output)"
+  Assert-True ($result.Outputs['resolved_commit'] -eq $result.MainCommit) 'annotated tag should peel to the underlying commit, not the tag object.'
+}
+
+Invoke-Test 'tag source peels lightweight tag to commit' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.1.2' -Tags @{ 'v3.1.2' = 'lightweight' }
+  Assert-True $result.Succeeded "lightweight tag source resolution failed: $($result.Output)"
+  Assert-True ($result.Outputs['resolved_commit'] -eq $result.MainCommit) 'lightweight tag should resolve to its target commit.'
+}
+
+Invoke-Test 'tag source rejects missing tag' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.1.2'
+  Assert-True (-not $result.Succeeded) 'missing tag should fail.'
+  Assert-Contains $result.Output "does not exist on remote" 'missing tag diagnostic should be clear.'
+}
+
+Invoke-Test 'tag source rejects malformed tag' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.1' -Tags @{ 'v3.1' = 'lightweight' }
+  Assert-True (-not $result.Succeeded) 'malformed tag should fail.'
+  Assert-Contains $result.Output 'Invalid semantic version' 'malformed tag diagnostic should validate the derived version.'
+}
+
+Invoke-Test 'tag source requires v prefix' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef '3.1.2' -Tags @{ '3.1.2' = 'lightweight' }
+  Assert-True (-not $result.Succeeded) 'tag without v prefix should fail.'
+  Assert-Contains $result.Output 'v<SemVer>' 'missing v prefix diagnostic should be clear.'
+}
+
+Invoke-Test 'tag source rejects invalid release version' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v2.9.9' -Tags @{ 'v2.9.9' = 'lightweight' }
+  Assert-True (-not $result.Succeeded) 'tag below the release major floor should fail.'
+  Assert-Contains $result.Output 'major version 3 or later' 'major-version diagnostic should be preserved.'
+}
+
+Invoke-Test 'tag source keeps v3.0.0 immutable' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.0.0' -Tags @{ 'v3.0.0' = 'lightweight' }
+  Assert-True (-not $result.Succeeded) 'v3.0.0 tag recovery should fail.'
+  Assert-Contains $result.Output '3.0.0 is immutable' 'immutable 3.0.0 diagnostic should be preserved.'
+}
+
+Invoke-Test 'tag source rejects explicit version input' {
+  $result = Invoke-ResolveSourceScenario -SourceType tag -SourceRef 'v3.1.2' -Version '3.1.3' -Tags @{ 'v3.1.2' = 'lightweight' }
+  Assert-True (-not $result.Succeeded) 'tag mode with explicit version should fail.'
+  Assert-Contains $result.Output 'Release source resolution failed' 'tag-mode version diagnostic should come from source resolution.'
+}
+
+Invoke-Test 'release artifact validation rejects tag-derived version mismatch' {
+  $result = Invoke-ReleaseArtifactValidationScenario -ExpectedVersion '3.1.2' -ArtifactVersion '3.2.0'
+  Assert-True (-not $result.Succeeded) 'artifact version mismatch should fail.'
+  Assert-Contains $result.Output 'A.3.1.2.nupkg' 'artifact version mismatch diagnostic should include the expected versioned package file.'
+}
+
+Invoke-Test 'release artifact validation rejects resolved commit mismatch' {
+  $result = Invoke-ReleaseArtifactValidationScenario `
+    -ExpectedCommit '1111111111111111111111111111111111111111' `
+    -ArtifactCommit '2222222222222222222222222222222222222222'
+  Assert-True (-not $result.Succeeded) 'artifact commit mismatch should fail.'
+}
+
+Invoke-Test 'original release artifact can match resolved tag identity' {
+  $result = Invoke-ReleaseArtifactValidationScenario `
+    -ExpectedVersion '3.1.2' `
+    -ArtifactVersion '3.1.2' `
+    -ExpectedCommit '1111111111111111111111111111111111111111' `
+    -ArtifactCommit '1111111111111111111111111111111111111111'
+  Assert-True $result.Succeeded "matching tag-derived artifact identity should pass: $($result.Output)"
+}
+
+Invoke-Test 'original release artifact can match resolved branch identity' {
+  $result = Invoke-ReleaseArtifactValidationScenario `
+    -ExpectedVersion '3.1.3' `
+    -ArtifactVersion '3.1.3' `
+    -ExpectedCommit '3333333333333333333333333333333333333333' `
+    -ArtifactCommit '3333333333333333333333333333333333333333'
+  Assert-True $result.Succeeded "matching branch-derived artifact identity should pass: $($result.Output)"
+}
+
+Invoke-Test 'release checksum verification accepts a complete artifact set' {
+  $result = Invoke-ChecksumScenario
+  Assert-True $result.Succeeded "checksum verification failed: $($result.Output)"
+}
+
+Invoke-Test 'release checksum verification rejects artifact hash mismatch' {
+  $result = Invoke-ChecksumScenario -CorruptPackageHash
+  Assert-True (-not $result.Succeeded) 'checksum mismatch should fail.'
+  Assert-Contains $result.Output 'Checksum mismatch for' 'checksum mismatch diagnostic should explain the failure.'
+  Assert-Contains $result.Output 'A.1.2.3.nupkg' 'checksum mismatch diagnostic should identify the package artifact.'
+}
+
+$twoPackages = @(
+  [ordered]@{ project = 'A'; projectPath = 'src/A/A.csproj'; packageId = 'A'; assetKind = 'library'; symbols = $true },
+  [ordered]@{ project = 'B'; projectPath = 'src/B/B.csproj'; packageId = 'B'; assetKind = 'library'; symbols = $false }
+)
+
+Invoke-Test 'NuGet.org recovery publishes all missing primary packages and symbol packages' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('404', '200')
+    B = @('404', '200')
+  }
+
+  Assert-True $result.Succeeded "publish script failed: $($result.Output)"
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'A.9.9.9-test.1.nupkg|*--no-symbols*' }).Count -eq 1) 'A primary package should be pushed with --no-symbols.'
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'B.9.9.9-test.1.nupkg|*--no-symbols*' }).Count -eq 1) 'B primary package should be pushed with --no-symbols.'
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'A.9.9.9-test.1.snupkg|*--skip-duplicate*' }).Count -eq 1) 'A symbol package should be pushed separately with duplicate-safe tooling semantics.'
+}
+
+Invoke-Test 'NuGet.org recovery validates and skips identical existing packages' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('200')
+    B = @('404', '200')
+  }
+
+  Assert-True $result.Succeeded "publish script failed: $($result.Output)"
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'A.9.9.9-test.1.nupkg|*' }).Count -eq 0) 'Existing identical A primary package should not be pushed.'
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'B.9.9.9-test.1.nupkg|*' }).Count -eq 1) 'Missing B primary package should be pushed.'
+}
+
+Invoke-Test 'NuGet.org recovery fails closed on existing artifact mismatch' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('200')
+    B = @('404', '200')
+  } -DifferentRemotePackages @('A')
+
+  Assert-True (-not $result.Succeeded) 'artifact mismatch should fail.'
+  Assert-Contains $result.Output 'does not match the local artifact' 'artifact mismatch diagnostic should be precise.'
+}
+
+Invoke-Test 'NuGet.org recovery validates all existing packages before first push' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('404')
+    B = @('200')
+  } -DifferentRemotePackages @('B')
+
+  Assert-True (-not $result.Succeeded) 'later existing package mismatch should fail before publication.'
+  Assert-Contains $result.Output 'does not match the local artifact' 'artifact mismatch diagnostic should be precise.'
+  Assert-True (@($result.PushLog).Count -eq 0) 'No package should be pushed before every existing package has passed content preflight.'
+}
+
+Invoke-Test 'NuGet.org async indexing does not block submission of remaining primary packages' {
+  $fivePackages = @(
+    [ordered]@{ project = 'A'; projectPath = 'src/A/A.csproj'; packageId = 'A'; assetKind = 'library'; symbols = $true },
+    [ordered]@{ project = 'B'; projectPath = 'src/B/B.csproj'; packageId = 'B'; assetKind = 'library'; symbols = $false },
+    [ordered]@{ project = 'C'; projectPath = 'src/C/C.csproj'; packageId = 'C'; assetKind = 'library'; symbols = $false },
+    [ordered]@{ project = 'D'; projectPath = 'src/D/D.csproj'; packageId = 'D'; assetKind = 'library'; symbols = $false },
+    [ordered]@{ project = 'E'; projectPath = 'src/E/E.csproj'; packageId = 'E'; assetKind = 'library'; symbols = $false }
+  )
+
+  $result = Invoke-PublishScenario -Packages $fivePackages -StatusSequences @{
+    A = @('404', '404', '200')
+    B = @('404', '200')
+    C = @('404', '200')
+    D = @('404', '200')
+    E = @('404', '200')
+  }
+
+  Assert-True $result.Succeeded "publish script failed: $($result.Output)"
+  foreach ($id in @('A', 'B', 'C', 'D', 'E')) {
+    Assert-True (@($result.PushLog | Where-Object { $_ -like "$id.9.9.9-test.1.nupkg|*" }).Count -eq 1) "$id should be submitted before final convergence can fail or wait."
+  }
+
+  $firstDownloadIndex = [Array]::IndexOf([string[]]$result.EventLog, 'curl-download:a')
+  Assert-True ($firstDownloadIndex -gt 0) 'Convergence download should occur only after publication status checks.'
+  Assert-Contains $result.Output 'indexing still pending for A' 'pending indexing diagnostic should identify the package that has not converged.'
+}
+
+Invoke-Test 'NuGet.org final convergence times out with precise missing identities' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('404')
+    B = @('404')
+  } -MaxAttempts 2
+
+  Assert-True (-not $result.Succeeded) 'convergence timeout should fail.'
+  Assert-Contains $result.Output 'Still missing from the Flat Container: A, B' 'timeout should list the exact missing package IDs.'
+}
+
+Invoke-Test 'NuGet.org unexpected HTTP status fails closed' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('503')
+    B = @('404', '200')
+  }
+
+  Assert-True (-not $result.Succeeded) 'unexpected HTTP status should fail.'
+  Assert-Contains $result.Output 'Unexpected NuGet.org response HTTP 503 for A' 'unexpected status diagnostic should include package and status.'
+}
+
+Invoke-Test 'symbol-enabled package is not considered recovered solely by primary visibility' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('200')
+    B = @('200')
+  }
+
+  Assert-True $result.Succeeded "publish script failed: $($result.Output)"
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'A.9.9.9-test.1.snupkg|*--skip-duplicate*' }).Count -eq 1) 'Visible primary package must still trigger independent symbol package recovery.'
+  Assert-Contains $result.Output 'does not expose a public content-comparison endpoint for .snupkg artifacts' 'symbol limitation should be logged.'
+}
+
+Invoke-Test 'GitHub Packages recovery validates and skips identical existing packages' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -Registry GitHubPackages -StatusSequences @{
+    A = @('200')
+    B = @('404', '200')
+  }
+
+  Assert-True $result.Succeeded "GitHub Packages recovery failed: $($result.Output)"
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'A.9.9.9-test.1.nupkg|*' }).Count -eq 0) 'Existing identical GitHub Packages artifact should not be pushed.'
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'B.9.9.9-test.1.nupkg|*' }).Count -eq 1) 'Missing GitHub Packages artifact should be pushed.'
+  Assert-Contains $result.Output 'GitHub Packages: validated existing A 9.9.9-test.1 against local artifact content' 'existing GitHub Packages artifact should be content-compared.'
+}
+
+Invoke-Test 'GitHub Packages recovery fails closed on existing artifact mismatch' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -Registry GitHubPackages -StatusSequences @{
+    A = @('200')
+    B = @('404', '200')
+  } -DifferentRemotePackages @('A')
+
+  Assert-True (-not $result.Succeeded) 'GitHub Packages artifact mismatch should fail.'
+  Assert-Contains $result.Output 'does not match the local artifact' 'GitHub Packages mismatch diagnostic should be precise.'
+  Assert-True (@($result.PushLog).Count -eq 0) 'GitHub Packages recovery should not publish missing packages after an existing package mismatch.'
+}
+
+if ($failures.Count -gt 0) {
+  throw "Release governance tests failed:`n$($failures -join [Environment]::NewLine)"
+}
+
+Write-Host "Release governance tests passed."
+) {
+        return [pscustomobject]@{
+          StatusCode = 204
+          Content = ''
+        }
+      }
+
+      throw "Unexpected rollback request: $Method $Uri"
+    }
+
+    $exitCode = 0
+    $output = @(
+      try {
+        & (Join-Path $repoRoot 'eng/rollback-release.ps1') `
+          -Version '9.9.9-test.1' `
+          -ReleaseTag 'v9.9.9-test.1' `
+          -Repository 'rodri-oliveira-dev/Dapper-FluentMap' `
+          -GitHubToken 'test-token' 2>&1
+      }
+      catch {
+        $exitCode = 1
+        $_
+      }
+    )
+
+    return [pscustomobject]@{
+      Succeeded = $exitCode -eq 0
+      Output = ($output | Out-String)
+      Requests = if (Test-Path -LiteralPath $requestLog) { @(Get-Content -LiteralPath $requestLog) } else { @() }
+    }
+  }
+  finally {
+    Remove-Item function:\Invoke-WebRequest -ErrorAction SilentlyContinue
+    $env:MOCK_ROLLBACK_REQUEST_LOG = $oldRequestLog
+    if (Test-Path -LiteralPath $tempRoot) {
+      Remove-Item -LiteralPath $tempRoot -Recurse -Force
+    }
+  }
+}
+
 $releaseWorkflow = Get-Content -Raw -LiteralPath (Join-Path $repoRoot '.github/workflows/release.yml')
 $recoveryWorkflow = Get-Content -Raw -LiteralPath (Join-Path $repoRoot '.github/workflows/release-recovery-missing-nuget.yml')
 
