@@ -134,7 +134,7 @@ jobs:
             switch ($httpStatus) {
               '200' {
                 if (-not $tagExists) {
-                  Write-Error "NuGet.org already has $packageId $env:VERSION while release tag '$releaseTag' is absent. This indicates partial prior publication; use the Recovery - Reconcile release state workflow instead of starting a new release from the current main commit."
+                  Write-Error "NuGet.org already has $packageId $env:VERSION while release tag '$releaseTag' is absent. This indicates partial prior publication. Use Recovery - Reconcile release state with source_type=branch, source_ref=main, version=$env:VERSION, and original_release_run_id set to the original Release run so recovery resolves its headSha instead of current main."
                   exit 1
                 }
 
