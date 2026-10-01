@@ -9,6 +9,8 @@ param(
 
   [string]$Version,
 
+  [string]$CommitOverride,
+
   [string]$Remote = 'origin',
 
   [string]$AllowedBranch = 'main',
@@ -114,6 +116,126 @@ function Write-OutputValue {
 $sourceTypeNormalized = $SourceType.ToLowerInvariant()
 $sourceRefNormalized = $SourceRef.Trim()
 $versionNormalized = if ($null -eq $Version) { '' } else { $Version.Trim() }
+$commitOverrideNormalized = if ($null -eq $CommitOverride) { '' } else { $CommitOverride.Trim().ToLowerInvariant() }
+
+if (-not [string]::IsNullOrWhiteSpace($commitOverrideNormalized) -and $commitOverrideNormalized -notmatch '^[0-9a-f]{40}
+
+if ([string]::IsNullOrWhiteSpace($sourceRefNormalized)) {
+  Fail 'source_ref is required.'
+}
+
+if (-not [string]::IsNullOrWhiteSpace($CurrentWorkflowRef) -and $CurrentWorkflowRef -ne "refs/heads/$AllowedBranch") {
+  Fail "The recovery workflow must be started from $AllowedBranch. Current ref: $CurrentWorkflowRef"
+}
+
+$resolvedBranch = ''
+$resolvedTag = ''
+$resolvedRef = ''
+$resolvedVersion = ''
+$resolvedCommit = ''
+$releaseHistoryRef = "refs/heads/$AllowedBranch"
+
+switch ($sourceTypeNormalized) {
+  'branch' {
+    if ($sourceRefNormalized -ne $AllowedBranch) {
+      Fail "Branch-mode recovery is restricted to '$AllowedBranch'. Provided source_ref: '$sourceRefNormalized'."
+    }
+
+    if ([string]::IsNullOrWhiteSpace($versionNormalized)) {
+      Fail 'version is required when source_type=branch.'
+    }
+
+    if ($versionNormalized.StartsWith('v', [System.StringComparison]::OrdinalIgnoreCase)) {
+      Fail "Enter the semantic version without the 'v' prefix when source_type=branch."
+    }
+
+    Assert-SemVer -Value $versionNormalized
+    Invoke-Git -Arguments @('check-ref-format', '--branch', $sourceRefNormalized) | Out-Null
+
+    $remoteBranch = Invoke-Git -Arguments @('ls-remote', '--exit-code', '--heads', $Remote, $sourceRefNormalized) -AllowFailure
+    if ($remoteBranch.ExitCode -ne 0) {
+      Fail "Branch '$sourceRefNormalized' does not exist on remote '$Remote'."
+    }
+
+    Invoke-Git -Arguments @('fetch', '--no-tags', $Remote, "+refs/heads/$sourceRefNormalized`:refs/remotes/$Remote/$sourceRefNormalized") | Out-Null
+    if ([string]::IsNullOrWhiteSpace($commitOverrideNormalized)) {
+      $resolvedCommit = Get-SingleCommit -Revision "refs/remotes/$Remote/$sourceRefNormalized"
+    }
+    else {
+      $resolvedCommit = Get-SingleCommit -Revision $commitOverrideNormalized
+    }
+    Assert-ReachableFromAllowedBranch -Commit $resolvedCommit
+
+    $resolvedVersion = $versionNormalized
+    $resolvedBranch = $sourceRefNormalized
+    $resolvedRef = "refs/heads/$sourceRefNormalized"
+  }
+
+  'tag' {
+    if (-not [string]::IsNullOrWhiteSpace($versionNormalized)) {
+      Fail 'Do not provide version when source_type=tag; the version is derived from the tag.'
+    }
+
+    if ($sourceRefNormalized -notmatch '^v(.+)$') {
+      Fail "Tag source_ref must use the release tag format v<SemVer>."
+    }
+
+    $resolvedVersion = $Matches[1]
+    Assert-SemVer -Value $resolvedVersion
+    Invoke-Git -Arguments @('check-ref-format', "refs/tags/$sourceRefNormalized") | Out-Null
+
+    $remoteTag = Invoke-Git -Arguments @('ls-remote', '--exit-code', '--tags', $Remote, "refs/tags/$sourceRefNormalized") -AllowFailure
+    if ($remoteTag.ExitCode -ne 0) {
+      Fail "Tag '$sourceRefNormalized' does not exist on remote '$Remote'."
+    }
+
+    Invoke-Git -Arguments @('fetch', '--force', '--no-tags', $Remote, "+refs/tags/$sourceRefNormalized`:refs/tags/$sourceRefNormalized") | Out-Null
+    $resolvedCommit = Get-SingleCommit -Revision "refs/tags/$sourceRefNormalized"
+    Assert-ReachableFromAllowedBranch -Commit $resolvedCommit
+
+    if (-not [string]::IsNullOrWhiteSpace($commitOverrideNormalized) -and $resolvedCommit -ne $commitOverrideNormalized) {
+      Fail "tag '$sourceRefNormalized' resolves to $resolvedCommit, but the original release run resolves to $commitOverrideNormalized."
+    }
+
+    $resolvedTag = $sourceRefNormalized
+    $resolvedRef = "refs/tags/$sourceRefNormalized"
+  }
+}
+
+$releaseTag = "v$resolvedVersion"
+
+Write-Host 'Release source'
+Write-Host '--------------'
+Write-Host "Type: $sourceTypeNormalized"
+Write-Host "Ref: $sourceRefNormalized"
+Write-Host "Resolved ref: $resolvedRef"
+Write-Host "Version: $resolvedVersion"
+Write-Host "Commit: $resolvedCommit"
+
+Write-OutputValue -Name 'source_type' -Value $sourceTypeNormalized
+Write-OutputValue -Name 'source_ref' -Value $sourceRefNormalized
+Write-OutputValue -Name 'resolved_ref' -Value $resolvedRef
+Write-OutputValue -Name 'resolved_version' -Value $resolvedVersion
+Write-OutputValue -Name 'resolved_commit' -Value $resolvedCommit
+Write-OutputValue -Name 'resolved_branch' -Value $resolvedBranch
+Write-OutputValue -Name 'resolved_tag' -Value $resolvedTag
+Write-OutputValue -Name 'release_tag' -Value $releaseTag
+Write-OutputValue -Name 'release_history_ref' -Value $releaseHistoryRef
+
+[pscustomobject]@{
+  source_type = $sourceTypeNormalized
+  source_ref = $sourceRefNormalized
+  resolved_ref = $resolvedRef
+  resolved_version = $resolvedVersion
+  resolved_commit = $resolvedCommit
+  resolved_branch = $resolvedBranch
+  resolved_tag = $resolvedTag
+  release_tag = $releaseTag
+  release_history_ref = $releaseHistoryRef
+}
+) {
+  Fail "commit override '$CommitOverride' is not a full 40-character commit SHA."
+}
 
 if ([string]::IsNullOrWhiteSpace($sourceRefNormalized)) {
   Fail 'source_ref is required.'
