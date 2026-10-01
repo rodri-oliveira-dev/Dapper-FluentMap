@@ -117,3 +117,8 @@ Historical release-candidate status retained for traceability. This section does
 The first fork release candidate used a prerelease version such as `3.0.0-rc.1`; this section is retained only to explain the fork line's history.
 
 Do not reuse `2.0.0` for the fork line because `Dapper.FluentMap` and `Dapper.FluentMap.Dommel` already have historical `2.0.0` packages.
+
+[Unreleased]: https://github.com/rodri-oliveira-dev/Dapper-FluentMap/compare/v3.5.0...HEAD
+[3.5.0]: https://github.com/rodri-oliveira-dev/Dapper-FluentMap/compare/v3.4.0...v3.5.0
+[3.4.0]: https://github.com/rodri-oliveira-dev/Dapper-FluentMap/compare/v3.0.3...v3.4.0
+[3.0.3]: https://github.com/rodri-oliveira-dev/Dapper-FluentMap/compare/v2.0.0...v3.0.3
