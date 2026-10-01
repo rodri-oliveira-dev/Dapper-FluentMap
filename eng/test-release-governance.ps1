@@ -972,6 +972,12 @@ Invoke-Test 'release workflow does not request release tag deletion during rollb
   Assert-True ($releaseWorkflow.IndexOf('-DeleteReleaseTag', [System.StringComparison]::Ordinal) -lt 0) 'release workflow must not pass -DeleteReleaseTag to rollback-release.ps1.'
 }
 
+Invoke-Test 'normal release redirects partial published versions to recovery' {
+  Assert-Contains $releaseWorkflow "while release tag '$releaseTag' is absent" 'normal release must fail closed when NuGet already contains the version but the release tag is absent.'
+  Assert-Contains $releaseWorkflow 'Recovery - Reconcile release state workflow' 'normal release must direct partial publication recovery to the governed recovery workflow.'
+}
+
+
 Invoke-Test 'recovery workflow reconciles governed release state' {
   foreach ($expected in @(
       'source_type',
