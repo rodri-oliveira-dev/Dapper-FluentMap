@@ -9,9 +9,7 @@ param(
     [string]$Repository,
 
     [Parameter(Mandatory = $true)]
-    [string]$GitHubToken,
-
-    [switch]$DeleteReleaseTag
+    [string]$GitHubToken
 )
 
 $ErrorActionPreference = 'Stop'
@@ -83,21 +81,11 @@ if ($null -ne $releaseLookup) {
     }
 }
 
-if ($DeleteReleaseTag) {
-    $tagDelete = Invoke-GitHubRequest -Method DELETE -Uri "https://api.github.com/repos/$Repository/git/refs/tags/$escapedTag"
-    if ($null -ne $tagDelete) {
-        $tagStatus = [int]$tagDelete.StatusCode
-        if ($tagStatus -in @(204, 404, 422)) {
-            Write-Host "Git tag: removed or already absent: $ReleaseTag."
-        }
-        else {
-            Add-RollbackFailure "Git tag deletion for $ReleaseTag returned HTTP $tagStatus."
-        }
-    }
-}
-else {
-    Write-Host "Git tag: retained $ReleaseTag because it was not created by this workflow run."
-}
+# Keep the release tag even when a downstream publication step fails. Package registries
+# are immutable from this rollback path, so deleting the tag would make a partial release
+# less recoverable and breaks GitHub's "Re-run failed jobs" semantics: successful tag
+# creation is not rerun, while the deleted tag is still required by --verify-tag.
+Write-Host "Git tag: retained $ReleaseTag to preserve the validated release identity for retry/recovery."
 
 if ($failures.Count -gt 0) {
     throw "Release rollback completed with $($failures.Count) compensation error(s). Review the rollback log before starting another release."

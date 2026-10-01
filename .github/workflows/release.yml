@@ -554,5 +554,4 @@ jobs:
             -Version $env:PACKAGE_VERSION `
             -ReleaseTag $env:RELEASE_TAG `
             -Repository $env:REPOSITORY `
-            -GitHubToken $env:GH_TOKEN `
-            -DeleteReleaseTag
+            -GitHubToken $env:GH_TOKEN

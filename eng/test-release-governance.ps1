@@ -847,6 +847,73 @@ function Invoke-ReleaseSbomScenario {
   }
 }
 
+function Invoke-RollbackScenario {
+  $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) "fluentmap-rollback-test-$([System.Guid]::NewGuid())"
+  $oldRequestLog = $env:MOCK_ROLLBACK_REQUEST_LOG
+
+  try {
+    New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
+    $requestLog = Join-Path $tempRoot 'requests.log'
+    New-Item -ItemType File -Force -Path $requestLog | Out-Null
+    $env:MOCK_ROLLBACK_REQUEST_LOG = $requestLog
+
+    function global:Invoke-WebRequest {
+      param(
+        [string]$Uri,
+        [string]$Method,
+        [hashtable]$Headers,
+        [switch]$SkipHttpErrorCheck
+      )
+
+      Add-Content -LiteralPath $env:MOCK_ROLLBACK_REQUEST_LOG -Value "$Method $Uri"
+
+      if ($Method -eq 'GET' -and $Uri -match '/releases/tags/') {
+        return [pscustomobject]@{
+          StatusCode = 200
+          Content = '{"id":4242}'
+        }
+      }
+
+      if ($Method -eq 'DELETE' -and $Uri -match '/releases/4242$') {
+        return [pscustomobject]@{
+          StatusCode = 204
+          Content = ''
+        }
+      }
+
+      throw "Unexpected rollback request: $Method $Uri"
+    }
+
+    $exitCode = 0
+    $output = @(
+      try {
+        & (Join-Path $repoRoot 'eng/rollback-release.ps1') `
+          -Version '9.9.9-test.1' `
+          -ReleaseTag 'v9.9.9-test.1' `
+          -Repository 'rodri-oliveira-dev/Dapper-FluentMap' `
+          -GitHubToken 'test-token' *>&1
+      }
+      catch {
+        $exitCode = 1
+        $_
+      }
+    )
+
+    return [pscustomobject]@{
+      Succeeded = $exitCode -eq 0
+      Output = ($output | Out-String)
+      Requests = if (Test-Path -LiteralPath $requestLog) { @(Get-Content -LiteralPath $requestLog) } else { @() }
+    }
+  }
+  finally {
+    Remove-Item function:\Invoke-WebRequest -ErrorAction SilentlyContinue
+    $env:MOCK_ROLLBACK_REQUEST_LOG = $oldRequestLog
+    if (Test-Path -LiteralPath $tempRoot) {
+      Remove-Item -LiteralPath $tempRoot -Recurse -Force
+    }
+  }
+}
+
 $releaseWorkflow = Get-Content -Raw -LiteralPath (Join-Path $repoRoot '.github/workflows/release.yml')
 $recoveryWorkflow = Get-Content -Raw -LiteralPath (Join-Path $repoRoot '.github/workflows/release-recovery-missing-nuget.yml')
 
@@ -890,6 +957,19 @@ Invoke-Test 'release and recovery share a non-cancelling release lock' {
   Assert-Contains $recoveryWorkflow 'group: release' 'recovery must use the shared release lock.'
   Assert-Contains $releaseWorkflow 'cancel-in-progress: false' 'normal release must not cancel in-progress release mutations.'
   Assert-Contains $recoveryWorkflow 'cancel-in-progress: false' 'recovery must not cancel in-progress release mutations.'
+}
+
+Invoke-Test 'rollback removes partial GitHub Release but retains release tag' {
+  $result = Invoke-RollbackScenario
+  Assert-True $result.Succeeded "rollback scenario failed: $($result.Output)"
+  Assert-True (@($result.Requests | Where-Object { $_ -match '^GET .*/releases/tags/v9\.9\.9-test\.1$' }).Count -eq 1) 'rollback must look up the partial GitHub Release by tag.'
+  Assert-True (@($result.Requests | Where-Object { $_ -match '^DELETE .*/releases/4242$' }).Count -eq 1) 'rollback must remove the partial GitHub Release.'
+  Assert-True (@($result.Requests | Where-Object { $_ -match '^DELETE .*/git/refs/tags/' }).Count -eq 0) 'rollback must never delete the validated release tag.'
+  Assert-Contains $result.Output 'Git tag: retained v9.9.9-test.1' 'rollback must explicitly report that the release tag is retained.'
+}
+
+Invoke-Test 'release workflow does not request release tag deletion during rollback' {
+  Assert-True ($releaseWorkflow.IndexOf('-DeleteReleaseTag', [System.StringComparison]::Ordinal) -lt 0) 'release workflow must not pass -DeleteReleaseTag to rollback-release.ps1.'
 }
 
 Invoke-Test 'recovery workflow reconciles governed release state' {
