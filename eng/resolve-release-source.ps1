@@ -9,6 +9,8 @@ param(
 
   [string]$Version,
 
+  [string]$CommitOverride,
+
   [string]$Remote = 'origin',
 
   [string]$AllowedBranch = 'main',
@@ -114,6 +116,11 @@ function Write-OutputValue {
 $sourceTypeNormalized = $SourceType.ToLowerInvariant()
 $sourceRefNormalized = $SourceRef.Trim()
 $versionNormalized = if ($null -eq $Version) { '' } else { $Version.Trim() }
+$commitOverrideNormalized = if ($null -eq $CommitOverride) { '' } else { $CommitOverride.Trim().ToLowerInvariant() }
+
+if (-not [string]::IsNullOrWhiteSpace($commitOverrideNormalized) -and $commitOverrideNormalized -notmatch '^[0-9a-f]{40}$') {
+  Fail "commit override '$CommitOverride' is not a full 40-character commit SHA."
+}
 
 if ([string]::IsNullOrWhiteSpace($sourceRefNormalized)) {
   Fail 'source_ref is required.'
@@ -153,7 +160,12 @@ switch ($sourceTypeNormalized) {
     }
 
     Invoke-Git -Arguments @('fetch', '--no-tags', $Remote, "+refs/heads/$sourceRefNormalized`:refs/remotes/$Remote/$sourceRefNormalized") | Out-Null
-    $resolvedCommit = Get-SingleCommit -Revision "refs/remotes/$Remote/$sourceRefNormalized"
+    if ([string]::IsNullOrWhiteSpace($commitOverrideNormalized)) {
+      $resolvedCommit = Get-SingleCommit -Revision "refs/remotes/$Remote/$sourceRefNormalized"
+    }
+    else {
+      $resolvedCommit = Get-SingleCommit -Revision $commitOverrideNormalized
+    }
     Assert-ReachableFromAllowedBranch -Commit $resolvedCommit
 
     $resolvedVersion = $versionNormalized
@@ -182,6 +194,10 @@ switch ($sourceTypeNormalized) {
     Invoke-Git -Arguments @('fetch', '--force', '--no-tags', $Remote, "+refs/tags/$sourceRefNormalized`:refs/tags/$sourceRefNormalized") | Out-Null
     $resolvedCommit = Get-SingleCommit -Revision "refs/tags/$sourceRefNormalized"
     Assert-ReachableFromAllowedBranch -Commit $resolvedCommit
+
+    if (-not [string]::IsNullOrWhiteSpace($commitOverrideNormalized) -and $resolvedCommit -ne $commitOverrideNormalized) {
+      Fail "tag '$sourceRefNormalized' resolves to $resolvedCommit, but the original release run resolves to $commitOverrideNormalized."
+    }
 
     $resolvedTag = $sourceRefNormalized
     $resolvedRef = "refs/tags/$sourceRefNormalized"

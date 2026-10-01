@@ -133,6 +133,11 @@ jobs:
 
             switch ($httpStatus) {
               '200' {
+                if (-not $tagExists) {
+                  Write-Error "NuGet.org already has $packageId $env:VERSION while release tag '$releaseTag' is absent. This indicates partial prior publication. Use Recovery - Reconcile release state with source_type=branch, source_ref=main, version=$env:VERSION, and original_release_run_id set to the original Release run so recovery resolves its headSha instead of current main."
+                  exit 1
+                }
+
                 Write-Host "NuGet.org already has $packageId $env:VERSION. Publication will validate the existing artifact before accepting it."
               }
               '404' {

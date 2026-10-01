@@ -531,7 +531,8 @@ function Invoke-ReleaseSourceScript {
     [string]$SourceType,
     [string]$SourceRef,
     [string]$Version,
-    [string]$CurrentWorkflowRef
+    [string]$CurrentWorkflowRef,
+    [string]$CommitOverride
   )
 
   Push-Location $WorkingDirectory
@@ -540,6 +541,7 @@ function Invoke-ReleaseSourceScript {
       -SourceType $SourceType `
       -SourceRef $SourceRef `
       -Version $Version `
+      -CommitOverride $CommitOverride `
       -CurrentWorkflowRef $CurrentWorkflowRef `
       -GitHubOutputPath $OutputPath 2>&1
   }
@@ -557,6 +559,8 @@ function Invoke-ResolveSourceScenario {
     [hashtable]$Tags = @{},
     [switch]$AddDevelopBranch,
     [switch]$SkipPushMain,
+    [switch]$AdvanceMain,
+    [switch]$UseOriginalMainCommit,
     [string]$CurrentWorkflowRef = 'refs/heads/main'
   )
 
@@ -573,6 +577,15 @@ function Invoke-ResolveSourceScenario {
 
     if (-not $SkipPushMain) {
       Invoke-GitTestCommand -WorkingDirectory $work -Arguments @('push', '-u', 'origin', 'main') | Out-Null
+    }
+
+    $currentMainCommit = $mainCommit
+    if ($AdvanceMain) {
+      Set-Content -LiteralPath (Join-Path $work 'advanced.txt') -Value 'advanced' -Encoding utf8
+      Invoke-GitTestCommand -WorkingDirectory $work -Arguments @('add', 'advanced.txt') | Out-Null
+      Invoke-GitTestCommand -WorkingDirectory $work -Arguments @('commit', '-m', 'advance main') | Out-Null
+      Invoke-GitTestCommand -WorkingDirectory $work -Arguments @('push', 'origin', 'main') | Out-Null
+      $currentMainCommit = (Invoke-GitTestCommand -WorkingDirectory $work -Arguments @('rev-parse', 'HEAD') | Select-Object -First 1).Trim()
     }
 
     if ($AddDevelopBranch) {
@@ -593,7 +606,8 @@ function Invoke-ResolveSourceScenario {
           -SourceType $SourceType `
           -SourceRef $SourceRef `
           -Version $Version `
-          -CurrentWorkflowRef $CurrentWorkflowRef
+          -CurrentWorkflowRef $CurrentWorkflowRef `
+          -CommitOverride $(if ($UseOriginalMainCommit) { $mainCommit } else { '' })
       }
       catch {
         $exitCode = 1
@@ -616,6 +630,7 @@ function Invoke-ResolveSourceScenario {
       Output = ($output | Out-String)
       Outputs = $outputs
       MainCommit = $mainCommit
+      CurrentMainCommit = $currentMainCommit
     }
   }
   finally {
@@ -972,6 +987,17 @@ Invoke-Test 'release workflow does not request release tag deletion during rollb
   Assert-True ($releaseWorkflow.IndexOf('-DeleteReleaseTag', [System.StringComparison]::Ordinal) -lt 0) 'release workflow must not pass -DeleteReleaseTag to rollback-release.ps1.'
 }
 
+Invoke-Test 'normal release redirects partial published versions to recovery' {
+  $guard = @'
+                if (-not $tagExists) {
+                  Write-Error "NuGet.org already has $packageId $env:VERSION while release tag '$releaseTag' is absent. This indicates partial prior publication. Use Recovery - Reconcile release state with source_type=branch, source_ref=main, version=$env:VERSION, and original_release_run_id set to the original Release run so recovery resolves its headSha instead of current main."
+                  exit 1
+                }
+'@
+  Assert-Contains $releaseWorkflow $guard 'normal release must fail closed before build when NuGet already contains the version but the release tag is absent.'
+}
+
+
 Invoke-Test 'recovery workflow reconciles governed release state' {
   foreach ($expected in @(
       'source_type',
@@ -980,6 +1006,9 @@ Invoke-Test 'recovery workflow reconciles governed release state' {
       'steps.source.outputs.resolved_version',
       'steps.source.outputs.resolved_commit',
       'original_release_run_id',
+      'Resolve original release run identity',
+      'steps.original-run.outputs.commit',
+      '-CommitOverride $env:SOURCE_COMMIT',
       'gh run download',
       'Recover and verify NuGet.org packages',
       'Recover and verify GitHub Packages',
@@ -1016,6 +1045,13 @@ Invoke-Test 'branch source resolves valid main version' {
   Assert-True ($result.Outputs['resolved_commit'] -eq $result.MainCommit) 'branch mode should resolve origin/main HEAD.'
   Assert-True ($result.Outputs['resolved_ref'] -eq 'refs/heads/main') 'branch mode should normalize the branch ref.'
   Assert-True ($result.Outputs['resolved_branch'] -eq 'main') 'branch mode should expose the resolved branch.'
+}
+
+Invoke-Test 'branch source can recover original release commit after main advances' {
+  $result = Invoke-ResolveSourceScenario -SourceType branch -SourceRef main -Version '3.1.2' -AdvanceMain -UseOriginalMainCommit
+  Assert-True $result.Succeeded "source resolution failed: $($result.Output)"
+  Assert-True ($result.CurrentMainCommit -ne $result.MainCommit) 'test setup must advance main beyond the original release commit.'
+  Assert-True ($result.Outputs['resolved_commit'] -eq $result.MainCommit) 'branch recovery with an original-run commit must resolve the historical release commit instead of current main HEAD.'
 }
 
 Invoke-Test 'branch source requires version' {
