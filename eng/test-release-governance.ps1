@@ -891,7 +891,7 @@ function Invoke-RollbackScenario {
           -Version '9.9.9-test.1' `
           -ReleaseTag 'v9.9.9-test.1' `
           -Repository 'rodri-oliveira-dev/Dapper-FluentMap' `
-          -GitHubToken 'test-token' 2>&1
+          -GitHubToken 'test-token' *>&1
       }
       catch {
         $exitCode = 1
