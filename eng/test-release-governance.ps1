@@ -988,8 +988,13 @@ Invoke-Test 'release workflow does not request release tag deletion during rollb
 }
 
 Invoke-Test 'normal release redirects partial published versions to recovery' {
-  Assert-Contains $releaseWorkflow 'while release tag ''$releaseTag'' is absent' 'normal release must fail closed when NuGet already contains the version but the release tag is absent.'
-  Assert-Contains $releaseWorkflow 'Recovery - Reconcile release state workflow' 'normal release must direct partial publication recovery to the governed recovery workflow.'
+  $guard = @'
+                if (-not $tagExists) {
+                  Write-Error "NuGet.org already has $packageId $env:VERSION while release tag '$releaseTag' is absent. This indicates partial prior publication. Use Recovery - Reconcile release state with source_type=branch, source_ref=main, version=$env:VERSION, and original_release_run_id set to the original Release run so recovery resolves its headSha instead of current main."
+                  exit 1
+                }
+'@
+  Assert-Contains $releaseWorkflow $guard 'normal release must fail closed before build when NuGet already contains the version but the release tag is absent.'
 }
 
 
