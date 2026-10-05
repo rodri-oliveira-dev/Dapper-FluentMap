@@ -24,7 +24,7 @@ concurrency:
 jobs:
   repository-configuration:
     name: Repository configuration
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
 
     steps:
@@ -68,7 +68,7 @@ jobs:
 
   compatibility:
     name: Compatibility (${{ matrix.dapper-lane }}, Dapper ${{ matrix.dapper-version }})
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -134,7 +134,7 @@ jobs:
 
   public-api:
     name: Public API and nullable contracts
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
 
     steps:
@@ -163,7 +163,7 @@ jobs:
 
   roslyn-components:
     name: Analyzer and generator compatibility
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
 
     steps:
@@ -199,7 +199,7 @@ jobs:
 
   provider-compatibility:
     name: Provider compatibility (SQL Server, PostgreSQL, MySQL, MariaDB)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     services:
       sqlserver:
@@ -368,7 +368,7 @@ jobs:
 
   pack:
     name: Pack
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     needs:
       - compatibility
@@ -491,7 +491,7 @@ jobs:
 
   sonar:
     name: SonarQube Cloud
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 35
     needs:
       - repository-configuration
@@ -797,7 +797,7 @@ jobs:
 
   ci-gate:
     name: CI Gate
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     if: ${{ always() }}
     needs:
