@@ -2,7 +2,7 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <IsPackable>false</IsPackable>
-    <SqlClientPackageVersion Condition="'$(SqlClientPackageVersion)' == ''">7.1.0</SqlClientPackageVersion>
+    <SqlClientPackageVersion Condition="'$(SqlClientPackageVersion)' == ''">7.1.1</SqlClientPackageVersion>
     <SqliteClientPackageVersion Condition="'$(SqliteClientPackageVersion)' == ''">10.0.12</SqliteClientPackageVersion>
     <MySqlConnectorPackageVersion Condition="'$(MySqlConnectorPackageVersion)' == ''">2.6.2</MySqlConnectorPackageVersion>
     <NpgsqlPackageVersion Condition="'$(NpgsqlPackageVersion)' == ''">10.0.3</NpgsqlPackageVersion>
