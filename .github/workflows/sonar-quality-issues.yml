@@ -18,7 +18,7 @@ concurrency:
 jobs:
   sync:
     name: Sync high-impact Sonar issues
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_OS || 'ubuntu-26.04' }}
     timeout-minutes: 15
     if: ${{ vars.SONAR_CI_ENABLED == 'true' }}
 
