@@ -589,6 +589,46 @@ namespace Dapper.FluentMap
                 return $"Entity '{type.FullName}' ({profileContext}) has a generated materializer for requested result columns {requestedShape}, but its member/converter contract does not match the effective FluentMap mapping.";
             }
 
+            var incompatibleCandidateDescription = DescribeIncompatibleGeneratedMaterializer(
+                type,
+                profileType,
+                columnNames,
+                profileContext,
+                requestedShape,
+                candidates);
+            if (incompatibleCandidateDescription != null)
+            {
+                return incompatibleCandidateDescription;
+            }
+
+            var closestCandidate = candidates
+                .Select(candidate => new
+                {
+                    Shape = candidate.Key.ColumnNames,
+                    Missing = candidate.Key.ColumnNames
+                        .Where(columnName => !columnNames.Contains(columnName, StringComparer.Ordinal))
+                        .ToList()
+                })
+                .OrderBy(candidate => candidate.Missing.Count)
+                .ThenBy(candidate => FormatColumnShape(candidate.Shape), StringComparer.Ordinal)
+                .First();
+            if (closestCandidate.Missing.Count > 0)
+            {
+                return $"Entity '{type.FullName}' ({profileContext}) requested result columns {requestedShape} are missing required generated columns {FormatColumnShape(closestCandidate.Missing)}. Closest registered generated shape: {FormatColumnShape(closestCandidate.Shape)}.";
+            }
+
+            var availableShapes = string.Join(", ", candidates.Select(pair => FormatColumnShape(pair.Key.ColumnNames)));
+            return $"Entity '{type.FullName}' ({profileContext}) has generated materializers, but none match requested result columns {requestedShape}. Registered generated shapes: {availableShapes}.";
+        }
+
+        private string DescribeIncompatibleGeneratedMaterializer(
+            Type type,
+            Type profileType,
+            string[] columnNames,
+            string profileContext,
+            string requestedShape,
+            IReadOnlyList<KeyValuePair<MaterializationPlanCacheKey, GeneratedMaterializerEntry>> candidates)
+        {
             foreach (var candidate in candidates)
             {
                 var missingColumns = candidate.Key.ColumnNames
@@ -616,24 +656,7 @@ namespace Dapper.FluentMap
                 }
             }
 
-            var closestCandidate = candidates
-                .Select(candidate => new
-                {
-                    Shape = candidate.Key.ColumnNames,
-                    Missing = candidate.Key.ColumnNames
-                        .Where(columnName => !columnNames.Contains(columnName, StringComparer.Ordinal))
-                        .ToList()
-                })
-                .OrderBy(candidate => candidate.Missing.Count)
-                .ThenBy(candidate => FormatColumnShape(candidate.Shape), StringComparer.Ordinal)
-                .First();
-            if (closestCandidate.Missing.Count > 0)
-            {
-                return $"Entity '{type.FullName}' ({profileContext}) requested result columns {requestedShape} are missing required generated columns {FormatColumnShape(closestCandidate.Missing)}. Closest registered generated shape: {FormatColumnShape(closestCandidate.Shape)}.";
-            }
-
-            var availableShapes = string.Join(", ", candidates.Select(pair => FormatColumnShape(pair.Key.ColumnNames)));
-            return $"Entity '{type.FullName}' ({profileContext}) has generated materializers, but none match requested result columns {requestedShape}. Registered generated shapes: {availableShapes}.";
+            return null;
         }
 
         internal void ValidateConfiguration()

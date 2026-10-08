@@ -730,6 +730,37 @@ namespace Dapper.FluentMap.Tests
 
         [Fact]
         [Trait("Category", "Integration")]
+        public void StrictGeneratedRuntimeShouldRejectIncompatibleContractForReorderedColumns()
+        {
+            var runtime = CreateRuntime(builder =>
+            {
+                builder
+                    .AddMap(new GeneratedContractCustomerMap())
+                    .AddGeneratedMaterializer(
+                        new[]
+                        {
+                            GeneratedMaterializerColumn.Map("customer_id", nameof(GeneratedContractCustomer.Name)),
+                            GeneratedMaterializerColumn.Map("full_name", nameof(GeneratedContractCustomer.Name))
+                        },
+                        ReadDefaultGeneratedCustomer)
+                    .UseStrictGeneratedMaterialization();
+            });
+
+            using (var connection = OpenConnection())
+            {
+                var exception = Assert.Throws<FluentMapConfigurationException>(() =>
+                    runtime.QueryMappedSingle<GeneratedContractCustomer>(
+                        connection,
+                        "SELECT 'Mismatch' AS full_name, 93 AS customer_id;"));
+
+                Assert.Contains("compatible with requested result columns", exception.Message);
+                Assert.Contains("member/converter contract does not match", exception.Message);
+                Assert.Equal(0, runtime.MaterializationPlanCacheEntryCount);
+            }
+        }
+
+        [Fact]
+        [Trait("Category", "Integration")]
         public void StrictGeneratedRuntimeShouldRemainIsolatedFromLegacyFallbackRuntime()
         {
             var strictRuntime = CreateRuntime(builder =>

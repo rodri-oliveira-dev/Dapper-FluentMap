@@ -969,27 +969,16 @@ namespace Dapper.FluentMap.Generators
             }
 
             var mapInvocations = new List<GeneratedMapInvocation>();
-            foreach (var invocation in constructor.Body.DescendantNodes().OfType<InvocationExpressionSyntax>())
+            if (!TryCollectDirectMapInvocations(
+                constructor,
+                mapType,
+                semanticModel,
+                cancellationToken,
+                mapInvocations,
+                out skipReason,
+                out diagnostic))
             {
-                var method = semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol as IMethodSymbol;
-                if (!IsMapInvocation(method))
-                {
-                    continue;
-                }
-
-                if (!TryCreateDirectMapInvocation(
-                    invocation,
-                    mapType,
-                    semanticModel,
-                    cancellationToken,
-                    out var mapInvocation,
-                    out skipReason,
-                    out diagnostic))
-                {
-                    return null;
-                }
-
-                mapInvocations.Add(mapInvocation);
+                return null;
             }
 
             if (mapInvocations.Count == 0)
@@ -1038,6 +1027,44 @@ namespace Dapper.FluentMap.Generators
                 columns,
                 root,
                 methodName: null);
+        }
+
+        private static bool TryCollectDirectMapInvocations(
+            ConstructorDeclarationSyntax constructor,
+            INamedTypeSymbol mapType,
+            SemanticModel semanticModel,
+            System.Threading.CancellationToken cancellationToken,
+            List<GeneratedMapInvocation> mapInvocations,
+            out string skipReason,
+            out GeneratedDiagnostic diagnostic)
+        {
+            skipReason = null;
+            diagnostic = null;
+
+            foreach (var invocation in constructor.Body.DescendantNodes().OfType<InvocationExpressionSyntax>())
+            {
+                var method = semanticModel.GetSymbolInfo(invocation, cancellationToken).Symbol as IMethodSymbol;
+                if (!IsMapInvocation(method))
+                {
+                    continue;
+                }
+
+                if (!TryCreateDirectMapInvocation(
+                    invocation,
+                    mapType,
+                    semanticModel,
+                    cancellationToken,
+                    out var mapInvocation,
+                    out skipReason,
+                    out diagnostic))
+                {
+                    return false;
+                }
+
+                mapInvocations.Add(mapInvocation);
+            }
+
+            return true;
         }
 
         private static bool TryAddMaterializedPath(

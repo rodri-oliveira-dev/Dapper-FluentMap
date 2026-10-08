@@ -334,6 +334,43 @@ public sealed class CustomerMap : EntityMap<Customer>
         }
 
         [Fact]
+        public void UnsupportedLaterMapInvocationShouldPreserveRuntimeFallback()
+        {
+            var source = @"
+using Dapper.FluentMap.Mapping;
+
+public sealed class Customer
+{
+    public int Id { get; set; }
+    public string Name { get; set; }
+}
+
+public sealed class NameConverter : IReadPropertyConverter<string, string>
+{
+    public string ConvertFromDatabase(string value) => value;
+}
+
+public sealed class CustomerMap : EntityMap<Customer>
+{
+    public CustomerMap()
+    {
+        Map(customer => customer.Id).ToColumn(""customer_id"");
+        Map(customer => customer.Name)
+            .ToColumn(""name"")
+            .ConvertFromDatabaseUsing<string, string>(new NameConverter());
+    }
+}";
+
+            var result = RunGenerator(source);
+            var diagnostic = Assert.Single(result.DfmDiagnostics);
+
+            Assert.Equal(MappingRegistrationGenerator.SkippedGeneratedMaterializerDiagnosticId, diagnostic.Id);
+            Assert.Contains("instances and delegates", diagnostic.GetMessage(), StringComparison.Ordinal);
+            Assert.Contains(".AddMap<global::CustomerMap>()", result.GeneratedSource, StringComparison.Ordinal);
+            Assert.DoesNotContain(".AddGeneratedMaterializer<global::Customer>(", result.GeneratedSource, StringComparison.Ordinal);
+        }
+
+        [Fact]
         public void InvalidReadConverterContractShouldReportDiagnostic()
         {
             var source = @"
