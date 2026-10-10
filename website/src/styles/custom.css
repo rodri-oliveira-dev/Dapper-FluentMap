@@ -14,15 +14,17 @@ body { letter-spacing: -.006em; overflow-x: clip; }
 .main-pane main:has(.landing-shell) > .content-panel:first-of-type { display: none; }
 .main-pane main:has(.landing-shell) > .content-panel:nth-of-type(2) { padding-inline: 0; }
 .main-pane main:has(.landing-shell) > .content-panel:nth-of-type(2) > .sl-container { max-width: none; padding-inline: 0; }
-.landing-shell { width: 100%; max-width: 100%; overflow: hidden; color: var(--fm-ink); background: var(--fm-paper); }
+.landing-shell { --fm-paper: #fbfdfc; --fm-ink: #102a2d; --fm-line: #d5e4e2; --sl-color-gray-2: #3c555a; --sl-color-gray-6: #edf5f3; --sl-color-accent-high: #064e3b; width: 100%; max-width: 100%; overflow: hidden; color: var(--fm-ink); background: var(--fm-paper); }
+:root[data-theme='dark'] .landing-shell { --fm-paper: #061f24; --fm-ink: #f1faf8; --fm-line: #31595a; --sl-color-gray-2: #c7ddda; --sl-color-gray-6: #123534; --sl-color-accent-high: #ccfbf1; }
 .landing-shell, .landing-shell *, .landing-shell *::before, .landing-shell *::after { box-sizing: border-box; }
 .landing-shell > section { padding-inline: max(1.25rem, calc((100vw - 1200px) / 2)); }
-.landing-hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(22rem, .95fr); gap: clamp(2.5rem, 6vw, 6rem); align-items: center; min-height: 43rem; padding-block: clamp(4rem, 8vw, 7.5rem); background: radial-gradient(circle at 82% 20%, color-mix(in srgb, var(--fm-mint), transparent 84%), transparent 30%), var(--fm-paper); }
+.landing-hero { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(22rem, .95fr); gap: clamp(2.5rem, 6vw, 6rem); align-items: center; min-height: 43rem; padding-block: clamp(4rem, 8vw, 7.5rem); background: var(--fm-paper); }
 .eyebrow { margin: 0 0 1.2rem; color: var(--sl-color-accent-high); font: 800 .76rem/1.4 var(--sl-font-mono); letter-spacing: .12em; text-transform: uppercase; }
 .eyebrow::before { content: ''; display: inline-block; width: 1.8rem; height: 2px; margin-right: .55rem; vertical-align: middle; background: var(--fm-amber); }
 .landing-hero h1 { max-width: 13ch; margin: 0; color: var(--fm-ink); font-size: clamp(2.7rem, 5.4vw, 5.2rem); line-height: .98; letter-spacing: -.065em; }
 .hero-lede { max-width: 42rem; margin-block: 1.6rem 2rem; color: var(--sl-color-gray-2); font-size: clamp(1.05rem, 1.6vw, 1.28rem); line-height: 1.65; }
 .hero-actions { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; }
+.hero-actions > a:not(.button) { color: var(--sl-color-accent-high); font-weight: 750; }
 .button { display: inline-flex; min-height: 2.9rem; align-items: center; justify-content: center; padding: .72rem 1.15rem; border: 1px solid transparent; border-radius: .65rem; font-weight: 760; text-decoration: none !important; }
 .button.primary { color: white; background: var(--fm-teal); box-shadow: 0 9px 25px rgb(15 118 110 / 25%); }
 .button.secondary { color: var(--fm-ink); border-color: var(--fm-line); background: color-mix(in srgb, var(--fm-paper), white 10%); }
@@ -50,7 +52,7 @@ body { letter-spacing: -.006em; overflow-x: clip; }
 .path-list a:hover { border-color: var(--sl-color-accent); transform: translateY(-2px); }
 .path-list span { display: block; margin-bottom: .6rem; color: var(--fm-teal); font: 800 .75rem var(--sl-font-mono); }
 .package-badge { display: flex; gap: .8rem; align-items: center; margin-block: 1.25rem; padding: .85rem 1rem; border: 1px solid var(--fm-line); border-left: 4px solid var(--fm-mint); border-radius: .7rem; background: var(--sl-color-gray-6); }
-.package-badge > span { color: var(--fm-teal); }.package-badge div { display: grid; }.package-badge small { color: var(--sl-color-gray-2); }
+.package-badge > span { color: var(--sl-color-accent-high); }.package-badge div { display: grid; }.package-badge small { color: var(--sl-color-gray-2); }
 .final-cta { margin-bottom: 3rem; padding-block: 5rem; text-align: center; color: #ecfdf9; background: var(--fm-deeper); }
 .final-cta h2 { max-width: 18ch; margin-inline: auto; color: white; font-size: clamp(2rem, 4vw, 3.5rem); }
 .final-cta p { max-width: 44rem; margin-inline: auto; color: #acd2cc; }
