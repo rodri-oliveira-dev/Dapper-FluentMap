@@ -38,6 +38,19 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Check Markdown links
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          args: >-
+            --no-progress
+            --exclude '^https://github\.com/rodri-oliveira-dev/Dapper-FluentMap/stargazers$'
+            --exclude '^https://rodri-oliveira-dev\.github\.io/Dapper-FluentMap(?:/pt-br)?/$'
+            --exclude-path '(^|/)AnalyzerReleases\.(Shipped|Unshipped)\.md$'
+            --exclude-path '^website/src/content/docs/'
+            './**/*.md'
+          fail: true
+          token: ${{ github.token }}
+
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -56,19 +69,6 @@ jobs:
       - name: Collect unique portal external links
         working-directory: website
         run: node scripts/collect-external-links.mjs > dist/external-links.txt
-
-      - name: Check Markdown links
-        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
-        with:
-          args: >-
-            --no-progress
-            --exclude '^https://github\.com/rodri-oliveira-dev/Dapper-FluentMap/stargazers$'
-            --exclude '^https://rodri-oliveira-dev\.github\.io/Dapper-FluentMap(?:/pt-br)?/$'
-            --exclude-path '(^|/)AnalyzerReleases\.(Shipped|Unshipped)\.md$'
-            --exclude-path '^website/src/content/docs/'
-            './**/*.md'
-          fail: true
-          token: ${{ github.token }}
 
       - name: Check portal external links
         uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
