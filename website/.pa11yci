@@ -2,6 +2,9 @@
   "defaults": {
     "standard": "WCAG2AA",
     "runners": ["axe", "htmlcs"],
+    "chromeLaunchConfig": {
+      "args": ["--no-sandbox"]
+    },
     "timeout": 30000,
     "wait": 500
   },

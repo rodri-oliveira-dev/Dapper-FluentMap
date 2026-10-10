@@ -7,7 +7,10 @@ module.exports = {
         'http://localhost/Dapper-FluentMap/getting-started/quick-start/',
         'http://localhost/Dapper-FluentMap/pt-br/'
       ],
-      numberOfRuns: 1
+      numberOfRuns: 1,
+      settings: {
+        chromeFlags: '--no-sandbox'
+      }
     },
     assert: {
       assertions: {
