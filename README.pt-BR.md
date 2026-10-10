@@ -1,84 +1,81 @@
 # FluentMap
 
-[![CI](https://github.com/rodri-oliveira-dev/Dapper-FluentMap/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rodri-oliveira-dev/Dapper-FluentMap/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/rodri-oliveira-dev/Dapper-FluentMap/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/rodri-oliveira-dev/Dapper-FluentMap/actions/workflows/codeql.yml)
-[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=rodri-oliveira-dev_Dapper-FluentMap&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=rodri-oliveira-dev_Dapper-FluentMap)
-[![Coverage](https://sonarcloud.io/api/project_badges/measure?project=rodri-oliveira-dev_Dapper-FluentMap&metric=coverage)](https://sonarcloud.io/summary/new_code?id=rodri-oliveira-dev_Dapper-FluentMap)
-[![codecov](https://codecov.io/github/rodri-oliveira-dev/Dapper-FluentMap/branch/main/graph/badge.svg)](https://codecov.io/github/rodri-oliveira-dev/Dapper-FluentMap)
-[![NuGet](https://img.shields.io/nuget/v/Dapper.FluentMap?logo=nuget)](https://www.nuget.org/packages/Dapper.FluentMap)
-[![.NET Standard 2.0](https://img.shields.io/badge/.NET%20Standard-2.0-512BD4?logo=dotnet&logoColor=white)](https://learn.microsoft.com/dotnet/standard/net-standard)
-[![License: MIT](https://img.shields.io/github/license/rodri-oliveira-dev/Dapper-FluentMap)](LICENSE)
-[![GitHub stars](https://img.shields.io/github/stars/rodri-oliveira-dev/Dapper-FluentMap?style=flat&logo=github)](https://github.com/rodri-oliveira-dev/Dapper-FluentMap/stargazers)
+<p align="center">
+  <img src="website/public/social/fluentmap-social.png" alt="Dapper FluentMap — Mapeie seus dados. Mantenha seus modelos limpos." width="1200">
+</p>
 
-[English](README.md) | Português (Brasil)
+<p align="center"><strong>Mapeie seus dados. Mantenha seus modelos limpos.</strong></p>
 
-FluentMap é uma camada avançada de mapeamento para Dapper. Ela permite descrever, com uma API fluente e fortemente tipada, como propriedades .NET se conectam a colunas de banco de dados, mantendo atributos de persistência fora dos POCOs.
+<p align="center">
+  <a href="README.md">English</a> · Português (Brasil)
+</p>
 
-FluentMap não é um ORM. Ele não faz tracking de entidades, não gera SQL arbitrário, não gerencia conexões, não executa migrations, não oferece LINQ e não substitui o Dapper.
+<p align="center">
+  <a href="https://github.com/rodri-oliveira-dev/Dapper-FluentMap/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/rodri-oliveira-dev/Dapper-FluentMap/actions/workflows/ci.yml/badge.svg?branch=main"></a>
+  <a href="https://www.nuget.org/packages/Dapper.FluentMap"><img alt="NuGet" src="https://img.shields.io/nuget/v/Dapper.FluentMap?logo=nuget"></a>
+  <a href="LICENSE"><img alt="Licença: MIT" src="https://img.shields.io/github/license/rodri-oliveira-dev/Dapper-FluentMap"></a>
+  <a href="https://github.com/rodri-oliveira-dev/Dapper-FluentMap/stargazers"><img alt="Estrelas no GitHub" src="https://img.shields.io/github/stars/rodri-oliveira-dev/Dapper-FluentMap?style=flat&amp;logo=github"></a>
+</p>
+<p align="center">
+  <a href="https://github.com/rodri-oliveira-dev/Dapper-FluentMap/actions/workflows/codeql.yml"><img alt="CodeQL" src="https://github.com/rodri-oliveira-dev/Dapper-FluentMap/actions/workflows/codeql.yml/badge.svg?branch=main"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=rodri-oliveira-dev_Dapper-FluentMap"><img alt="Quality Gate" src="https://sonarcloud.io/api/project_badges/measure?project=rodri-oliveira-dev_Dapper-FluentMap&amp;metric=alert_status"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=rodri-oliveira-dev_Dapper-FluentMap"><img alt="Cobertura" src="https://sonarcloud.io/api/project_badges/measure?project=rodri-oliveira-dev_Dapper-FluentMap&amp;metric=coverage"></a>
+</p>
 
-## Estado do Projeto
+<p align="center">
+  <a href="website/src/content/docs/pt-br/getting-started/index.md">Primeiros passos</a> ·
+  <a href="website/src/content/docs/pt-br/index.mdx">Documentação</a> ·
+  <a href="https://www.nuget.org/packages/Dapper.FluentMap">NuGet</a> ·
+  <a href="website/src/content/docs/pt-br/examples/index.md">Exemplos</a> ·
+  <a href="https://github.com/rodri-oliveira-dev/Dapper-FluentMap/releases">Releases no GitHub</a> ·
+  <a href="#como-contribuir">Como contribuir</a>
+</p>
 
-Dapper.FluentMap é mantido ativamente. A linha 3.x atual continua a história do projeto original, preservando o modelo histórico de mapping e adicionando recursos mais novos de forma opt-in.
+FluentMap fornece mapeamentos fluentes e fortemente tipados para aplicações que usam [Dapper](https://github.com/DapperLib/Dapper). Ele conecta propriedades .NET a colunas do banco de dados sem adicionar atributos de persistência às entidades de domínio.
 
-Mappings existentes com `EntityMap<T>` e `FluentMapper.Initialize(...)` continuam sendo a base de compatibilidade. Aplicações que usam mappings raiz normais do Dapper geralmente não precisam reescrever maps que já funcionam ao migrar da 2.x.
+FluentMap complementa o Dapper; não o substitui e não é um ORM completo. SQL, conexões, transações, migrations e tracking de entidades permanecem fora do seu escopo.
 
-Consulte [MIGRATION.pt-BR.md](MIGRATION.pt-BR.md) ao migrar do FluentMap 2.x.
+## Por que FluentMap?
 
-## Principais Recursos
+Imagine uma aplicação .NET com uma entidade `Customer` cujas propriedades são `Id` e `Name`, enquanto o banco retorna `customer_id` e `customer_name`. O FluentMap mantém esses nomes físicos em um map dedicado e fortemente tipado, sem acoplar a entidade aos detalhes de persistência.
 
-| Recurso | API principal |
-| --- | --- |
-| Mapping explícito de propriedade para coluna | `EntityMap<T>`, `Map(...).ToColumn(...)` |
-| Convenções e naming policies | `AddConvention(...)`, `UseNamingPolicy(...)` |
-| Construção imutável/factory | mapping de construtor, `ConstructUsing(...)` |
-| Objetos aninhados e value objects por componentes | `QueryMapped*` |
-| Formatos SQL alternativos | mapping profiles |
-| Multi-mapping de dois/três tipos | `QueryMapped<...>(..., splitOn: ...)` |
-| Múltiplos result sets | `QueryMultipleMapped*`, `ReadMapped*` |
-| Streaming síncrono/assíncrono | `QueryMappedUnbuffered*` |
-| Conversão por propriedade | property converters |
-| Registro/materialização gerados | `AddGeneratedMappings()` |
-| Caminho gerado estrito | `UseStrictGeneratedMaterialization()`, `QueryGeneratedMapped*` |
-| Configuração isolada | `FluentMapRuntime` |
-| Dependency Injection | `AddFluentMap(...)` |
-| Persistência/conversão de escrita Dommel | `InsertMapped*`, `UpdateMapped*` |
-| Diagnósticos em compilação | `FluentMap.Analyzers` |
+Com isso, você obtém:
 
-Exemplos detalhados estão em [USAGE.pt-BR.md](USAGE.pt-BR.md).
+- modelos de domínio mais limpos;
+- configuração fortemente tipada;
+- mappings explícitos e reutilizáveis;
+- integração direta com Dapper;
+- suporte a convenções reutilizáveis;
+- melhor organização do código de persistência.
 
-## Instalação
+## Início rápido
 
-Instale somente os pacotes necessários para a aplicação:
-
-| Finalidade | NuGet PackageId |
-| --- | --- |
-| Core | `Dapper.FluentMap` |
-| Integração Dommel | `Dapper.FluentMap.Dommel` |
-| Dependency Injection | `FluentMap.DependencyInjection` |
-| Analyzers Roslyn | `FluentMap.Analyzers` |
-| Source generators | `FluentMap.Generators` |
-
-Pacote principal:
+Instale o pacote principal e, para este exemplo autocontido com SQLite, o provider de banco de dados:
 
 ```bash
 dotnet add package Dapper.FluentMap
+dotnet add package Microsoft.Data.Sqlite
 ```
 
-Os PackageIds `FluentMap.*` são apenas identidades de distribuição. Assemblies, namespaces e APIs públicas continuam sob `Dapper.FluentMap.*`.
-
-Os pacotes públicos targetam `netstandard2.0`. Faixas suportadas de dependências e providers certificados estão documentados em [COMPATIBILITY.md](COMPATIBILITY.md).
-
-## Início Rápido
+Defina a entidade e seu map, registre-o uma vez durante a inicialização e consulte normalmente com Dapper:
 
 ```csharp
 using Dapper;
 using Dapper.FluentMap;
 using Dapper.FluentMap.Mapping;
+using Microsoft.Data.Sqlite;
+
+FluentMapper.Initialize(config => config.AddMap<CustomerMap>());
+FluentMapper.Validate();
+
+using var connection = new SqliteConnection("Data Source=:memory:");
+var customer = connection.QuerySingle<Customer>(
+    "SELECT 7 AS customer_id, 'Ada' AS customer_name;");
 
 public sealed class Customer
 {
     public int Id { get; set; }
-    public string Name { get; set; }
+    public string Name { get; set; } = string.Empty;
 }
 
 public sealed class CustomerMap : EntityMap<Customer>
@@ -89,93 +86,65 @@ public sealed class CustomerMap : EntityMap<Customer>
         Map(customer => customer.Name).ToColumn("customer_name");
     }
 }
-
-FluentMapper.Initialize(config =>
-{
-    config.AddMap<CustomerMap>();
-});
-
-var customer = connection.QuerySingle<Customer>(
-    "SELECT 7 AS customer_id, 'Ada' AS customer_name;");
 ```
 
-Chame `FluentMapper.Initialize(...)` durante o startup da aplicação e trate a configuração global efetiva como somente leitura depois que as queries começarem.
+Inicialize a configuração global antes de consultas concorrentes e trate-a como somente leitura depois disso. Consulte o [código-fonte do Início rápido](website/src/content/docs/pt-br/getting-started/quick-start.md) se o portal planejado ainda não estiver publicado.
 
-Para validar a configuração:
+## Principais funcionalidades
 
-```csharp
-FluentMapper.Validate();
-```
+| Funcionalidade | Escopo | Saiba mais |
+| --- | --- | --- |
+| Mapeamento explícito de propriedades | Principal | [`EntityMap<T>` e mapeamento de propriedades](website/src/content/docs/pt-br/concepts/property-mapping.md) |
+| Convenções de nomenclatura | Principal | [Convenções](website/src/content/docs/pt-br/concepts/mapping-conventions.md) |
+| Objetos imutáveis | Principal | [Objetos imutáveis](website/src/content/docs/pt-br/advanced/immutable-objects.md) |
+| Profiles de mapeamento | Principal | [Profiles de mapeamento](website/src/content/docs/pt-br/advanced/mapping-profiles.md) |
+| Isolamento em runtime | Principal | [`FluentMapRuntime`](website/src/content/docs/pt-br/advanced/runtime-isolation.md) |
+| Dependency Injection | Pacote opcional | [Integração com DI](website/src/content/docs/pt-br/integrations/dependency-injection.md) |
+| Integração com Dommel | Pacote opcional | [Integração com Dommel](website/src/content/docs/pt-br/integrations/dommel.md) |
+| Source generators | Pacote opcional | [Source generators](website/src/content/docs/pt-br/integrations/source-generators.md) |
+| Analyzers Roslyn | Pacote opcional | [Analyzers Roslyn](website/src/content/docs/pt-br/integrations/roslyn-analyzers.md) |
 
-## Uso Avançado
+O [guia de uso](USAGE.pt-BR.md) no repositório permanece disponível como alternativa para exemplos detalhados da API.
 
-Use as APIs de query controladas pelo FluentMap quando o mapping precisar de comportamento além do type map histórico no nível raiz do Dapper.
+## Pacotes
 
-Isso inclui:
+| Pacote | Finalidade |
+| --- | --- |
+| [`Dapper.FluentMap`](https://www.nuget.org/packages/Dapper.FluentMap) | APIs principais de mapping, convenções, profiles, materialização e runtime. |
+| [`Dapper.FluentMap.Dommel`](https://www.nuget.org/packages/Dapper.FluentMap.Dommel) | Integração opcional com metadados e persistência do Dommel. |
+| [`FluentMap.DependencyInjection`](https://www.nuget.org/packages/FluentMap.DependencyInjection) | Registro da configuração imutável e de runtimes isolados no Microsoft DI. |
+| [`FluentMap.Analyzers`](https://www.nuget.org/packages/FluentMap.Analyzers) | Diagnósticos Roslyn para problemas de mapping detectáveis estaticamente. |
+| [`FluentMap.Generators`](https://www.nuget.org/packages/FluentMap.Generators) | Registro gerado de maps e materializadores compatíveis. |
 
-- objetos aninhados e value objects por componentes;
-- profiles;
-- multi-mapping de dois/três tipos com `splitOn`;
-- múltiplos result sets mapeados;
-- streaming síncrono/assíncrono;
-- property converters;
-- materialização gerada e gerada estrita;
-- runtimes isolados e DI;
-- metadata de persistência Dommel.
-
-Consulte [USAGE.pt-BR.md](USAGE.pt-BR.md) para exemplos completos e orientação de API.
-
-## Migrando da 2.x
-
-A linha 3.x preserva o principal caminho histórico de mapping compatível em código-fonte.
-
-Se a aplicação usa `EntityMap<T>`, `FluentMapper.Initialize(...)` e chamadas normais de `Dapper.Query<T>()` para mappings raiz, a migração normalmente consiste em atualizar os pacotes, validar a configuração e executar os testes da aplicação.
-
-Consulte [MIGRATION.pt-BR.md](MIGRATION.pt-BR.md) para:
-
-- o caminho mínimo de migração;
-- os pré-requisitos de Dapper e Dommel;
-- a revisão de persistência envolvendo `Ignore()`/Dommel;
-- decisões de migração por cenário;
-- o checklist final.
-
-## Compatibilidade
-
-As afirmações de compatibilidade ficam intencionalmente fora do README para poderem evoluir sem duplicar informações sensíveis a cada release.
-
-Consulte [COMPATIBILITY.md](COMPATIBILITY.md) para:
-
-- faixas suportadas de Dapper e Dommel;
-- certificação de providers;
-- limites de trimming e Native AOT;
-- limitações de estado global;
-- ambientes não suportados e fronteiras de API.
+Os PackageIds são identidades de distribuição. Assemblies, namespaces e APIs públicas permanecem sob `Dapper.FluentMap.*` onde documentado.
 
 ## Documentação
 
-- [Portal de documentação](https://rodri-oliveira-dev.github.io/Dapper-FluentMap/pt-br/)
-- [Guia de uso](USAGE.pt-BR.md)
-- [Migração da 2.x](MIGRATION.pt-BR.md)
-- [Compatibilidade](COMPATIBILITY.md)
-- [Changelog](CHANGELOG.md)
-- [Suporte](SUPPORT.md)
-- [Governança para mantenedores](MAINTAINING.md)
-- [English](README.md)
+O portal bilíngue de documentação está planejado para `https://rodri-oliveira-dev.github.io/Dapper-FluentMap/pt-br/`. Enquanto a publicação não estiver confirmada, use como alternativa os arquivos locais indicados.
 
-## Contribuição
+| Assunto | Código-fonte do portal | Guia no repositório |
+| --- | --- | --- |
+| Primeiros passos | [Comece aqui](website/src/content/docs/pt-br/getting-started/index.md) | [Início rápido](website/src/content/docs/pt-br/getting-started/quick-start.md) |
+| Mapeamento básico | [Mapeamento de propriedades](website/src/content/docs/pt-br/concepts/property-mapping.md) | [Guia de uso](USAGE.pt-BR.md) |
+| Mapeamento avançado | [Mapeamento avançado](website/src/content/docs/pt-br/advanced/index.md) | [Guia de uso](USAGE.pt-BR.md) |
+| Integrações | [Integrações](website/src/content/docs/pt-br/integrations/index.md) | [Visão geral dos pacotes](website/src/content/docs/pt-br/reference/package-overview.md) |
+| Exemplos | [Exemplos](website/src/content/docs/pt-br/examples/index.md) | [Exemplo com SQLite](website/src/content/docs/pt-br/examples/sqlite.md) |
+| Guia de migração | [Migração](website/src/content/docs/pt-br/migration/index.md) | [MIGRATION.pt-BR.md](MIGRATION.pt-BR.md) |
+| Compatibilidade | [Matriz de compatibilidade](website/src/content/docs/pt-br/reference/compatibility-matrix.md) | [COMPATIBILITY.md](COMPATIBILITY.md) |
+| Referência da API | [Visão geral da API](website/src/content/docs/pt-br/reference/api-overview.md) | [Referência de configuração](website/src/content/docs/pt-br/reference/configuration-reference.md) |
 
-Mantenha mudanças pequenas, compatíveis com a API pública e cobertas por testes focados. `Dapper.FluentMap.slnx` é a solução preferencial para SDKs .NET atuais; `Dapper.FluentMap.sln` permanece disponível como fallback de compatibilidade.
+## Estado do projeto
 
-Validação local típica:
+FluentMap está em manutenção ativa. A linha 3.x preserva os principais contratos históricos — incluindo `EntityMap<T>`, `FluentMapper.Initialize(...)` e a ponte de type map do Dapper — enquanto as funcionalidades mais recentes permanecem opt-in. Consulte a [documentação de compatibilidade](COMPATIBILITY.md) antes de atualizar.
 
-```bash
-dotnet restore ./Dapper.FluentMap.slnx
-dotnet build ./Dapper.FluentMap.slnx --configuration Release --no-restore
-dotnet test ./Dapper.FluentMap.slnx --configuration Release --no-build
-```
+Para versões publicadas e histórico de releases, consulte as [Releases no GitHub](https://github.com/rodri-oliveira-dev/Dapper-FluentMap/releases) e o [changelog](CHANGELOG.md).
 
-Quando habilitado, SonarQube Cloud participa do quality gate da CI. A configuração específica do repositório fica intencionalmente fora deste README.
+## Como contribuir
+
+Contribuições são bem-vindas. Você pode [reportar um bug ou sugerir uma melhoria](https://github.com/rodri-oliveira-dev/Dapper-FluentMap/issues/new/choose), ajudar a melhorar a [documentação](website/README.md) ou enviar um [pull request](https://github.com/rodri-oliveira-dev/Dapper-FluentMap/pulls) focado.
+
+Se o FluentMap for útil no seu projeto, considere deixar uma [estrela no GitHub](https://github.com/rodri-oliveira-dev/Dapper-FluentMap/stargazers).
 
 ## Licença
 
-FluentMap é licenciado sob a [MIT License](LICENSE).
+FluentMap é licenciado sob a [Licença MIT](LICENSE).
