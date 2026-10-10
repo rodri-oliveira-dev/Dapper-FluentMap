@@ -153,6 +153,7 @@ See [COMPATIBILITY.md](COMPATIBILITY.md) for:
 
 ## Documentation
 
+- [Documentation portal](https://rodri-oliveira-dev.github.io/Dapper-FluentMap/)
 - [Usage guide](USAGE.md)
 - [Migration from 2.x](MIGRATION.md)
 - [Compatibility](COMPATIBILITY.md)
