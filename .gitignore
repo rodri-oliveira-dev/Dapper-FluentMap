@@ -71,6 +71,12 @@ temp/
 ~$*
 *~
 
+# Documentation portal
+website/node_modules/
+website/dist/
+website/.astro/
+website/.lighthouseci/
+
 # Operating system
 .DS_Store
 Thumbs.db

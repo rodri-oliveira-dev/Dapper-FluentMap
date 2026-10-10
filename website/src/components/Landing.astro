@@ -1,0 +1,90 @@
+---
+import CodeFiles from './CodeFiles.astro';
+import PackageBadge from './PackageBadge.astro';
+interface Props { locale?: 'en' | 'pt-br' }
+const { locale = 'en' } = Astro.props;
+const pt = locale === 'pt-br';
+const prefix = pt ? '/Dapper-FluentMap/pt-br' : '/Dapper-FluentMap';
+const heroCode = `public sealed class CustomerMap\n  : EntityMap<Customer>\n{\n  public CustomerMap()\n  {\n    Map(x => x.Id)\n      .ToColumn("customer_id");\n    Map(x => x.Name)\n      .ToColumn("customer_name");\n  }\n}`;
+const benefits = pt ? [
+  ['Mapeamento fluente', 'Relacione propriedades e colunas com uma API clara.'],
+  ['Configuração tipada', 'Expressões C# mantêm o mapeamento próximo do compilador.'],
+  ['Modelos limpos', 'Evite atributos de persistência no domínio.'],
+  ['Convenções', 'Aplique regras repetíveis e políticas de nomenclatura.'],
+  ['Objetos imutáveis', 'Materialize construtores e fábricas nos caminhos suportados.'],
+  ['Integração com Dapper', 'Continue usando conexões, SQL e consultas do Dapper.'],
+  ['Geração opcional', 'Registre mappings e materializadores compatíveis no build.'],
+  ['Diagnósticos', 'Valide configurações em runtime e com analyzers opcionais.']
+] : [
+  ['Fluent property mapping', 'Connect properties and columns through a clear API.'],
+  ['Strongly typed configuration', 'C# expressions keep mappings close to the compiler.'],
+  ['Clean domain models', 'Keep persistence attributes out of your domain.'],
+  ['Mapping conventions', 'Apply repeatable rules and naming policies.'],
+  ['Immutable objects', 'Materialize constructors and factories on supported paths.'],
+  ['Dapper integration', 'Keep using Dapper connections, SQL, and queries.'],
+  ['Optional generation', 'Register mappings and supported materializers at build time.'],
+  ['Diagnostics', 'Validate configuration at runtime and with optional analyzers.']
+];
+const uses = pt ? [
+  ['Bancos legados', 'Mapeie nomes antigos sem contaminar suas entidades.'],
+  ['Convenções divergentes', 'Conecte PascalCase, snake_case e esquemas específicos.'],
+  ['ASP.NET Core', 'Use configuração isolada e integração com DI.'],
+  ['Vários provedores', 'Mantenha o mapeamento acima do provider ADO.NET.']
+] : [
+  ['Legacy databases', 'Map old column names without changing your entities.'],
+  ['Different conventions', 'Bridge PascalCase, snake_case, and schema-specific names.'],
+  ['ASP.NET Core', 'Use isolated configuration and DI integration.'],
+  ['Multiple providers', 'Keep mapping above the ADO.NET provider layer.']
+];
+---
+<div class="landing-shell">
+  <section class="landing-hero">
+    <div>
+      <p class="eyebrow">Dapper FluentMap · .NET</p>
+      <h1>{pt ? 'Mapeie seus dados. Mantenha seus modelos limpos.' : 'Map your data. Keep your models clean.'}</h1>
+      <p class="hero-lede">{pt ? 'Adicione mapeamento fluente e fortemente tipado ao Dapper sem colocar atributos de persistência em seus POCOs. FluentMap complementa o Dapper; ele não substitui o Dapper nem pretende ser um ORM completo.' : 'Add fluent, strongly typed mapping to Dapper without persistence attributes in your POCOs. FluentMap complements Dapper; it does not replace Dapper or aim to become a full ORM.'}</p>
+      <div class="hero-actions">
+        <a class="button primary" href={`${prefix}/getting-started/quick-start/`}>{pt ? 'Começar' : 'Get Started'}</a>
+        <a class="button secondary" href="https://github.com/rodri-oliveira-dev/Dapper-FluentMap">{pt ? 'Ver no GitHub' : 'View on GitHub'}</a>
+        <a href="https://www.nuget.org/packages/Dapper.FluentMap">NuGet ↗</a>
+      </div>
+    </div>
+    <div class="code-window" aria-label={pt ? 'Visão resumida do fluxo de mapeamento' : 'Mapping flow overview'}>
+      <div class="window-bar"><i></i><i></i><i></i><code>CustomerMap.cs</code></div>
+      <pre><code>{heroCode}</code></pre>
+    </div>
+  </section>
+
+  <section class="landing-section tinted">
+    <div class="section-heading"><h2>{pt ? 'Mapeamento explícito onde ele ajuda' : 'Explicit mapping where it helps'}</h2><p>{pt ? 'Uma camada pequena e previsível entre seus objetos e os nomes que o banco expõe.' : 'A small, predictable layer between your objects and the names exposed by the database.'}</p></div>
+    <div class="benefit-grid">{benefits.map(([title, text]) => <article class="benefit-card"><b>{title}</b><p>{text}</p></article>)}</div>
+  </section>
+
+  <section class="landing-section">
+    <div class="section-heading"><h2>{pt ? 'Do modelo à consulta em três arquivos' : 'From model to query in three files'}</h2><p>{pt ? 'O exemplo usa apenas APIs verificadas do pacote principal. Troque de aba, copie o arquivo e avance para o guia completo.' : 'This example uses verified core-package APIs. Switch tabs, copy a file, and continue with the full guide.'}</p></div>
+    <PackageBadge name="Dapper.FluentMap" locale={locale} />
+    <CodeFiles locale={locale} />
+  </section>
+
+  <section class="landing-section tinted">
+    <div class="section-heading"><h2>{pt ? 'Feito para sistemas reais' : 'Built for real systems'}</h2><p>{pt ? 'Use o FluentMap quando o esquema do banco e o modelo da aplicação precisam evoluir com responsabilidades distintas.' : 'Use FluentMap when the database schema and application model need to evolve with separate responsibilities.'}</p></div>
+    <div class="use-grid">{uses.map(([title, text]) => <article class="use-card"><h3>{title}</h3><p>{text}</p></article>)}</div>
+  </section>
+
+  <section class="landing-section">
+    <div class="section-heading"><h2>{pt ? 'Escolha seu próximo passo' : 'Choose your next step'}</h2><p>{pt ? 'A documentação progride do primeiro mapping até materialização, integração e migração.' : 'The documentation progresses from your first mapping through materialization, integration, and migration.'}</p></div>
+    <nav class="path-list" aria-label={pt ? 'Jornadas de aprendizado' : 'Learning paths'}>
+      <a href={`${prefix}/getting-started/introduction/`}><span>01</span>{pt ? 'Novo no FluentMap?' : 'New to FluentMap?'}</a>
+      <a href={`${prefix}/getting-started/first-mapping/`}><span>02</span>{pt ? 'Mapeamento básico' : 'Basic mapping'}</a>
+      <a href={`${prefix}/advanced/immutable-objects/`}><span>03</span>{pt ? 'Mapeamento avançado' : 'Advanced mapping'}</a>
+      <a href={`${prefix}/migration/migrating-2-to-3/`}><span>04</span>{pt ? 'Migrar da 2.x' : 'Migrate from 2.x'}</a>
+      <a href={`${prefix}/reference/api-overview/`}><span>05</span>{pt ? 'Referência da API' : 'API reference'}</a>
+    </nav>
+  </section>
+
+  <section class="final-cta">
+    <h2>{pt ? 'Ajude o FluentMap a ficar ainda melhor.' : 'Help FluentMap get even better.'}</h2>
+    <p>{pt ? 'Reporte bugs, proponha melhorias, compartilhe exemplos ou contribua com código e documentação. Se o projeto ajuda seu trabalho, uma estrela facilita que outros desenvolvedores o encontrem.' : 'Report bugs, propose improvements, share examples, or contribute code and documentation. If the project helps your work, a star makes it easier for other developers to find.'}</p>
+    <div class="hero-actions"><a class="button primary" href="https://github.com/rodri-oliveira-dev/Dapper-FluentMap/issues">{pt ? 'Participar' : 'Contribute'}</a><a class="button secondary" href="https://github.com/rodri-oliveira-dev/Dapper-FluentMap/stargazers">{pt ? 'Apoiar com uma estrela' : 'Support with a star'}</a></div>
+  </section>
+</div>

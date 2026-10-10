@@ -1,0 +1,42 @@
+{
+  "name": "dapper-fluentmap-documentation",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "content:generate": "node scripts/generate-content.mjs",
+    "predev": "npm run content:generate",
+    "dev": "astro dev",
+    "prebuild": "npm run content:generate",
+    "build": "astro build",
+    "preview": "astro preview",
+    "precheck": "npm run content:generate",
+    "check": "astro check",
+    "test": "vitest run",
+    "test:examples": "dotnet build examples/PortalExamples.csproj --configuration Release",
+    "test:routes": "node scripts/check-routes.mjs",
+    "test:links": "node scripts/check-links.mjs",
+    "test:seo": "node scripts/validate-seo.mjs",
+    "test:translations": "node scripts/check-translations.mjs",
+    "test:html": "html-validate \"dist/**/*.html\"",
+    "validate": "npm run check && npm run test && npm run test:examples && npm run build && npm run test:routes && npm run test:translations && npm run test:links && npm run test:seo && npm run test:html"
+  },
+  "dependencies": {
+    "@astrojs/sitemap": "3.7.4",
+    "@astrojs/starlight": "0.42.6",
+    "astro": "7.3.8",
+    "sharp": "0.35.5"
+  },
+  "devDependencies": {
+    "@astrojs/check": "0.9.6",
+    "html-validate": "11.16.2",
+    "typescript": "5.9.3",
+    "vitest": "5.0.3"
+  },
+  "overrides": {
+    "postcss-selector-parser": "7.1.6"
+  }
+}
