@@ -7,7 +7,7 @@ description: "Register an explicit map and execute a normal Dapper query."
 
 <nav class="portal-breadcrumbs" aria-label="Breadcrumb"><a href="/Dapper-FluentMap/">Home</a><span aria-hidden="true">/</span><a href="/Dapper-FluentMap/getting-started/">Getting Started</a><span aria-hidden="true">/</span><span aria-current="page">Quick Start</span></nav>
 
-> **Required package:** [`Dapper.FluentMap`](https://www.nuget.org/packages/Dapper.FluentMap)
+> **Required packages:** [`Dapper.FluentMap`](https://www.nuget.org/packages/Dapper.FluentMap), [`Microsoft.Data.Sqlite`](https://www.nuget.org/packages/Microsoft.Data.Sqlite)
 
 ## Problem solved
 
@@ -20,6 +20,28 @@ Use this capability when the column shape and .NET model should remain separated
 ## Example
 
 ```csharp
+using Dapper;
+using Dapper.FluentMap;
+using Dapper.FluentMap.Mapping;
+using Microsoft.Data.Sqlite;
+
+FluentMapper.Initialize(config =>
+{
+    config.AddMap<CustomerMap>();
+});
+
+FluentMapper.Validate();
+
+using var connection = new SqliteConnection("Data Source=:memory:");
+var customer = connection.QuerySingle<Customer>(
+    "SELECT 7 AS customer_id, 'Ada' AS customer_name;");
+
+public sealed class Customer
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+}
+
 public sealed class CustomerMap : EntityMap<Customer>
 {
     public CustomerMap()

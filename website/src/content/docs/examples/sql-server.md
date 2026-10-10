@@ -7,7 +7,7 @@ description: "Use FluentMap with a SqlConnection while retaining parameterized S
 
 <nav class="portal-breadcrumbs" aria-label="Breadcrumb"><a href="/Dapper-FluentMap/">Home</a><span aria-hidden="true">/</span><a href="/Dapper-FluentMap/examples/">Examples</a><span aria-hidden="true">/</span><span aria-current="page">SQL Server Example</span></nav>
 
-> **Required package:** [`Dapper.FluentMap`](https://www.nuget.org/packages/Dapper.FluentMap)
+> **Required packages:** [`Dapper.FluentMap`](https://www.nuget.org/packages/Dapper.FluentMap), [`Microsoft.Data.SqlClient`](https://www.nuget.org/packages/Microsoft.Data.SqlClient)
 
 ## Problem solved
 

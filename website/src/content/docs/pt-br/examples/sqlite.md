@@ -7,7 +7,7 @@ description: "Use um banco SQLite em memória em um exemplo compacto de integra�
 
 <nav class="portal-breadcrumbs" aria-label="Trilha de navegação"><a href="/Dapper-FluentMap/pt-br/">Início</a><span aria-hidden="true">/</span><a href="/Dapper-FluentMap/pt-br/examples/">Exemplos</a><span aria-hidden="true">/</span><span aria-current="page">Exemplo com SQLite</span></nav>
 
-> **Pacote necessário:** [`Dapper.FluentMap`](https://www.nuget.org/packages/Dapper.FluentMap)
+> **Pacotes necessários:** [`Dapper.FluentMap`](https://www.nuget.org/packages/Dapper.FluentMap), [`Microsoft.Data.Sqlite`](https://www.nuget.org/packages/Microsoft.Data.Sqlite)
 
 ## Problema resolvido
 

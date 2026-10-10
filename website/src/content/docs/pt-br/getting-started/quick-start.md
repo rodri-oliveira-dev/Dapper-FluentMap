@@ -7,7 +7,7 @@ description: "Registre um map explícito e execute uma consulta normal do Dapper
 
 <nav class="portal-breadcrumbs" aria-label="Trilha de navegação"><a href="/Dapper-FluentMap/pt-br/">Início</a><span aria-hidden="true">/</span><a href="/Dapper-FluentMap/pt-br/getting-started/">Primeiros passos</a><span aria-hidden="true">/</span><span aria-current="page">Início rápido</span></nav>
 
-> **Pacote necessário:** [`Dapper.FluentMap`](https://www.nuget.org/packages/Dapper.FluentMap)
+> **Pacotes necessários:** [`Dapper.FluentMap`](https://www.nuget.org/packages/Dapper.FluentMap), [`Microsoft.Data.Sqlite`](https://www.nuget.org/packages/Microsoft.Data.Sqlite)
 
 ## Problema resolvido
 
@@ -20,6 +20,28 @@ Use este recurso quando o formato das colunas e o modelo .NET precisarem permane
 ## Exemplo
 
 ```csharp
+using Dapper;
+using Dapper.FluentMap;
+using Dapper.FluentMap.Mapping;
+using Microsoft.Data.Sqlite;
+
+FluentMapper.Initialize(config =>
+{
+    config.AddMap<CustomerMap>();
+});
+
+FluentMapper.Validate();
+
+using var connection = new SqliteConnection("Data Source=:memory:");
+var customer = connection.QuerySingle<Customer>(
+    "SELECT 7 AS customer_id, 'Ada' AS customer_name;");
+
+public sealed class Customer
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+}
+
 public sealed class CustomerMap : EntityMap<Customer>
 {
     public CustomerMap()

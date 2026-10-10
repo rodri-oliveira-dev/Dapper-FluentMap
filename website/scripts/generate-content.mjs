@@ -113,6 +113,7 @@ const sections = {
 const code = {
   default: `public sealed class CustomerMap : EntityMap<Customer>\n{\n    public CustomerMap()\n    {\n        Map(x => x.Id).ToColumn("customer_id");\n        Map(x => x.Name).ToColumn("customer_name");\n    }\n}`,
   installation: `dotnet add package Dapper.FluentMap`,
+  'quick-start': `using Dapper;\nusing Dapper.FluentMap;\nusing Dapper.FluentMap.Mapping;\nusing Microsoft.Data.Sqlite;\n\nFluentMapper.Initialize(config =>\n{\n    config.AddMap<CustomerMap>();\n});\n\nFluentMapper.Validate();\n\nusing var connection = new SqliteConnection("Data Source=:memory:");\nvar customer = connection.QuerySingle<Customer>(\n    "SELECT 7 AS customer_id, 'Ada' AS customer_name;");\n\npublic sealed class Customer\n{\n    public int Id { get; set; }\n    public string Name { get; set; } = string.Empty;\n}\n\npublic sealed class CustomerMap : EntityMap<Customer>\n{\n    public CustomerMap()\n    {\n        Map(x => x.Id).ToColumn("customer_id");\n        Map(x => x.Name).ToColumn("customer_name");\n    }\n}`,
   configuration: `FluentMapper.Initialize(config =>\n{\n    config.AddMap<CustomerMap>();\n});\n\nFluentMapper.Validate();`,
   'mapping-conventions': `FluentMapper.Initialize(config =>\n{\n    config.UseNamingPolicy(NamingPolicy.SnakeCase, caseSensitive: false);\n});`,
   'ignored-properties': `Map(x => x.TransientValue).Ignore();`,
@@ -152,12 +153,16 @@ const restrictions = {
   default: ['Initialize before concurrent queries and treat the effective configuration as read-only afterward.', 'Inicialize antes de consultas concorrentes e trate a configuração efetiva como somente leitura depois disso.']
 };
 
-const packageFor = (_section, slug) => {
-  if (slug === 'dommel') return 'Dapper.FluentMap.Dommel';
-  if (slug === 'dependency-injection' || slug === 'aspnet-core') return 'FluentMap.DependencyInjection';
-  if (slug === 'roslyn-analyzers') return 'FluentMap.Analyzers';
-  if (slug === 'source-generators' || slug === 'generated-mapping') return 'FluentMap.Generators';
-  return 'Dapper.FluentMap';
+const packagesFor = (_section, slug) => {
+  if (slug === 'dommel') return ['Dapper.FluentMap.Dommel'];
+  if (slug === 'dependency-injection' || slug === 'aspnet-core') return ['FluentMap.DependencyInjection'];
+  if (slug === 'roslyn-analyzers') return ['FluentMap.Analyzers'];
+  if (slug === 'source-generators' || slug === 'generated-mapping') return ['FluentMap.Generators'];
+  if (slug === 'quick-start') return ['Dapper.FluentMap', 'Microsoft.Data.Sqlite'];
+  if (slug === 'postgresql') return ['Dapper.FluentMap', 'Npgsql'];
+  if (slug === 'sql-server') return ['Dapper.FluentMap', 'Microsoft.Data.SqlClient'];
+  if (slug === 'sqlite') return ['Dapper.FluentMap', 'Microsoft.Data.Sqlite'];
+  return ['Dapper.FluentMap'];
 };
 
 const yaml = (value) => JSON.stringify(value);
@@ -175,22 +180,25 @@ function pageBody(section, entry, pt) {
   const [slug, enTitle, ptTitle, enDescription, ptDescription] = entry;
   const title = pt ? ptTitle : enTitle;
   const description = pt ? ptDescription : enDescription;
-  const packageName = packageFor(section, slug);
+  const packageNames = packagesFor(section, slug);
+  const packageLinks = packageNames
+    .map((packageName) => `[\`${packageName}\`](https://www.nuget.org/packages/${packageName})`)
+    .join(', ');
   const sample = code[slug] ?? code.default;
   const constraint = restrictions[slug]?.[pt ? 1 : 0] ?? restrictions.default[pt ? 1 : 0];
   const labels = pt ? {
-    package: 'Pacote necessário', problem: 'Problema resolvido', when: 'Quando usar', example: 'Exemplo', explanation: 'Como funciona', limits: 'Restrições', related: 'Referências relacionadas',
+    package: packageNames.length > 1 ? 'Pacotes necessários' : 'Pacote necessário', problem: 'Problema resolvido', when: 'Quando usar', example: 'Exemplo', explanation: 'Como funciona', limits: 'Restrições', related: 'Referências relacionadas',
     whenText: 'Use este recurso quando o formato das colunas e o modelo .NET precisarem permanecer separados por uma configuração explícita e revisável.',
     explainText: 'O FluentMap registra metadados tipados e os aplica no caminho de materialização correspondente. O SQL, a conexão, os parâmetros e o ciclo de vida continuam sob responsabilidade da aplicação e do Dapper.'
   } : {
-    package: 'Required package', problem: 'Problem solved', when: 'When to use it', example: 'Example', explanation: 'How it works', limits: 'Constraints', related: 'Related references',
+    package: packageNames.length > 1 ? 'Required packages' : 'Required package', problem: 'Problem solved', when: 'When to use it', example: 'Example', explanation: 'How it works', limits: 'Constraints', related: 'Related references',
     whenText: 'Use this capability when the column shape and .NET model should remain separated by explicit, reviewable configuration.',
     explainText: 'FluentMap registers typed metadata and applies it through the matching materialization path. SQL, connections, parameters, and lifecycle remain responsibilities of the application and Dapper.'
   };
   const prefix = pt ? '/Dapper-FluentMap/pt-br' : '/Dapper-FluentMap';
   const sectionTitle = pt ? sections[section].pt : sections[section].en;
   const breadcrumb = `<nav class="portal-breadcrumbs" aria-label="${pt ? 'Trilha de navegação' : 'Breadcrumb'}"><a href="${prefix}/">${pt ? 'Início' : 'Home'}</a><span aria-hidden="true">/</span><a href="${prefix}/${section}/">${sectionTitle}</a><span aria-hidden="true">/</span><span aria-current="page">${title}</span></nav>`;
-  return `---\ntitle: ${yaml(title)}\ndescription: ${yaml(description)}\n---\n\n<!-- Generated by scripts/generate-content.mjs. Edit the generator, not this file. -->\n\n${breadcrumb}\n\n> **${labels.package}:** [\`${packageName}\`](https://www.nuget.org/packages/${packageName})\n\n## ${labels.problem}\n\n${description}\n\n## ${labels.when}\n\n${labels.whenText}\n\n## ${labels.example}\n\n\`\`\`${sample.startsWith('dotnet ') ? 'bash' : 'csharp'}\n${sample}\n\`\`\`\n\n## ${labels.explanation}\n\n${labels.explainText}\n\n## ${labels.limits}\n\n:::caution\n${constraint}\n:::\n\n## ${labels.related}\n\n${sourceLinks(section, pt)}\n`;
+  return `---\ntitle: ${yaml(title)}\ndescription: ${yaml(description)}\n---\n\n<!-- Generated by scripts/generate-content.mjs. Edit the generator, not this file. -->\n\n${breadcrumb}\n\n> **${labels.package}:** ${packageLinks}\n\n## ${labels.problem}\n\n${description}\n\n## ${labels.when}\n\n${labels.whenText}\n\n## ${labels.example}\n\n\`\`\`${sample.startsWith('dotnet ') ? 'bash' : 'csharp'}\n${sample}\n\`\`\`\n\n## ${labels.explanation}\n\n${labels.explainText}\n\n## ${labels.limits}\n\n:::caution\n${constraint}\n:::\n\n## ${labels.related}\n\n${sourceLinks(section, pt)}\n`;
 }
 
 function indexBody(data, pt) {

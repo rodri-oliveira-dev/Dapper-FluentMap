@@ -83,11 +83,11 @@ jobs:
 
       - name: Validate WCAG 2.2 AA applicable rules
         working-directory: website
-        run: npm exec --yes --ignore-scripts --package=pa11y-ci@5.0.0 -- pa11y-ci --config .pa11yci --threshold 0
+        run: npm run audit:a11y
 
       - name: Audit Lighthouse categories
         working-directory: website
-        run: npm exec --yes --ignore-scripts --package=@lhci/cli@0.15.1 -- lhci autorun
+        run: npm run audit:lighthouse
 
       - name: Stop production preview
         if: always()

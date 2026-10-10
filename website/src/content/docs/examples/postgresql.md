@@ -7,7 +7,7 @@ description: "Apply FluentMap above an Npgsql connection and explicit SQL aliase
 
 <nav class="portal-breadcrumbs" aria-label="Breadcrumb"><a href="/Dapper-FluentMap/">Home</a><span aria-hidden="true">/</span><a href="/Dapper-FluentMap/examples/">Examples</a><span aria-hidden="true">/</span><span aria-current="page">PostgreSQL Example</span></nav>
 
-> **Required package:** [`Dapper.FluentMap`](https://www.nuget.org/packages/Dapper.FluentMap)
+> **Required packages:** [`Dapper.FluentMap`](https://www.nuget.org/packages/Dapper.FluentMap), [`Npgsql`](https://www.nuget.org/packages/Npgsql)
 
 ## Problem solved
 

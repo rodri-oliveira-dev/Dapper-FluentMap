@@ -22,7 +22,9 @@
     "test:seo": "node scripts/validate-seo.mjs",
     "test:translations": "node scripts/check-translations.mjs",
     "test:html": "html-validate \"dist/**/*.html\"",
-    "validate": "npm run check && npm run test && npm run test:examples && npm run build && npm run test:routes && npm run test:translations && npm run test:links && npm run test:seo && npm run test:html"
+    "validate": "npm run check && npm run test && npm run test:examples && npm run build && npm run test:routes && npm run test:translations && npm run test:links && npm run test:seo && npm run test:html",
+    "audit:a11y": "pa11y-ci --config .pa11yci --threshold 0",
+    "audit:lighthouse": "lhci autorun"
   },
   "dependencies": {
     "@astrojs/sitemap": "3.7.4",
@@ -32,7 +34,9 @@
   },
   "devDependencies": {
     "@astrojs/check": "0.9.6",
+    "@lhci/cli": "0.15.1",
     "html-validate": "11.16.2",
+    "pa11y-ci": "5.0.0",
     "typescript": "5.9.3",
     "vitest": "5.0.3"
   },

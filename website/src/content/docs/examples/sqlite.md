@@ -7,7 +7,7 @@ description: "Use an in-memory SQLite database for a compact integration example
 
 <nav class="portal-breadcrumbs" aria-label="Breadcrumb"><a href="/Dapper-FluentMap/">Home</a><span aria-hidden="true">/</span><a href="/Dapper-FluentMap/examples/">Examples</a><span aria-hidden="true">/</span><span aria-current="page">SQLite Example</span></nav>
 
-> **Required package:** [`Dapper.FluentMap`](https://www.nuget.org/packages/Dapper.FluentMap)
+> **Required packages:** [`Dapper.FluentMap`](https://www.nuget.org/packages/Dapper.FluentMap), [`Microsoft.Data.Sqlite`](https://www.nuget.org/packages/Microsoft.Data.Sqlite)
 
 ## Problem solved
 

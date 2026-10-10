@@ -26,7 +26,7 @@ npm run validate
 
 This command regenerates deterministic editorial pages, type-checks Astro and TypeScript, runs unit tests, compiles the checked C# portal example, creates the production build, and checks localized routes, translation parity, internal links, SEO, JSON-LD, sitemap coverage, orphan pages, and generated HTML.
 
-Browser accessibility and Lighthouse checks run in `.github/workflows/documentation-portal.yml` against representative English and Portuguese routes. To run accessibility locally, build the site, start `npm run preview -- --host 127.0.0.1`, then execute `npx --yes pa11y-ci@5.0.0 --config .pa11yci --threshold 0` in another terminal.
+Browser accessibility and Lighthouse checks run in `.github/workflows/documentation-portal.yml` against representative English and Portuguese routes. To run them locally, build the site, start `npm run preview -- --host 127.0.0.1`, then execute `npm run audit:a11y` or `npm run audit:lighthouse` in another terminal. Both audit tools are pinned in `package-lock.json`.
 
 ## Content model
 

@@ -1,7 +1,7 @@
-using System.Data;
 using Dapper;
 using Dapper.FluentMap;
 using Dapper.FluentMap.Mapping;
+using Microsoft.Data.Sqlite;
 
 FluentMapper.Initialize(config =>
 {
@@ -10,7 +10,7 @@ FluentMapper.Initialize(config =>
 
 FluentMapper.Validate();
 
-IDbConnection connection = null!;
+using var connection = new SqliteConnection("Data Source=:memory:");
 _ = connection.QuerySingle<Customer>(
     "SELECT 7 AS customer_id, 'Ada' AS customer_name;");
 
