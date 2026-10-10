@@ -42,7 +42,9 @@ jobs:
           args: >-
             --no-progress
             --exclude '^https://github\.com/rodri-oliveira-dev/Dapper-FluentMap/stargazers$'
+            --exclude '^https://rodri-oliveira-dev\.github\.io/Dapper-FluentMap(?:/pt-br)?/$'
             --exclude-path '(^|/)AnalyzerReleases\.(Shipped|Unshipped)\.md$'
+            --exclude-path '^website/src/content/docs/'
             './**/*.md'
           fail: true
           token: ${{ github.token }}
