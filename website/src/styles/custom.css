@@ -52,7 +52,7 @@ body { letter-spacing: -.006em; overflow-x: clip; }
 .path-list a:hover { border-color: var(--sl-color-accent); transform: translateY(-2px); }
 .path-list span { display: block; margin-bottom: .6rem; color: var(--fm-teal); font: 800 .75rem var(--sl-font-mono); }
 .package-badge { display: flex; gap: .8rem; align-items: center; margin-block: 1.25rem; padding: .85rem 1rem; border: 1px solid var(--fm-line); border-left: 4px solid var(--fm-mint); border-radius: .7rem; background: var(--sl-color-gray-6); }
-.package-badge > span { color: var(--sl-color-accent-high); }.package-badge div { display: grid; }.package-badge small { color: var(--sl-color-gray-2); }
+.package-badge div { display: grid; }.package-badge small { color: var(--sl-color-gray-2); }
 .final-cta { margin-bottom: 3rem; padding-block: 5rem; text-align: center; color: #ecfdf9; background: var(--fm-deeper); }
 .final-cta h2 { max-width: 18ch; margin-inline: auto; color: white; font-size: clamp(2rem, 4vw, 3.5rem); }
 .final-cta p { max-width: 44rem; margin-inline: auto; color: #acd2cc; }

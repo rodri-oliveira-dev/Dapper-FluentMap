@@ -4,6 +4,5 @@ const { name, href = `https://www.nuget.org/packages/${name}`, locale = 'en' } =
 const pt = locale === 'pt-br';
 ---
 <aside class="package-badge" aria-label={`${pt ? 'Pacote NuGet necessário' : 'Required NuGet package'}: ${name}`}>
-  <span aria-hidden="true">◆</span>
   <div><small>{pt ? 'Pacote NuGet' : 'NuGet package'}</small><a href={href}>{name}</a></div>
 </aside>
