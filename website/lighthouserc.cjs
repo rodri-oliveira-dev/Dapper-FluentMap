@@ -1,11 +1,10 @@
 module.exports = {
   ci: {
     collect: {
-      staticDistDir: './dist',
       url: [
-        'http://localhost/Dapper-FluentMap/',
-        'http://localhost/Dapper-FluentMap/getting-started/quick-start/',
-        'http://localhost/Dapper-FluentMap/pt-br/'
+        'http://127.0.0.1:4321/Dapper-FluentMap/',
+        'http://127.0.0.1:4321/Dapper-FluentMap/getting-started/quick-start/',
+        'http://127.0.0.1:4321/Dapper-FluentMap/pt-br/'
       ],
       numberOfRuns: 1,
       settings: {
@@ -19,7 +18,6 @@ module.exports = {
         'categories:best-practices': ['error', { minScore: 0.9 }],
         'categories:seo': ['error', { minScore: 0.9 }]
       }
-    },
-    upload: { target: 'temporary-public-storage' }
+    }
   }
 };
