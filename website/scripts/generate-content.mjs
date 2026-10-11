@@ -188,18 +188,18 @@ Consumidores avançados podem usar as APIs públicas \`DommelMapper.AddSqlBuilde
 - **FluentMap + Dommel certified:** required real-database tests also cover the supported Dommel persistence path.
 - **Legacy/upstream-limited:** retained for compatibility without a modern certification lane.
 
-| Provider | Core | Dommel |
-| --- | --- | --- |
-| SQLite | Certified | Certified |
-| SQL Server | Certified | Certified |
-| PostgreSQL | Certified | Certified |
-| MySQL | Certified | Certified |
-| MariaDB | Certified | Certified |
-| Oracle | Certified | Not certified |
-| Firebird | Certified | Not certified |
-| SQL Server CE | Legacy/upstream-limited | Legacy/upstream-limited |
+| Provider | Core | Dommel | Tested server/runtime | Tested client |
+| --- | --- | --- | --- | --- |
+| SQLite | Certified | Certified | In-memory | \`Microsoft.Data.Sqlite\` 10.0.12 |
+| SQL Server | Certified | Certified | 2022 CU23 | \`Microsoft.Data.SqlClient\` 7.1.0 |
+| PostgreSQL | Certified | Certified | 18.6 | \`Npgsql\` 10.0.3 |
+| MySQL | Certified | Certified | 8.4.11 | \`MySqlConnector\` 2.6.2 |
+| MariaDB | Certified | Certified | 11.8.9 | \`MySqlConnector\` 2.6.2 |
+| Oracle | Certified | Not certified | 23.26.0 Free | \`Oracle.ManagedDataAccess.Core\` 23.26.301 |
+| Firebird | Certified | Not certified | 5.0.4 | \`FirebirdSql.Data.FirebirdClient\` 10.3.4 |
+| SQL Server CE | Legacy/upstream-limited | Legacy/upstream-limited | Not certified | Not certified |
 
-The exact pinned server/client versions and evidence are maintained in the compatibility contract.`,
+These pinned versions and evidence are also maintained in the machine-readable compatibility contract.`,
     `## Níveis de suporte
 
 - **Compatível com Dapper:** funcionamento esperado via Dapper/ADO.NET, sem certificação dedicada do FluentMap em banco real.
@@ -207,18 +207,18 @@ The exact pinned server/client versions and evidence are maintained in the compa
 - **FluentMap + Dommel certificado:** testes obrigatórios em banco real também cobrem o caminho de persistência suportado pelo Dommel.
 - **Legado/limitado pelo upstream:** mantido por compatibilidade, sem uma lane moderna de certificação.
 
-| Provider | Core | Dommel |
-| --- | --- | --- |
-| SQLite | Certificado | Certificado |
-| SQL Server | Certificado | Certificado |
-| PostgreSQL | Certificado | Certificado |
-| MySQL | Certificado | Certificado |
-| MariaDB | Certificado | Certificado |
-| Oracle | Certificado | Não certificado |
-| Firebird | Certificado | Não certificado |
-| SQL Server CE | Legado/limitado pelo upstream | Legado/limitado pelo upstream |
+| Provider | Core | Dommel | Servidor/runtime testado | Cliente testado |
+| --- | --- | --- | --- | --- |
+| SQLite | Certificado | Certificado | Em memória | \`Microsoft.Data.Sqlite\` 10.0.12 |
+| SQL Server | Certificado | Certificado | 2022 CU23 | \`Microsoft.Data.SqlClient\` 7.1.0 |
+| PostgreSQL | Certificado | Certificado | 18.6 | \`Npgsql\` 10.0.3 |
+| MySQL | Certificado | Certificado | 8.4.11 | \`MySqlConnector\` 2.6.2 |
+| MariaDB | Certificado | Certificado | 11.8.9 | \`MySqlConnector\` 2.6.2 |
+| Oracle | Certificado | Não certificado | 23.26.0 Free | \`Oracle.ManagedDataAccess.Core\` 23.26.301 |
+| Firebird | Certificado | Não certificado | 5.0.4 | \`FirebirdSql.Data.FirebirdClient\` 10.3.4 |
+| SQL Server CE | Legado/limitado pelo upstream | Legado/limitado pelo upstream | Não certificado | Não certificado |
 
-As versões exatas de servidor/cliente e suas evidências são mantidas no contrato de compatibilidade.`
+Essas versões fixadas e suas evidências também são mantidas no contrato de compatibilidade legível por máquina.`
   ]
 };
 

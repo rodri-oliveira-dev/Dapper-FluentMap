@@ -41,18 +41,18 @@ O FluentMap registra metadados tipados e os aplica no caminho de materializaçã
 - **FluentMap + Dommel certificado:** testes obrigatórios em banco real também cobrem o caminho de persistência suportado pelo Dommel.
 - **Legado/limitado pelo upstream:** mantido por compatibilidade, sem uma lane moderna de certificação.
 
-| Provider | Core | Dommel |
-| --- | --- | --- |
-| SQLite | Certificado | Certificado |
-| SQL Server | Certificado | Certificado |
-| PostgreSQL | Certificado | Certificado |
-| MySQL | Certificado | Certificado |
-| MariaDB | Certificado | Certificado |
-| Oracle | Certificado | Não certificado |
-| Firebird | Certificado | Não certificado |
-| SQL Server CE | Legado/limitado pelo upstream | Legado/limitado pelo upstream |
+| Provider | Core | Dommel | Servidor/runtime testado | Cliente testado |
+| --- | --- | --- | --- | --- |
+| SQLite | Certificado | Certificado | Em memória | `Microsoft.Data.Sqlite` 10.0.12 |
+| SQL Server | Certificado | Certificado | 2022 CU23 | `Microsoft.Data.SqlClient` 7.1.0 |
+| PostgreSQL | Certificado | Certificado | 18.6 | `Npgsql` 10.0.3 |
+| MySQL | Certificado | Certificado | 8.4.11 | `MySqlConnector` 2.6.2 |
+| MariaDB | Certificado | Certificado | 11.8.9 | `MySqlConnector` 2.6.2 |
+| Oracle | Certificado | Não certificado | 23.26.0 Free | `Oracle.ManagedDataAccess.Core` 23.26.301 |
+| Firebird | Certificado | Não certificado | 5.0.4 | `FirebirdSql.Data.FirebirdClient` 10.3.4 |
+| SQL Server CE | Legado/limitado pelo upstream | Legado/limitado pelo upstream | Não certificado | Não certificado |
 
-As versões exatas de servidor/cliente e suas evidências são mantidas no contrato de compatibilidade.
+Essas versões fixadas e suas evidências também são mantidas no contrato de compatibilidade legível por máquina.
 
 ## Restrições
 

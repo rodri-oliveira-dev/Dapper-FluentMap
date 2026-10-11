@@ -163,7 +163,9 @@ foreach ($document in @('COMPATIBILITY.md', 'MIGRATION.md')) {
 $compatibility = Read-RequiredText 'COMPATIBILITY.md'
 foreach ($provider in $providers) {
   $dapperLabel = if ([string]$provider.supportLevel -eq 'legacy-upstream-limited') { 'Legacy/upstream-limited' } else { 'Dapper-compatible' }
-  $expectedRow = "| $($provider.displayName) | $dapperLabel | $($documentationLabels[[string]$provider.coreEvidence]) | $($dommelDocumentationLabels[[string]$provider.dommelEvidence]) |"
+  $serverLabel = if ([string]::IsNullOrWhiteSpace([string]$provider.serverVersion)) { 'Not certified' } elseif ([string]$provider.id -eq 'sqlite') { 'In-memory' } else { [string]$provider.serverVersion }
+  $clientLabel = if ([string]::IsNullOrWhiteSpace([string]$provider.clientPackage)) { 'Not certified' } else { "``$($provider.clientPackage)`` $($provider.clientVersion)" }
+  $expectedRow = "| $($provider.displayName) | $dapperLabel | $($documentationLabels[[string]$provider.coreEvidence]) | $($dommelDocumentationLabels[[string]$provider.dommelEvidence]) | $serverLabel | $clientLabel |"
   Assert-Contains 'COMPATIBILITY.md' $compatibility $expectedRow "provider '$($provider.id)' support row"
 }
 

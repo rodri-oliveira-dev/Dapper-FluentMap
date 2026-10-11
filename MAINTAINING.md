@@ -22,6 +22,8 @@ Do not hand-approve a removal or signature replacement without the compatibility
 
 When changing the matrix, update the contract, required CI provider list and `COMPATIBILITY.md` together, run `eng/test-compatibility-consistency.ps1`, and preserve pinned server/client versions. Never promote a provider based only on common ADO.NET abstractions or theoretical compatibility.
 
+Oracle and Firebird are currently Core-only. SQLite, SQL Server, PostgreSQL, MySQL and MariaDB are the exact Dommel-certified set; MySQL and MariaDB share the `MySqlConnection`/`MySqlSqlBuilder` path. SQL Server CE builder registration is retained as legacy/upstream-limited compatibility without a modern certification lane. Any new project-owned Dommel dialect requires a separate scope with SQL-generation and real persistence evidence; a consumer's custom `DommelMapper.AddSqlBuilder(...)` registration is not project certification.
+
 ## Nullable contracts
 
 Maintained public projects compile with C# nullable annotations enabled. Warning enforcement is staged as `Nullable=annotations` because enabling full flow analysis currently exposes substantial internal legacy debt; this prevents a blanket suppression migration. Public signatures must still model actual behavior deliberately.

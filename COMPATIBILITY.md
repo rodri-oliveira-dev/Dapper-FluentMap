@@ -71,16 +71,16 @@ The machine-readable provider matrix is part of `eng/compatibility-contract.json
 
 Current support contract:
 
-| Provider | Dapper/ADO.NET | FluentMap Core evidence | FluentMap + Dommel evidence |
-| --- | --- | --- | --- |
-| SQLite | Dapper-compatible | FluentMap Core certified | FluentMap + Dommel certified |
-| SQL Server | Dapper-compatible | FluentMap Core certified | FluentMap + Dommel certified |
-| PostgreSQL | Dapper-compatible | FluentMap Core certified | FluentMap + Dommel certified |
-| MySQL | Dapper-compatible | FluentMap Core certified | FluentMap + Dommel certified |
-| MariaDB | Dapper-compatible | FluentMap Core certified | FluentMap + Dommel certified |
-| Oracle | Dapper-compatible | FluentMap Core certified | Not certified |
-| Firebird | Dapper-compatible | FluentMap Core certified | Not certified |
-| SQL Server CE | Legacy/upstream-limited | Legacy/upstream-limited | Legacy/upstream-limited |
+| Provider | Dapper/ADO.NET | FluentMap Core evidence | FluentMap + Dommel evidence | Tested server/runtime | Tested client |
+| --- | --- | --- | --- | --- | --- |
+| SQLite | Dapper-compatible | FluentMap Core certified | FluentMap + Dommel certified | In-memory | `Microsoft.Data.Sqlite` 10.0.12 |
+| SQL Server | Dapper-compatible | FluentMap Core certified | FluentMap + Dommel certified | 2022 CU23 | `Microsoft.Data.SqlClient` 7.1.0 |
+| PostgreSQL | Dapper-compatible | FluentMap Core certified | FluentMap + Dommel certified | 18.6 | `Npgsql` 10.0.3 |
+| MySQL | Dapper-compatible | FluentMap Core certified | FluentMap + Dommel certified | 8.4.11 | `MySqlConnector` 2.6.2 |
+| MariaDB | Dapper-compatible | FluentMap Core certified | FluentMap + Dommel certified | 11.8.9 | `MySqlConnector` 2.6.2 |
+| Oracle | Dapper-compatible | FluentMap Core certified | Not certified | 23.26.0 Free | `Oracle.ManagedDataAccess.Core` 23.26.301 |
+| Firebird | Dapper-compatible | FluentMap Core certified | Not certified | 5.0.4 | `FirebirdSql.Data.FirebirdClient` 10.3.4 |
+| SQL Server CE | Legacy/upstream-limited | Legacy/upstream-limited | Legacy/upstream-limited | Not certified | Not certified |
 
 Certification evidence:
 
