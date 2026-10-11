@@ -1,0 +1,136 @@
+name: Documentation portal
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'website/**'
+      - 'README.md'
+      - 'README.pt-BR.md'
+      - 'USAGE.md'
+      - 'USAGE.pt-BR.md'
+      - 'MIGRATION.md'
+      - 'MIGRATION.pt-BR.md'
+      - 'COMPATIBILITY.md'
+      - 'CHANGELOG.md'
+      - '.github/workflows/documentation-portal.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'website/**'
+      - 'README.md'
+      - 'README.pt-BR.md'
+      - 'USAGE.md'
+      - 'USAGE.pt-BR.md'
+      - 'MIGRATION.md'
+      - 'MIGRATION.pt-BR.md'
+      - 'COMPATIBILITY.md'
+      - 'CHANGELOG.md'
+      - '.github/workflows/documentation-portal.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: documentation-portal-${{ github.event_name == 'push' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name != 'push' }}
+
+jobs:
+  validate:
+    name: Validate portal
+    runs-on: ${{ vars.RUNNER_OS || 'ubuntu-26.04' }}
+    timeout-minutes: 25
+    env:
+      CHROME_PATH: /usr/bin/google-chrome
+      PUPPETEER_EXECUTABLE_PATH: /usr/bin/google-chrome
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+
+      - name: Install from lockfile
+        working-directory: website
+        run: npm ci --ignore-scripts
+
+      - name: Check, test, build, and validate output
+        working-directory: website
+        run: npm run validate
+
+      - name: Start production preview
+        working-directory: website
+        shell: bash
+        run: |
+          npm run preview -- --host 127.0.0.1 > /tmp/fluentmap-preview.log 2>&1 &
+          echo $! > /tmp/fluentmap-preview.pid
+          for _ in {1..30}; do
+            curl --fail --silent http://127.0.0.1:4321/Dapper-FluentMap/ > /dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/fluentmap-preview.log
+          exit 1
+
+      - name: Validate WCAG 2.2 AA applicable rules
+        working-directory: website
+        run: npm run audit:a11y
+
+      - name: Audit Lighthouse categories
+        working-directory: website
+        run: npm run audit:lighthouse
+
+      - name: Stop production preview
+        if: always()
+        shell: bash
+        run: test ! -f /tmp/fluentmap-preview.pid || kill "$(cat /tmp/fluentmap-preview.pid)" 2>/dev/null || true
+
+  build-pages:
+    name: Build Pages artifact
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: validate
+    runs-on: ${{ vars.RUNNER_OS || 'ubuntu-26.04' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pages: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build and upload Astro site
+        uses: withastro/action@3eafd002e65cc31b4f0eae0bb05450d521562247 # v6
+        with:
+          path: website
+          node-version: 24
+          package-manager: npm@latest
+
+  deploy:
+    name: Deploy to GitHub Pages
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build-pages
+    runs-on: ${{ vars.RUNNER_OS || 'ubuntu-26.04' }}
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy artifact
+        id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.0

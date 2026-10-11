@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 310 52" role="img" aria-labelledby="title">
+  <title id="title">Dapper FluentMap</title>
+  <defs><linearGradient id="g" x1="0" x2="1"><stop stop-color="#0f766e"/><stop offset="1" stop-color="#0891b2"/></linearGradient></defs>
+  <rect x="2" y="4" width="44" height="44" rx="12" fill="#082f49"/>
+  <path d="M14 16h11c8 0 13 4 13 10s-5 10-13 10H14V16Zm8 6v8h4c3 0 5-1 5-4s-2-4-5-4h-4Z" fill="url(#g)"/>
+  <circle cx="38" cy="14" r="4" fill="#f59e0b"/>
+  <text x="58" y="33" fill="currentColor" font-family="Inter,system-ui,sans-serif" font-size="24" font-weight="750">Dapper FluentMap</text>
+</svg>

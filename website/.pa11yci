@@ -1,0 +1,17 @@
+{
+  "defaults": {
+    "standard": "WCAG2AA",
+    "runners": ["axe", "htmlcs"],
+    "chromeLaunchConfig": {
+      "args": ["--no-sandbox"]
+    },
+    "timeout": 30000,
+    "wait": 500
+  },
+  "urls": [
+    "http://127.0.0.1:4321/Dapper-FluentMap/",
+    "http://127.0.0.1:4321/Dapper-FluentMap/getting-started/quick-start/",
+    "http://127.0.0.1:4321/Dapper-FluentMap/pt-br/",
+    "http://127.0.0.1:4321/Dapper-FluentMap/pt-br/getting-started/quick-start/"
+  ]
+}

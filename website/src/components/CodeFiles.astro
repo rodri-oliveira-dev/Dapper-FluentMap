@@ -1,0 +1,59 @@
+---
+interface Props { locale?: 'en' | 'pt-br' }
+const { locale = 'en' } = Astro.props;
+const pt = locale === 'pt-br';
+const files = [
+  { name: 'Customer.cs', code: `public sealed class Customer\n{\n    public int Id { get; set; }\n    public string Name { get; set; } = string.Empty;\n}` },
+  { name: 'CustomerMap.cs', code: `public sealed class CustomerMap : EntityMap<Customer>\n{\n    public CustomerMap()\n    {\n        Map(x => x.Id).ToColumn("customer_id");\n        Map(x => x.Name).ToColumn("customer_name");\n    }\n}` },
+  { name: 'Program.cs', code: `FluentMapper.Initialize(config =>\n    config.AddMap<CustomerMap>());\n\nvar customer = connection.QuerySingle<Customer>(\n    "SELECT customer_id, customer_name FROM customers");` }
+];
+const uid = `code-files-${Math.random().toString(36).slice(2)}`;
+---
+<section class="code-files" data-code-files aria-label={pt ? 'Exemplo de código em três arquivos' : 'Three-file code example'}>
+  <header>
+    <span>{pt ? 'Pacote' : 'Package'}: <a href="https://www.nuget.org/packages/Dapper.FluentMap">Dapper.FluentMap</a></span>
+    <button type="button" data-copy>{pt ? 'Copiar' : 'Copy'}</button>
+  </header>
+  <div role="tablist" aria-label={pt ? 'Arquivos do exemplo' : 'Example files'}>
+    {files.map((file, index) => <button type="button" role="tab" id={`${uid}-tab-${index}`} aria-controls={`${uid}-panel-${index}`} aria-selected={index === 0 ? 'true' : 'false'} tabindex={index === 0 ? 0 : -1}>{file.name}</button>)}
+  </div>
+  {files.map((file, index) => <div role="tabpanel" id={`${uid}-panel-${index}`} aria-labelledby={`${uid}-tab-${index}`} hidden={index !== 0}><pre><code>{file.code}</code></pre></div>)}
+</section>
+<script>
+  for (const group of document.querySelectorAll<HTMLElement>('[data-code-files]')) {
+    const tabs = [...group.querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+    const panels = [...group.querySelectorAll<HTMLElement>('[role="tabpanel"]')];
+    const select = (index: number) => {
+      tabs.forEach((tab, i) => { tab.setAttribute('aria-selected', String(i === index)); tab.tabIndex = i === index ? 0 : -1; });
+      panels.forEach((panel, i) => { panel.hidden = i !== index; });
+    };
+    tabs.forEach((tab, index) => {
+      tab.addEventListener('click', () => select(index));
+      tab.addEventListener('keydown', (event) => {
+        if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+        event.preventDefault();
+        const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+        select(next); tabs[next].focus();
+      });
+    });
+    group.querySelector<HTMLButtonElement>('[data-copy]')?.addEventListener('click', async (event) => {
+      const current = panels.find((panel) => !panel.hidden)?.textContent ?? '';
+      await navigator.clipboard.writeText(current);
+      const button = event.currentTarget as HTMLButtonElement;
+      const original = button.textContent;
+      button.textContent = document.documentElement.lang === 'pt-BR' ? 'Copiado!' : 'Copied!';
+      window.setTimeout(() => { button.textContent = original; }, 1400);
+    });
+  }
+</script>
+
+<style>
+  .code-files { overflow: hidden; border: 1px solid var(--fm-line); border-radius: 1rem; background: var(--fm-deeper); box-shadow: var(--fm-shadow); }
+  header { display: flex; justify-content: space-between; align-items: center; padding: .7rem 1rem; color: #b9dcd7; background: #062b30; font: .76rem var(--sl-font-mono); }
+  header a { color: #5eead4; } header button { border: 0; color: #fbbf24; background: transparent; cursor: pointer; font-weight: 700; }
+  [role='tablist'] { display: flex; overflow-x: auto; border-bottom: 1px solid #245256; background: #041f24; }
+  [role='tab'] { padding: .8rem 1rem; border: 0; border-bottom: 3px solid transparent; color: #9cc5c1; background: transparent; cursor: pointer; font-weight: 700; }
+  [role='tab'][aria-selected='true'] { border-bottom-color: #2dd4bf; color: white; }
+  [role='tabpanel'] pre { min-height: 16rem; margin: 0; padding: 1.35rem; overflow: auto; color: #ddfff9; background: var(--fm-deeper); font-size: .8rem; line-height: 1.65; }
+  [hidden] { display: none; }
+</style>

@@ -6,12 +6,14 @@ on:
       - main
     paths:
       - '**/*.md'
+      - 'website/**'
       - '.github/workflows/documentation-links.yml'
   push:
     branches:
       - main
     paths:
       - '**/*.md'
+      - 'website/**'
       - '.github/workflows/documentation-links.yml'
   schedule:
     - cron: '17 9 * * 1'
@@ -42,7 +44,42 @@ jobs:
           args: >-
             --no-progress
             --exclude '^https://github\.com/rodri-oliveira-dev/Dapper-FluentMap/stargazers$'
+            --exclude '^https://rodri-oliveira-dev\.github\.io/Dapper-FluentMap(?:/pt-br)?/$'
             --exclude-path '(^|/)AnalyzerReleases\.(Shipped|Unshipped)\.md$'
+            --exclude-path '^website/src/content/docs/'
             './**/*.md'
+          fail: true
+          token: ${{ github.token }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: website/package-lock.json
+
+      - name: Install portal dependencies
+        working-directory: website
+        run: npm ci --ignore-scripts
+
+      - name: Build portal
+        working-directory: website
+        run: npm run build
+
+      - name: Collect unique portal external links
+        working-directory: website
+        run: node scripts/collect-external-links.mjs > dist/external-links.txt
+
+      - name: Check portal external links
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          args: >-
+            --no-progress
+            --host-concurrency 2
+            --host-request-interval 250ms
+            --scheme https
+            --exclude '^https://github\.com/rodri-oliveira-dev/Dapper-FluentMap/stargazers$'
+            --exclude '^https://rodri-oliveira-dev\.github\.io/Dapper-FluentMap/'
+            './website/dist/external-links.txt'
           fail: true
           token: ${{ github.token }}

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://rodri-oliveira-dev.github.io/Dapper-FluentMap/sitemap-index.xml
