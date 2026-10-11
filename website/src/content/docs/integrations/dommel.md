@@ -31,6 +31,19 @@ FluentMapper.Initialize(config =>
 
 FluentMap registers typed metadata and applies it through the matching materialization path. SQL, connections, parameters, and lifecycle remain responsibilities of the application and Dapper.
 
+## Provider boundary
+
+The Dommel package has a narrower provider boundary than FluentMap Core:
+
+| Provider path | Status |
+| --- | --- |
+| SQLite, SQL Server, PostgreSQL | Dommel persistence certified |
+| MySQL, MariaDB | Certified through the shared `MySqlConnection` / `MySqlSqlBuilder` path |
+| Oracle, Firebird | Core-only; no built-in Dommel 3.5.3 SQL builder |
+| SQL Server CE | Builder registration retained; legacy/upstream-limited and not modernly certified |
+
+Advanced consumers may use Dommel's public `DommelMapper.AddSqlBuilder(Type, ISqlBuilder)` or `AddSqlBuilder(string, ISqlBuilder)` APIs. Registration is process-wide, and a custom builder remains the application's SQL-generation and persistence-testing responsibility; it does not extend this project's certification.
+
 ## Constraints
 
 :::caution

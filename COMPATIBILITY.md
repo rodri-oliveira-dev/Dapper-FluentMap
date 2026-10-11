@@ -51,6 +51,15 @@ Validated in the current matrix:
 
 Dommel integration is optional and process-wide. It uses global `DommelMapper` resolvers/builders and does not participate in isolated `FluentMapRuntime` configuration.
 
+The Dommel boundary is narrower than FluentMap Core provider compatibility:
+
+- **Certified here:** SQLite, SQL Server, PostgreSQL, MySQL and MariaDB have real persistence coverage in the required provider matrix.
+- **Shared MySQL path:** MySQL and MariaDB are both exercised through `MySqlConnector`'s `MySqlConnection` and Dommel's built-in `MySqlSqlBuilder` registration.
+- **Core-only:** Oracle and Firebird have required FluentMap Core evidence, but Dommel 3.5.3 has no built-in SQL builder for either provider. They are not Dommel-certified.
+- **Legacy:** the existing `SqlServerCeSqlBuilder` registration is retained for source and behavioral compatibility, but SQL Server CE has no modern real-database certification lane and is legacy/upstream-limited.
+
+Dommel 3.5.3 exposes the public `DommelMapper.AddSqlBuilder(Type, ISqlBuilder)` and `AddSqlBuilder(string, ISqlBuilder)` APIs for advanced consumers. A custom builder is global process state and remains the consumer's SQL-generation responsibility; registering one does not make that provider certified by this project. A new project-owned dialect would require separate review plus SQL-generation and real persistence tests.
+
 ## Providers
 
 The machine-readable provider matrix is part of `eng/compatibility-contract.json`. Each provider has one overall support level and independent Core and Dommel evidence, using these terms:

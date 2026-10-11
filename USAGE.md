@@ -370,6 +370,10 @@ FluentMapper.Initialize(config =>
 
 `DommelEntityMap<TEntity>`, `IsKey()`, `IsIdentity()` and `SetGeneratedOption(...)` remain the Dommel-specific mapping surface.
 
+Provider support for this optional package is intentionally narrower than FluentMap Core support. This repository certifies Dommel persistence with SQLite, SQL Server, PostgreSQL, MySQL and MariaDB. MySQL and MariaDB share the `MySqlConnection`/`MySqlSqlBuilder` path. Oracle and Firebird are Core-only because Dommel 3.5.3 has no built-in SQL builder for either provider. The SQL Server CE builder registration remains available for compatibility, but it is legacy/upstream-limited and has no modern certification lane.
+
+Advanced consumers can register an `ISqlBuilder` through Dommel's public `DommelMapper.AddSqlBuilder(Type, ISqlBuilder)` or `AddSqlBuilder(string, ISqlBuilder)` APIs. Registration is process-wide, and the application owns validation of the generated SQL and persistence behavior. A custom registration does not extend this project's certified provider matrix.
+
 ## Generated Registration And Materialization
 
 Install the source-generator package:
