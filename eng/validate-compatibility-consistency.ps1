@@ -129,14 +129,21 @@ foreach ($provider in $providers) {
   if ([bool]$provider.requiredCi -and [string]::IsNullOrWhiteSpace([string]$provider.ciFilter)) {
     Fail "provider '$id' is required in CI but has no ciFilter."
   }
+  if ($coreEvidence -eq 'certified' -and (
+      [string]::IsNullOrWhiteSpace([string]$provider.serverVersion) -or
+      [string]::IsNullOrWhiteSpace([string]$provider.clientPackage) -or
+      [string]::IsNullOrWhiteSpace([string]$provider.clientVersion))) {
+    Fail "provider '$id' is Core certified but does not pin serverVersion, clientPackage and clientVersion."
+  }
 }
 
-$providerLoop = [Regex]::Match($ci, 'for provider in (?<providers>[^\r\n]+); do')
-if (-not $providerLoop.Success) {
+$providerLoops = [Regex]::Matches($ci, 'for provider in (?<providers>[^\r\n]+); do')
+if ($providerLoops.Count -eq 0) {
   Fail '.github/workflows/ci.yml does not expose the required provider execution loop.'
 }
 $ciProviders = @(
-  [Regex]::Matches($providerLoop.Groups['providers'].Value, '"(?<name>[^"]+)"') |
+  $providerLoops |
+    ForEach-Object { [Regex]::Matches($_.Groups['providers'].Value, '"(?<name>[^"]+)"') } |
     ForEach-Object { $_.Groups['name'].Value }
 )
 $contractCiProviders = @(

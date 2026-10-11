@@ -76,14 +76,14 @@
       {
         "id": "oracle",
         "displayName": "Oracle",
-        "supportLevel": "dapper-compatible",
-        "coreEvidence": "not-certified",
+        "supportLevel": "core-certified",
+        "coreEvidence": "certified",
         "dommelEvidence": "not-certified",
-        "requiredCi": false,
-        "ciFilter": null,
-        "serverVersion": null,
-        "clientPackage": null,
-        "clientVersion": null
+        "requiredCi": true,
+        "ciFilter": "Oracle",
+        "serverVersion": "23.26.0 Free",
+        "clientPackage": "Oracle.ManagedDataAccess.Core",
+        "clientVersion": "23.26.301"
       },
       {
         "id": "firebird",

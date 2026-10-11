@@ -169,7 +169,7 @@ const pageDetails = {
 | PostgreSQL | Certified | Certified |
 | MySQL | Certified | Certified |
 | MariaDB | Certified | Certified |
-| Oracle | Not certified | Not certified |
+| Oracle | Certified | Not certified |
 | Firebird | Not certified | Not certified |
 | SQL Server CE | Legacy/upstream-limited | Legacy/upstream-limited |
 
@@ -188,7 +188,7 @@ The exact pinned server/client versions and evidence are maintained in the compa
 | PostgreSQL | Certificado | Certificado |
 | MySQL | Certificado | Certificado |
 | MariaDB | Certificado | Certificado |
-| Oracle | Não certificado | Não certificado |
+| Oracle | Certificado | Não certificado |
 | Firebird | Não certificado | Não certificado |
 | SQL Server CE | Legado/limitado pelo upstream | Legado/limitado pelo upstream |
 

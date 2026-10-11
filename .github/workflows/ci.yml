@@ -305,6 +305,73 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  oracle-compatibility:
+    name: Provider compatibility (Oracle Core)
+    runs-on: ${{ vars.RUNNER_OS || 'ubuntu-26.04' }}
+    timeout-minutes: 45
+    services:
+      oracle:
+        image: gvenzl/oracle-free:23.26.0-slim-faststart
+        env:
+          ORACLE_PASSWORD: "Oracle-${{ github.run_id }}!"
+          APP_USER: fluentmap
+          APP_USER_PASSWORD: "FluentMap-${{ github.run_id }}!"
+        ports:
+          - 1521:1521
+        options: >-
+          --health-cmd healthcheck.sh
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 60
+          --health-start-period 30s
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          show-progress: false
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+
+      - name: Show .NET info
+        run: dotnet --info
+
+      - name: Restore
+        run: dotnet restore ./Dapper.FluentMap.slnx
+
+      - name: Build provider compatibility tests
+        run: dotnet build ./test/Dapper.FluentMap.ProviderCompatibility.Tests/Dapper.FluentMap.ProviderCompatibility.Tests.csproj --configuration Release --no-restore
+
+      - name: Test Oracle Core compatibility
+        env:
+          DFM_PROVIDER_COMPATIBILITY_STRICT: "true"
+          DFM_ORACLE_CONNECTION_STRING: "User Id=fluentmap;Password=FluentMap-${{ github.run_id }}!;Data Source=localhost:1521/FREEPDB1;"
+        run: |
+          mkdir -p ./artifacts/test-results/providers
+          for provider in "Oracle"; do
+            DFM_PROVIDER_FILTER="$provider" \
+              dotnet ./test/Dapper.FluentMap.ProviderCompatibility.Tests/bin/Release/net10.0/Dapper.FluentMap.ProviderCompatibility.Tests.dll \
+                -failSkips \
+                -parallelMode none \
+                -trait- "Capability=Dommel" \
+                -trait- "Capability=MultipleResults" \
+                -result-trx ./artifacts/test-results/providers/oracle.trx
+          done
+
+      - name: Upload Oracle test results
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: oracle-compatibility-results
+          path: ./artifacts/test-results/providers/oracle.trx
+          if-no-files-found: error
+          retention-days: 14
+
   native-aot:
     name: Native AOT strict generated smoke (SQLite, win-x64)
     runs-on: windows-latest
@@ -374,6 +441,7 @@ jobs:
       - compatibility
       - roslyn-components
       - provider-compatibility
+      - oracle-compatibility
 
     steps:
       - name: Checkout
@@ -499,6 +567,7 @@ jobs:
       - public-api
       - roslyn-components
       - provider-compatibility
+      - oracle-compatibility
     if: ${{ vars.SONAR_CI_ENABLED == 'true' && ((github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch') }}
     permissions:
       contents: read
@@ -806,6 +875,7 @@ jobs:
       - public-api
       - roslyn-components
       - provider-compatibility
+      - oracle-compatibility
       - native-aot
       - pack
       - sonar
@@ -819,6 +889,7 @@ jobs:
           echo "public-api=${{ needs.public-api.result }}"
           echo "roslyn-components=${{ needs.roslyn-components.result }}"
           echo "provider-compatibility=${{ needs.provider-compatibility.result }}"
+          echo "oracle-compatibility=${{ needs.oracle-compatibility.result }}"
           echo "native-aot=${{ needs.native-aot.result }}"
           echo "pack=${{ needs.pack.result }}"
           echo "sonar=${{ needs.sonar.result }}"
@@ -827,6 +898,7 @@ jobs:
                 "${{ needs.compatibility.result }}" != "success" || \
                 "${{ needs.public-api.result }}" != "success" || \
                 "${{ needs.provider-compatibility.result }}" != "success" || \
+                "${{ needs.oracle-compatibility.result }}" != "success" || \
                 "${{ needs.native-aot.result }}" != "success" || \
                 "${{ needs.roslyn-components.result }}" != "success" || \
                 "${{ needs.pack.result }}" != "success" ]]; then

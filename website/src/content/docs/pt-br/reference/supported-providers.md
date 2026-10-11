@@ -48,7 +48,7 @@ O FluentMap registra metadados tipados e os aplica no caminho de materializaçã
 | PostgreSQL | Certificado | Certificado |
 | MySQL | Certificado | Certificado |
 | MariaDB | Certificado | Certificado |
-| Oracle | Não certificado | Não certificado |
+| Oracle | Certificado | Não certificado |
 | Firebird | Não certificado | Não certificado |
 | SQL Server CE | Legado/limitado pelo upstream | Legado/limitado pelo upstream |
 
