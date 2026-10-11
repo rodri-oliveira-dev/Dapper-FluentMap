@@ -153,6 +153,75 @@ const restrictions = {
   default: ['Initialize before concurrent queries and treat the effective configuration as read-only afterward.', 'Inicialize antes de consultas concorrentes e trate a configuração efetiva como somente leitura depois disso.']
 };
 
+const pageDetails = {
+  dommel: [
+    `## Provider boundary
+
+The Dommel package has a narrower provider boundary than FluentMap Core:
+
+| Provider path | Status |
+| --- | --- |
+| SQLite, SQL Server, PostgreSQL | Dommel persistence certified |
+| MySQL, MariaDB | Certified through the shared \`MySqlConnection\` / \`MySqlSqlBuilder\` path |
+| Oracle, Firebird | Core-only; no built-in Dommel 3.5.3 SQL builder |
+| SQL Server CE | Builder registration retained; legacy/upstream-limited and not modernly certified |
+
+Advanced consumers may use Dommel's public \`DommelMapper.AddSqlBuilder(Type, ISqlBuilder)\` or \`AddSqlBuilder(string, ISqlBuilder)\` APIs. Registration is process-wide, and a custom builder remains the application's SQL-generation and persistence-testing responsibility; it does not extend this project's certification.`,
+    `## Limite de providers
+
+O pacote Dommel possui um limite de providers mais restrito que o FluentMap Core:
+
+| Caminho do provider | Status |
+| --- | --- |
+| SQLite, SQL Server, PostgreSQL | Persistência Dommel certificada |
+| MySQL, MariaDB | Certificados pelo caminho compartilhado \`MySqlConnection\` / \`MySqlSqlBuilder\` |
+| Oracle, Firebird | Somente Core; sem SQL builder integrado no Dommel 3.5.3 |
+| SQL Server CE | Registro do builder preservado; legado/limitado pelo upstream e sem certificação moderna |
+
+Consumidores avançados podem usar as APIs públicas \`DommelMapper.AddSqlBuilder(Type, ISqlBuilder)\` ou \`AddSqlBuilder(string, ISqlBuilder)\` do Dommel. O registro é global ao processo, e um builder customizado continua sob responsabilidade da aplicação quanto à geração de SQL e aos testes de persistência; ele não amplia a certificação deste projeto.`
+  ],
+  'supported-providers': [
+    `## Support levels
+
+- **Dapper-compatible:** expected to work through Dapper/ADO.NET, without dedicated real-database FluentMap certification.
+- **FluentMap Core certified:** required real-database tests cover FluentMap mapping and materialization, independently of Dommel.
+- **FluentMap + Dommel certified:** required real-database tests also cover the supported Dommel persistence path.
+- **Legacy/upstream-limited:** retained for compatibility without a modern certification lane.
+
+| Provider | Core | Dommel | Tested server/runtime | Tested client |
+| --- | --- | --- | --- | --- |
+| SQLite | Certified | Certified | In-memory | \`Microsoft.Data.Sqlite\` 10.0.12 |
+| SQL Server | Certified | Certified | 2022 CU23 | \`Microsoft.Data.SqlClient\` 7.1.0 |
+| PostgreSQL | Certified | Certified | 18.6 | \`Npgsql\` 10.0.3 |
+| MySQL | Certified | Certified | 8.4.11 | \`MySqlConnector\` 2.6.2 |
+| MariaDB | Certified | Certified | 11.8.9 | \`MySqlConnector\` 2.6.2 |
+| Oracle | Certified | Not certified | 23.26.0 Free | \`Oracle.ManagedDataAccess.Core\` 23.26.301 |
+| Firebird | Certified | Not certified | 5.0.4 | \`FirebirdSql.Data.FirebirdClient\` 10.3.4 |
+| SQL Server CE | Legacy/upstream-limited | Legacy/upstream-limited | Not certified | Not certified |
+
+These pinned versions and evidence are also maintained in the machine-readable compatibility contract.`,
+    `## Níveis de suporte
+
+- **Compatível com Dapper:** funcionamento esperado via Dapper/ADO.NET, sem certificação dedicada do FluentMap em banco real.
+- **FluentMap Core certificado:** testes obrigatórios em banco real cobrem mapping e materialização do FluentMap, independentemente do Dommel.
+- **FluentMap + Dommel certificado:** testes obrigatórios em banco real também cobrem o caminho de persistência suportado pelo Dommel.
+- **Legado/limitado pelo upstream:** mantido por compatibilidade, sem uma lane moderna de certificação.
+
+| Provider | Core | Dommel | Servidor/runtime testado | Cliente testado |
+| --- | --- | --- | --- | --- |
+| SQLite | Certificado | Certificado | Em memória | \`Microsoft.Data.Sqlite\` 10.0.12 |
+| SQL Server | Certificado | Certificado | 2022 CU23 | \`Microsoft.Data.SqlClient\` 7.1.0 |
+| PostgreSQL | Certificado | Certificado | 18.6 | \`Npgsql\` 10.0.3 |
+| MySQL | Certificado | Certificado | 8.4.11 | \`MySqlConnector\` 2.6.2 |
+| MariaDB | Certificado | Certificado | 11.8.9 | \`MySqlConnector\` 2.6.2 |
+| Oracle | Certificado | Não certificado | 23.26.0 Free | \`Oracle.ManagedDataAccess.Core\` 23.26.301 |
+| Firebird | Certificado | Não certificado | 5.0.4 | \`FirebirdSql.Data.FirebirdClient\` 10.3.4 |
+| SQL Server CE | Legado/limitado pelo upstream | Legado/limitado pelo upstream | Não certificado | Não certificado |
+
+Essas versões fixadas e suas evidências também são mantidas no contrato de compatibilidade legível por máquina.`
+  ]
+};
+
 const packagesFor = (_section, slug) => {
   if (slug === 'dommel') return ['Dapper.FluentMap.Dommel'];
   if (slug === 'dependency-injection' || slug === 'aspnet-core') return ['FluentMap.DependencyInjection'];
@@ -186,6 +255,8 @@ function pageBody(section, entry, pt) {
     .join(', ');
   const sample = code[slug] ?? code.default;
   const constraint = restrictions[slug]?.[pt ? 1 : 0] ?? restrictions.default[pt ? 1 : 0];
+  const detail = pageDetails[slug]?.[pt ? 1 : 0] ?? '';
+  const detailBlock = detail ? `\n\n${detail}` : '';
   const labels = pt ? {
     package: packageNames.length > 1 ? 'Pacotes necessários' : 'Pacote necessário', problem: 'Problema resolvido', when: 'Quando usar', example: 'Exemplo', explanation: 'Como funciona', limits: 'Restrições', related: 'Referências relacionadas',
     whenText: 'Use este recurso quando o formato das colunas e o modelo .NET precisarem permanecer separados por uma configuração explícita e revisável.',
@@ -198,7 +269,7 @@ function pageBody(section, entry, pt) {
   const prefix = pt ? '/Dapper-FluentMap/pt-br' : '/Dapper-FluentMap';
   const sectionTitle = pt ? sections[section].pt : sections[section].en;
   const breadcrumb = `<nav class="portal-breadcrumbs" aria-label="${pt ? 'Trilha de navegação' : 'Breadcrumb'}"><a href="${prefix}/">${pt ? 'Início' : 'Home'}</a><span aria-hidden="true">/</span><a href="${prefix}/${section}/">${sectionTitle}</a><span aria-hidden="true">/</span><span aria-current="page">${title}</span></nav>`;
-  return `---\ntitle: ${yaml(title)}\ndescription: ${yaml(description)}\n---\n\n<!-- Generated by scripts/generate-content.mjs. Edit the generator, not this file. -->\n\n${breadcrumb}\n\n> **${labels.package}:** ${packageLinks}\n\n## ${labels.problem}\n\n${description}\n\n## ${labels.when}\n\n${labels.whenText}\n\n## ${labels.example}\n\n\`\`\`${sample.startsWith('dotnet ') ? 'bash' : 'csharp'}\n${sample}\n\`\`\`\n\n## ${labels.explanation}\n\n${labels.explainText}\n\n## ${labels.limits}\n\n:::caution\n${constraint}\n:::\n\n## ${labels.related}\n\n${sourceLinks(section, pt)}\n`;
+  return `---\ntitle: ${yaml(title)}\ndescription: ${yaml(description)}\n---\n\n<!-- Generated by scripts/generate-content.mjs. Edit the generator, not this file. -->\n\n${breadcrumb}\n\n> **${labels.package}:** ${packageLinks}\n\n## ${labels.problem}\n\n${description}\n\n## ${labels.when}\n\n${labels.whenText}\n\n## ${labels.example}\n\n\`\`\`${sample.startsWith('dotnet ') ? 'bash' : 'csharp'}\n${sample}\n\`\`\`\n\n## ${labels.explanation}\n\n${labels.explainText}${detailBlock}\n\n## ${labels.limits}\n\n:::caution\n${constraint}\n:::\n\n## ${labels.related}\n\n${sourceLinks(section, pt)}\n`;
 }
 
 function indexBody(data, pt) {

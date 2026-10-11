@@ -1,8 +1,114 @@
 {
-  "schemaVersion": "1.0",
+  "schemaVersion": "2.0",
   "dapper": {
     "minimumSupportedVersion": "2.1.79",
     "latestStableVersion": "2.1.89",
     "packageRange": "[2.1.79,3.0.0)"
+  },
+  "providerSupport": {
+    "levels": [
+      "dapper-compatible",
+      "core-certified",
+      "core-dommel-certified",
+      "legacy-upstream-limited"
+    ],
+    "providers": [
+      {
+        "id": "sqlite",
+        "displayName": "SQLite",
+        "supportLevel": "core-dommel-certified",
+        "coreEvidence": "certified",
+        "dommelEvidence": "certified",
+        "requiredCi": true,
+        "ciFilter": "SQLite",
+        "serverVersion": "in-memory",
+        "clientPackage": "Microsoft.Data.Sqlite",
+        "clientVersion": "10.0.12"
+      },
+      {
+        "id": "sql-server",
+        "displayName": "SQL Server",
+        "supportLevel": "core-dommel-certified",
+        "coreEvidence": "certified",
+        "dommelEvidence": "certified",
+        "requiredCi": true,
+        "ciFilter": "SQL Server",
+        "serverVersion": "2022 CU23",
+        "clientPackage": "Microsoft.Data.SqlClient",
+        "clientVersion": "7.1.0"
+      },
+      {
+        "id": "postgresql",
+        "displayName": "PostgreSQL",
+        "supportLevel": "core-dommel-certified",
+        "coreEvidence": "certified",
+        "dommelEvidence": "certified",
+        "requiredCi": true,
+        "ciFilter": "PostgreSQL",
+        "serverVersion": "18.6",
+        "clientPackage": "Npgsql",
+        "clientVersion": "10.0.3"
+      },
+      {
+        "id": "mysql",
+        "displayName": "MySQL",
+        "supportLevel": "core-dommel-certified",
+        "coreEvidence": "certified",
+        "dommelEvidence": "certified",
+        "requiredCi": true,
+        "ciFilter": "MySQL",
+        "serverVersion": "8.4.11",
+        "clientPackage": "MySqlConnector",
+        "clientVersion": "2.6.2"
+      },
+      {
+        "id": "mariadb",
+        "displayName": "MariaDB",
+        "supportLevel": "core-dommel-certified",
+        "coreEvidence": "certified",
+        "dommelEvidence": "certified",
+        "requiredCi": true,
+        "ciFilter": "MariaDB",
+        "serverVersion": "11.8.9",
+        "clientPackage": "MySqlConnector",
+        "clientVersion": "2.6.2"
+      },
+      {
+        "id": "oracle",
+        "displayName": "Oracle",
+        "supportLevel": "core-certified",
+        "coreEvidence": "certified",
+        "dommelEvidence": "not-certified",
+        "requiredCi": true,
+        "ciFilter": "Oracle",
+        "serverVersion": "23.26.0 Free",
+        "clientPackage": "Oracle.ManagedDataAccess.Core",
+        "clientVersion": "23.26.301"
+      },
+      {
+        "id": "firebird",
+        "displayName": "Firebird",
+        "supportLevel": "core-certified",
+        "coreEvidence": "certified",
+        "dommelEvidence": "not-certified",
+        "requiredCi": true,
+        "ciFilter": "Firebird",
+        "serverVersion": "5.0.4",
+        "clientPackage": "FirebirdSql.Data.FirebirdClient",
+        "clientVersion": "10.3.4"
+      },
+      {
+        "id": "sql-server-ce",
+        "displayName": "SQL Server CE",
+        "supportLevel": "legacy-upstream-limited",
+        "coreEvidence": "legacy",
+        "dommelEvidence": "legacy",
+        "requiredCi": false,
+        "ciFilter": null,
+        "serverVersion": null,
+        "clientPackage": null,
+        "clientVersion": null
+      }
+    ]
   }
 }

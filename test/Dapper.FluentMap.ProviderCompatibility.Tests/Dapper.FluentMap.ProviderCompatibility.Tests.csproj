@@ -6,6 +6,8 @@
     <SqliteClientPackageVersion Condition="'$(SqliteClientPackageVersion)' == ''">10.0.12</SqliteClientPackageVersion>
     <MySqlConnectorPackageVersion Condition="'$(MySqlConnectorPackageVersion)' == ''">2.6.2</MySqlConnectorPackageVersion>
     <NpgsqlPackageVersion Condition="'$(NpgsqlPackageVersion)' == ''">10.0.3</NpgsqlPackageVersion>
+    <OracleManagedDataAccessPackageVersion Condition="'$(OracleManagedDataAccessPackageVersion)' == ''">23.26.301</OracleManagedDataAccessPackageVersion>
+    <FirebirdClientPackageVersion Condition="'$(FirebirdClientPackageVersion)' == ''">10.3.4</FirebirdClientPackageVersion>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Dapper.FluentMap\Dapper.FluentMap.csproj" />
@@ -14,6 +16,8 @@
     <PackageReference Include="Microsoft.Data.Sqlite" Version="$(SqliteClientPackageVersion)" />
     <PackageReference Include="MySqlConnector" Version="$(MySqlConnectorPackageVersion)" />
     <PackageReference Include="Npgsql" Version="$(NpgsqlPackageVersion)" />
+    <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="$(OracleManagedDataAccessPackageVersion)" />
+    <PackageReference Include="FirebirdSql.Data.FirebirdClient" Version="$(FirebirdClientPackageVersion)" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.5" PrivateAssets="all" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
     <PackageReference Include="xunit.v3" Version="4.0.1" />
