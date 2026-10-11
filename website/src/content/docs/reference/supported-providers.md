@@ -49,7 +49,7 @@ FluentMap registers typed metadata and applies it through the matching materiali
 | MySQL | Certified | Certified |
 | MariaDB | Certified | Certified |
 | Oracle | Certified | Not certified |
-| Firebird | Not certified | Not certified |
+| Firebird | Certified | Not certified |
 | SQL Server CE | Legacy/upstream-limited | Legacy/upstream-limited |
 
 The exact pinned server/client versions and evidence are maintained in the compatibility contract.

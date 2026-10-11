@@ -13,6 +13,7 @@ using Dapper.FluentMap.Dommel.Mapping;
 using Dapper.FluentMap.Mapping;
 using Dapper.FluentMap.Materialization;
 using Dommel;
+using FirebirdSql.Data.FirebirdClient;
 using Microsoft.Data.SqlClient;
 using Microsoft.Data.Sqlite;
 using MySqlConnector;
@@ -34,7 +35,8 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
                 ProviderCase.PostgreSqlName,
                 ProviderCase.MySqlName,
                 ProviderCase.MariaDbName,
-                ProviderCase.OracleName
+                ProviderCase.OracleName,
+                ProviderCase.FirebirdName
             };
 
             foreach (var provider in providers)
@@ -53,6 +55,7 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
             yield return new object[] { ProviderCase.MySqlName };
             yield return new object[] { ProviderCase.MariaDbName };
             yield return new object[] { ProviderCase.OracleName };
+            yield return new object[] { ProviderCase.FirebirdName };
         }
 
         [Fact]
@@ -62,7 +65,7 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
             var providers = Providers().Select(row => Assert.IsType<string>(Assert.Single(row))).ToArray();
 
             var filter = Environment.GetEnvironmentVariable("DFM_PROVIDER_FILTER");
-            Assert.Equal(string.IsNullOrWhiteSpace(filter) ? 6 : 1, providers.Length);
+            Assert.Equal(string.IsNullOrWhiteSpace(filter) ? 7 : 1, providers.Length);
             if (!string.IsNullOrWhiteSpace(filter))
             {
                 Assert.Equal(filter, Assert.Single(providers));
@@ -76,7 +79,7 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
         {
             var provider = ProviderCase.Create(providerName);
 
-            if (provider.Name == ProviderCase.OracleName)
+            if (provider.Name == ProviderCase.OracleName || provider.Name == ProviderCase.FirebirdName)
             {
                 Assert.False(provider.SupportsMultipleResults);
                 Assert.False(provider.SupportsPersistence);
@@ -709,6 +712,7 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
             public const string MySqlName = "MySQL";
             public const string MariaDbName = "MariaDB";
             public const string OracleName = "Oracle";
+            public const string FirebirdName = "Firebird";
 
             private readonly string connectionString;
             private readonly Func<string, DbConnection> connectionFactory;
@@ -813,6 +817,19 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
                     supportsPersistence: false);
             }
 
+            public static ProviderCase Firebird()
+            {
+                const string environmentVariable = "DFM_FIREBIRD_CONNECTION_STRING";
+                return new ProviderCase(
+                    FirebirdName,
+                    environmentVariable,
+                    Environment.GetEnvironmentVariable(environmentVariable),
+                    connectionString => new FbConnection(connectionString),
+                    ProviderDialect.Firebird,
+                    supportsMultipleResults: false,
+                    supportsPersistence: false);
+            }
+
             public static ProviderCase Create(string name)
             {
                 switch (name)
@@ -829,6 +846,8 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
                         return MariaDb();
                     case OracleName:
                         return Oracle();
+                    case FirebirdName:
+                        return Firebird();
                     default:
                         throw new ArgumentOutOfRangeException(nameof(name), name, "Unknown provider.");
                 }
@@ -883,7 +902,8 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
                 return Dialect == ProviderDialect.Sqlite ||
                        Dialect == ProviderDialect.MySql ||
                        Dialect == ProviderDialect.MariaDb ||
-                       Dialect == ProviderDialect.Oracle
+                       Dialect == ProviderDialect.Oracle ||
+                       Dialect == ProviderDialect.Firebird
                     ? value.ToString()
                     : (object)value;
             }
@@ -902,6 +922,12 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
                         break;
                     case ProviderDialect.Oracle:
                         connection.Execute("BEGIN EXECUTE IMMEDIATE 'DROP TABLE " + tableName + "'; EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF; END;");
+                        break;
+                    case ProviderDialect.Firebird:
+                        connection.Execute(
+                            "EXECUTE BLOCK AS BEGIN " +
+                            "IF (EXISTS(SELECT 1 FROM RDB$RELATIONS WHERE RDB$RELATION_NAME = '" + tableName.ToUpperInvariant() + "')) " +
+                            "THEN EXECUTE STATEMENT 'DROP TABLE " + tableName + "'; END");
                         break;
                     default:
                         connection.Execute("DROP TABLE IF EXISTS " + tableName + ";");
@@ -945,6 +971,14 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
     external_id VARCHAR2(36) NOT NULL,
     created_at TIMESTAMP NOT NULL,
     balance NUMBER(18, 2) NOT NULL
+)";
+                    case ProviderDialect.Firebird:
+                        return @"CREATE TABLE " + tableName + @" (
+    customer_id INTEGER NOT NULL,
+    optional_name VARCHAR(100),
+    external_id CHAR(36) NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    balance DECIMAL(18, 2) NOT NULL
 )";
                     default:
                         return @"CREATE TABLE " + tableName + @" (
@@ -1029,6 +1063,13 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
             public string ParameterizedCustomerSql()
             {
                 var parameterPrefix = Dialect == ProviderDialect.Oracle ? ":" : "@";
+                if (Dialect == ProviderDialect.Firebird)
+                {
+                    return "SELECT CAST(@Id AS INTEGER) AS " + Alias("customer_id") +
+                        ", CAST(@Name AS VARCHAR(100)) AS " + Alias("customer_name") +
+                        ", 1 AS " + Alias("provider_trace") + DummyTableClause();
+                }
+
                 return "SELECT " + parameterPrefix + "Id AS " + Alias("customer_id") + ", " + parameterPrefix +
                     "Name AS " + Alias("customer_name") + ", 1 AS " + Alias("provider_trace") + DummyTableClause() + StatementTerminator();
             }
@@ -1134,22 +1175,31 @@ WHERE code = @Code;";
 
             private string DummyTableClause()
             {
-                return Dialect == ProviderDialect.Oracle ? " FROM DUAL" : string.Empty;
+                if (Dialect == ProviderDialect.Oracle)
+                {
+                    return " FROM DUAL";
+                }
+
+                return Dialect == ProviderDialect.Firebird ? " FROM RDB$DATABASE" : string.Empty;
             }
 
             private string Alias(string name)
             {
-                return Dialect == ProviderDialect.Oracle ? "\"" + name + "\"" : name;
+                return Dialect == ProviderDialect.Oracle || Dialect == ProviderDialect.Firebird
+                    ? "\"" + name + "\""
+                    : name;
             }
 
             private string SelectColumn(string name)
             {
-                return Dialect == ProviderDialect.Oracle ? name + " AS " + Alias(name) : name;
+                return Dialect == ProviderDialect.Oracle || Dialect == ProviderDialect.Firebird
+                    ? name + " AS " + Alias(name)
+                    : name;
             }
 
             private string StatementTerminator()
             {
-                return Dialect == ProviderDialect.Oracle ? string.Empty : ";";
+                return Dialect == ProviderDialect.Oracle || Dialect == ProviderDialect.Firebird ? string.Empty : ";";
             }
 
             private static bool IsStrictProviderCertification()
@@ -1168,7 +1218,8 @@ WHERE code = @Code;";
             PostgreSql,
             MySql,
             MariaDb,
-            Oracle
+            Oracle,
+            Firebird
         }
 
         private sealed class BasicProviderCustomer

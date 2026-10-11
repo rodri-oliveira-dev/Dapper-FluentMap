@@ -70,7 +70,7 @@ Current support contract:
 | MySQL | Dapper-compatible | FluentMap Core certified | FluentMap + Dommel certified |
 | MariaDB | Dapper-compatible | FluentMap Core certified | FluentMap + Dommel certified |
 | Oracle | Dapper-compatible | FluentMap Core certified | Not certified |
-| Firebird | Dapper-compatible | Not certified | Not certified |
+| Firebird | Dapper-compatible | FluentMap Core certified | Not certified |
 | SQL Server CE | Legacy/upstream-limited | Legacy/upstream-limited | Legacy/upstream-limited |
 
 Certification evidence:
@@ -81,9 +81,10 @@ Certification evidence:
 - MySQL 8.4.11 (`MySqlConnector` 2.6.2) uses `mysql:8.4.11-oraclelinux9` in mandatory CI.
 - MariaDB 11.8.9 (`MySqlConnector` 2.6.2) uses `mariadb:11.8.9-ubi9` in mandatory CI.
 - Oracle Database Free 23.26.0 (`Oracle.ManagedDataAccess.Core` 23.26.301) uses `gvenzl/oracle-free:23.26.0-slim-faststart` in a mandatory Core-only CI lane. It covers explicit mapping, immutable/nested/value-object and generated/runtime materialization, sync/async streaming, parameter binding and null handling. ODP.NET does not expose the suite's multi-statement `QueryMultiple` shape, and no Oracle Dommel SQL builder is claimed.
+- Firebird 5.0.4 (`FirebirdSql.Data.FirebirdClient` 10.3.4) uses the official `firebirdsql/firebird:5.0.4` image in a mandatory Core-only CI lane. It covers explicit mapping, immutable/nested/value-object and generated/runtime materialization, sync/async streaming, parameter binding and null handling. The ADO.NET provider does not expose the suite's multi-statement `QueryMultiple` shape through an ordinary Dapper command, and no Firebird Dommel SQL builder is claimed.
 - Provider-independent Core tests additionally use `DataTableReader` and common ADO.NET contracts, but that evidence alone never certifies a database provider.
 
-The Oracle provider and database image are test-only dependencies, are publicly retrievable without repository credentials, and retain their respective upstream license terms. CI creates an ephemeral application schema with run-scoped credentials rather than depending on private Oracle infrastructure.
+The Oracle and Firebird providers and database images are test-only dependencies, are publicly retrievable without repository credentials, and retain their respective upstream license terms. CI creates ephemeral databases/users with run-scoped credentials rather than depending on private infrastructure.
 
 `MySqlConnector` 2.6.2 is used only by the provider-certification test project because one async ADO.NET driver can exercise both pinned MySQL and MariaDB services, targets `netstandard2.0`, and is distributed under the MIT license. This choice does not add a runtime dependency to the FluentMap packages or certify any server, driver version, or feature outside the matrix above.
 

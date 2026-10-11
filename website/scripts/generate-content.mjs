@@ -170,7 +170,7 @@ const pageDetails = {
 | MySQL | Certified | Certified |
 | MariaDB | Certified | Certified |
 | Oracle | Certified | Not certified |
-| Firebird | Not certified | Not certified |
+| Firebird | Certified | Not certified |
 | SQL Server CE | Legacy/upstream-limited | Legacy/upstream-limited |
 
 The exact pinned server/client versions and evidence are maintained in the compatibility contract.`,
@@ -189,7 +189,7 @@ The exact pinned server/client versions and evidence are maintained in the compa
 | MySQL | Certificado | Certificado |
 | MariaDB | Certificado | Certificado |
 | Oracle | Certificado | Não certificado |
-| Firebird | Não certificado | Não certificado |
+| Firebird | Certificado | Não certificado |
 | SQL Server CE | Legado/limitado pelo upstream | Legado/limitado pelo upstream |
 
 As versões exatas de servidor/cliente e suas evidências são mantidas no contrato de compatibilidade.`
