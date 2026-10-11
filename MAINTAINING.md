@@ -16,6 +16,12 @@ For an intentional API change:
 
 Do not hand-approve a removal or signature replacement without the compatibility and SemVer review required for a public library. Package validation remains enabled and is not replaced by these files.
 
+## Provider support claims
+
+`eng/compatibility-contract.json` is the machine-readable source of truth for provider support. Keep Dapper/ADO.NET compatibility, FluentMap Core certification, FluentMap + Dommel certification and legacy/upstream-limited status distinct. A Core claim requires executable real-database mapping/materialization evidence in required CI; a Dommel claim additionally requires real persistence evidence for the provider's supported SQL builder path. Registration or availability of an SQL builder alone is not certification.
+
+When changing the matrix, update the contract, required CI provider list and `COMPATIBILITY.md` together, run `eng/test-compatibility-consistency.ps1`, and preserve pinned server/client versions. Never promote a provider based only on common ADO.NET abstractions or theoretical compatibility.
+
 ## Nullable contracts
 
 Maintained public projects compile with C# nullable annotations enabled. Warning enforcement is staged as `Nullable=annotations` because enabling full flow analysis currently exposes substantial internal legacy debt; this prevents a blanket suppression migration. Public signatures must still model actual behavior deliberately.

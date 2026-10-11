@@ -34,6 +34,26 @@ public sealed class CustomerMap : EntityMap<Customer>
 
 O FluentMap registra metadados tipados e os aplica no caminho de materialização correspondente. O SQL, a conexão, os parâmetros e o ciclo de vida continuam sob responsabilidade da aplicação e do Dapper.
 
+## Níveis de suporte
+
+- **Compatível com Dapper:** funcionamento esperado via Dapper/ADO.NET, sem certificação dedicada do FluentMap em banco real.
+- **FluentMap Core certificado:** testes obrigatórios em banco real cobrem mapping e materialização do FluentMap, independentemente do Dommel.
+- **FluentMap + Dommel certificado:** testes obrigatórios em banco real também cobrem o caminho de persistência suportado pelo Dommel.
+- **Legado/limitado pelo upstream:** mantido por compatibilidade, sem uma lane moderna de certificação.
+
+| Provider | Core | Dommel |
+| --- | --- | --- |
+| SQLite | Certificado | Certificado |
+| SQL Server | Certificado | Certificado |
+| PostgreSQL | Certificado | Certificado |
+| MySQL | Certificado | Certificado |
+| MariaDB | Certificado | Certificado |
+| Oracle | Não certificado | Não certificado |
+| Firebird | Não certificado | Não certificado |
+| SQL Server CE | Legado/limitado pelo upstream | Legado/limitado pelo upstream |
+
+As versões exatas de servidor/cliente e suas evidências são mantidas no contrato de compatibilidade.
+
 ## Restrições
 
 :::caution

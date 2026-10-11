@@ -44,6 +44,27 @@ try {
   }
 
   Write-Host 'PASS compatibility consistency validator detects intentional documentation drift.'
+
+  [System.IO.File]::Copy((Join-Path $repoRoot 'COMPATIBILITY.md'), $compatibilityPath, $true)
+  $ciPath = Join-Path $temporaryRoot '.github/workflows/ci.yml'
+  $driftedCi = [System.IO.File]::ReadAllText($ciPath).Replace(
+    '"SQLite" "SQL Server" "PostgreSQL" "MySQL" "MariaDB"',
+    '"SQLite" "SQL Server" "PostgreSQL" "MySQL"')
+  [System.IO.File]::WriteAllText($ciPath, $driftedCi)
+
+  $detected = $false
+  try {
+    & $validator -RepositoryRoot $temporaryRoot
+  }
+  catch {
+    $detected = $_.Exception.Message -like '*.github/workflows/ci.yml provider loop*'
+  }
+
+  if (-not $detected) {
+    throw 'Negative compatibility-consistency proof failed: provider CI drift was not detected with an actionable file name.'
+  }
+
+  Write-Host 'PASS compatibility consistency validator detects intentional provider CI drift.'
 }
 finally {
   if (Test-Path -LiteralPath $temporaryRoot) {
