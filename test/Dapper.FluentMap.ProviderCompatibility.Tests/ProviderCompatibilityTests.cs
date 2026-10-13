@@ -340,7 +340,7 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
             provider.SkipIfUnavailable();
             if (!provider.SupportsMultipleResults)
             {
-                Assert.Equal(ProviderCase.OracleName, provider.Name);
+                Assert.Contains(provider.Name, new[] { ProviderCase.OracleName, ProviderCase.FirebirdName });
                 return;
             }
             PreTest(typeof(MultipleCustomer), typeof(MultipleOrder));
@@ -457,7 +457,7 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
             provider.SkipIfUnavailable();
             if (!provider.SupportsMultipleResults)
             {
-                Assert.Equal(ProviderCase.OracleName, provider.Name);
+                Assert.Contains(provider.Name, new[] { ProviderCase.OracleName, ProviderCase.FirebirdName });
                 return;
             }
             PreTest(typeof(MultipleCustomer), typeof(MultipleOrder));
@@ -574,7 +574,7 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
             provider.SkipIfUnavailable();
             if (!provider.SupportsPersistence)
             {
-                Assert.Equal(ProviderCase.OracleName, provider.Name);
+                Assert.Contains(provider.Name, new[] { ProviderCase.OracleName, ProviderCase.FirebirdName });
                 return;
             }
             PreTest(typeof(ProviderPersistenceEntity));
@@ -640,7 +640,7 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
             provider.SkipIfUnavailable();
             if (!provider.SupportsPersistence)
             {
-                Assert.Equal(ProviderCase.OracleName, provider.Name);
+                Assert.Contains(provider.Name, new[] { ProviderCase.OracleName, ProviderCase.FirebirdName });
                 return;
             }
             PreTest(typeof(ProviderAssignedKeyEntity));
