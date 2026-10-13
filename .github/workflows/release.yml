@@ -34,6 +34,7 @@ jobs:
       contents: read
     outputs:
       package-version: ${{ steps.version.outputs.package_version }}
+      release-commit: ${{ steps.version.outputs.release_commit }}
       release-tag: ${{ steps.version.outputs.release_tag }}
       is-prerelease: ${{ steps.version.outputs.is_prerelease }}
 
@@ -57,8 +58,6 @@ jobs:
           VERSION: ${{ inputs.version }}
         run: |
           $ErrorActionPreference = 'Stop'
-          Import-Module './eng/PackageCatalog.psm1' -Force
-
           if ($env:GITHUB_REF -ne 'refs/heads/main') {
             Write-Error "Releases must be started from the main branch. Current ref: $env:GITHUB_REF"
             exit 1
@@ -87,6 +86,7 @@ jobs:
 
           $releaseTag = "v$env:VERSION"
           $isPrerelease = if ($env:VERSION.Contains('-')) { 'true' } else { 'false' }
+          $validatedCommit = $env:GITHUB_SHA
 
           Write-Host "Checking release tag '$releaseTag'..."
           git fetch --tags
@@ -95,16 +95,26 @@ jobs:
           if ($LASTEXITCODE -eq 0) {
             $tagExists = $true
             $tagSha = (& git rev-list -n 1 $releaseTag).Trim()
-            if ($tagSha -ne $env:GITHUB_SHA) {
-              Write-Error "Release tag '$releaseTag' points to $tagSha instead of validated commit $env:GITHUB_SHA. Refusing to move the tag."
+            & git merge-base --is-ancestor $tagSha $env:GITHUB_SHA
+            if ($LASTEXITCODE -ne 0) {
+              Write-Error "Release tag '$releaseTag' points to $tagSha, which is not an ancestor of the selected main commit $env:GITHUB_SHA. Refusing to publish unrelated artifacts."
               exit 1
             }
 
-            Write-Host "Release tag '$releaseTag' already points to the validated commit; accepting it."
+            $validatedCommit = $tagSha
+            Write-Host "Release tag '$releaseTag' already exists at $validatedCommit; reusing the original release commit."
           }
           else {
-            Write-Host "Release tag '$releaseTag' does not currently exist."
+            Write-Host "Release tag '$releaseTag' does not currently exist; using current main commit."
           }
+
+          # Repeated versions must rebuild from their immutable tag, not from a newer main.
+          & git checkout --detach $validatedCommit
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Unable to check out validated release commit $validatedCommit."
+            exit 1
+          }
+          Import-Module './eng/PackageCatalog.psm1' -Force
 
           $versionLower = $env:VERSION.ToLowerInvariant()
           foreach ($package in @(Get-FluentMapPackages)) {
@@ -150,12 +160,14 @@ jobs:
             }
           }
 
+          "release_commit=$validatedCommit" >> $env:GITHUB_OUTPUT
           "package_version=$env:VERSION" >> $env:GITHUB_OUTPUT
           "release_tag=$releaseTag" >> $env:GITHUB_OUTPUT
           "is_prerelease=$isPrerelease" >> $env:GITHUB_OUTPUT
           "tag_exists=$tagExists" >> $env:GITHUB_OUTPUT
           Write-Host "Release version: $env:VERSION"
           Write-Host "Release tag: $releaseTag"
+          Write-Host "Release commit: $validatedCommit"
           Write-Host 'Preflight passed: tag state is compatible and NuGet.org returned only expected package-version states.'
 
       - name: Show .NET info
@@ -176,12 +188,13 @@ jobs:
       - name: Build release
         env:
           PACKAGE_VERSION: ${{ steps.version.outputs.package_version }}
+          VALIDATED_COMMIT: ${{ steps.version.outputs.release_commit }}
         run: >-
           dotnet build ./Dapper.FluentMap.slnx
           --configuration Release
           --no-restore
           -p:Version=${PACKAGE_VERSION}
-          -p:RepositoryCommit=${GITHUB_SHA}
+          -p:RepositoryCommit=${VALIDATED_COMMIT}
           -p:RepositoryBranch=${GITHUB_REF}
           -p:ContinuousIntegrationBuild=true
 
@@ -191,6 +204,7 @@ jobs:
       - name: Pack release
         env:
           PACKAGE_VERSION: ${{ steps.version.outputs.package_version }}
+          VALIDATED_COMMIT: ${{ steps.version.outputs.release_commit }}
         run: >-
           dotnet pack ./Dapper.FluentMap.slnx
           --configuration Release
@@ -198,7 +212,7 @@ jobs:
           --no-restore
           --output ./artifacts/packages
           -p:Version=${PACKAGE_VERSION}
-          -p:RepositoryCommit=${GITHUB_SHA}
+          -p:RepositoryCommit=${VALIDATED_COMMIT}
           -p:RepositoryBranch=${GITHUB_REF}
           -p:ContinuousIntegrationBuild=true
 
@@ -208,7 +222,7 @@ jobs:
           PACKAGE_VERSION: ${{ steps.version.outputs.package_version }}
           REPOSITORY: ${{ github.repository }}
           REPOSITORY_URL: https://github.com/${{ github.repository }}
-          COMMIT: ${{ github.sha }}
+          COMMIT: ${{ steps.version.outputs.release_commit }}
           BRANCH: ${{ github.ref }}
         run: |
           $ErrorActionPreference = 'Stop'
@@ -244,7 +258,7 @@ jobs:
         env:
           PACKAGE_VERSION: ${{ steps.version.outputs.package_version }}
           REPOSITORY: ${{ github.repository }}
-          COMMIT: ${{ github.sha }}
+          COMMIT: ${{ steps.version.outputs.release_commit }}
         run: |
           $ErrorActionPreference = 'Stop'
           $createdUtc = (& git show -s --format=%cI $env:COMMIT).Trim()
@@ -310,7 +324,7 @@ jobs:
         shell: bash
         env:
           RELEASE_TAG: ${{ needs.build-and-pack.outputs.release-tag }}
-          VALIDATED_SHA: ${{ github.sha }}
+          VALIDATED_SHA: ${{ needs.build-and-pack.outputs.release-commit }}
         run: |
           set -euo pipefail
 
