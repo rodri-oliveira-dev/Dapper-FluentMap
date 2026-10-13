@@ -997,7 +997,7 @@ Invoke-Test 'normal release reuses existing tag commit when main advances' {
       'git checkout --detach $validatedCommit',
       'Import-Module ''./eng/PackageCatalog.psm1'' -Force',
       'VALIDATED_COMMIT: ${{ steps.version.outputs.release_commit }}',
-      '-p:RepositoryCommit=${VALIDATED_COMMIT}',
+      '-p:RepositoryCommit="${VALIDATED_COMMIT}"',
       'COMMIT: ${{ steps.version.outputs.release_commit }}',
       'VALIDATED_SHA: ${{ needs.build-and-pack.outputs.release-commit }}'
     )) {
