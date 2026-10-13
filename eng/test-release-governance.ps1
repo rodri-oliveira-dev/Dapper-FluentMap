@@ -987,6 +987,22 @@ Invoke-Test 'release workflow does not request release tag deletion during rollb
   Assert-True ($releaseWorkflow.IndexOf('-DeleteReleaseTag', [System.StringComparison]::Ordinal) -lt 0) 'release workflow must not pass -DeleteReleaseTag to rollback-release.ps1.'
 }
 
+Invoke-Test 'normal release reuses existing tag commit when main advances' {
+  foreach ($expected in @(
+      'release-commit: ${{ steps.version.outputs.release_commit }}',
+      '$validatedCommit = $tagSha',
+      'git merge-base --is-ancestor $tagSha $env:GITHUB_SHA',
+      'git checkout --detach $validatedCommit',
+      'Import-Module ''./eng/PackageCatalog.psm1'' -Force',
+      'VALIDATED_COMMIT: ${{ steps.version.outputs.release_commit }}',
+      '-p:RepositoryCommit=${VALIDATED_COMMIT}',
+      'COMMIT: ${{ steps.version.outputs.release_commit }}',
+      'VALIDATED_SHA: ${{ needs.build-and-pack.outputs.release-commit }}'
+    )) {
+    Assert-Contains $releaseWorkflow $expected "normal release must preserve original release commit: $expected"
+  }
+}
+
 Invoke-Test 'normal release redirects partial published versions to recovery' {
   $guard = @'
                 if (-not $tagExists) {
@@ -1261,14 +1277,28 @@ Invoke-Test 'NuGet.org async indexing does not block submission of remaining pri
   Assert-Contains $result.Output 'indexing still pending for A' 'pending indexing diagnostic should identify the package that has not converged.'
 }
 
+Invoke-Test 'NuGet.org already published package set is validated without republishing primary packages' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('200')
+    B = @('200')
+  }
+
+  Assert-True $result.Succeeded "repeat release should succeed: $($result.Output)"
+  Assert-True (@($result.PushLog | Where-Object { $_ -like '*.nupkg|*' }).Count -eq 0) 'Existing primary packages should not be re-pushed.'
+  Assert-Contains $result.Output 'all 2 primary package identities converged' 'existing packages should be verified without timeout.'
+}
+
 Invoke-Test 'NuGet.org final convergence times out with precise missing identities' {
   $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
     A = @('404')
     B = @('404')
   } -MaxAttempts 2
 
-  Assert-True (-not $result.Succeeded) 'convergence timeout should fail.'
-  Assert-Contains $result.Output 'Still missing from the Flat Container: A, B' 'timeout should list the exact missing package IDs.'
+  Assert-True $result.Succeeded 'Indexing timeout after accepted package pushes should not fail publication.'
+  Assert-Contains $result.Output '::warning title=NuGet.org indexing pending::' 'timeout must emit a visible GitHub Actions warning annotation.'
+  Assert-Contains $result.Output 'Still missing from the Flat Container: A, B' 'warning should list the exact pending package IDs.'
+  Assert-True (@($result.PushLog | Where-Object { $_ -like 'A.9.9.9-test.1.snupkg|*--skip-duplicate*' }).Count -eq 1) 'Symbol packages must still be published after indexing timeout.'
+  Assert-True (@($result.PushLog | Where-Object { $_ -like '*.nupkg|*--skip-duplicate*' }).Count -eq 2) 'Primary retries must tolerate an accepted but not-yet-indexed duplicate.'
 }
 
 Invoke-Test 'NuGet.org unexpected HTTP status fails closed' {
