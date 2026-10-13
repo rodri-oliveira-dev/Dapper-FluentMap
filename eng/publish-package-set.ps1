@@ -444,7 +444,7 @@ function Wait-NuGetOrgPackageSetConverged {
 
   $pendingList = $notConverged -join ', '
   $warning = "NuGet.org indexing is still pending for $Version after $NuGetConvergenceMaxAttempts checks. Still missing from the Flat Container: $pendingList. Package uploads were accepted or treated as duplicates; verify availability after indexing completes."
-  Write-Host "::warning title=NuGet.org indexing pending::$warning"
+  Write-Output "::warning title=NuGet.org indexing pending::$warning"
   if (-not [string]::IsNullOrWhiteSpace($env:GITHUB_STEP_SUMMARY)) {
     Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value "### NuGet.org indexing pending for $Version"
     Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value "The publication job completed, but the NuGet.org Flat Container has not confirmed these packages: $pendingList. Check package visibility after NuGet.org finishes processing. This is a warning, not proof of successful indexing."
