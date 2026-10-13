@@ -1323,7 +1323,7 @@ Invoke-Test 'NuGet.org recovery refuses to complete while any primary package re
   } -MaxAttempts 2 -RequireNuGetConvergence
 
   Assert-True (-not $result.Succeeded) 'Recovery must fail closed when NuGet indexing does not converge.'
-  Assert-Contains $result.Output 'NuGet.org primary package convergence timed out' "Recovery must report strict convergence failure. Actual: $($result.Output)"
+  Assert-Contains $result.Output 'Package publication failed: NuGet.org primary package convergence timed' 'Recovery must report strict convergence failure.'
   Assert-Contains $result.Output 'Still missing from the Flat Container: A, B' 'Recovery must identify unverified packages.'
   Assert-True (@($result.PushLog | Where-Object { $_ -like '*.snupkg|*' }).Count -eq 0) 'Recovery must not proceed to symbols before primary package convergence.'
 }
