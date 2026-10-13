@@ -51,23 +51,53 @@ Validated in the current matrix:
 
 Dommel integration is optional and process-wide. It uses global `DommelMapper` resolvers/builders and does not participate in isolated `FluentMapRuntime` configuration.
 
+The Dommel boundary is narrower than FluentMap Core provider compatibility:
+
+- **Certified here:** SQLite, SQL Server, PostgreSQL, MySQL and MariaDB have real persistence coverage in the required provider matrix.
+- **Shared MySQL path:** MySQL and MariaDB are both exercised through `MySqlConnector`'s `MySqlConnection` and Dommel's built-in `MySqlSqlBuilder` registration.
+- **Core-only:** Oracle and Firebird have required FluentMap Core evidence, but Dommel 3.5.3 has no built-in SQL builder for either provider. They are not Dommel-certified.
+- **Legacy:** the existing `SqlServerCeSqlBuilder` registration is retained for source and behavioral compatibility, but SQL Server CE has no modern real-database certification lane and is legacy/upstream-limited.
+
+Dommel 3.5.3 exposes the public `DommelMapper.AddSqlBuilder(Type, ISqlBuilder)` and `AddSqlBuilder(string, ISqlBuilder)` APIs for advanced consumers. A custom builder is global process state and remains the consumer's SQL-generation responsibility; registering one does not make that provider certified by this project. A new project-owned dialect would require separate review plus SQL-generation and real persistence tests.
+
 ## Providers
 
-Provider support is split into certification levels:
+The machine-readable provider matrix is part of `eng/compatibility-contract.json`. Each provider has one overall support level and independent Core and Dommel evidence, using these terms:
 
-| Provider | Status | Evidence |
-| --- | --- | --- |
-| SQLite (`Microsoft.Data.Sqlite` 10.0.12) | Validated | Automated provider compatibility tests cover basic reads, immutable/nested/value-object reads, generated/runtime materialization, `QueryMultipleMapped`, `QueryMultipleMappedAsync`, sync/async streaming and Dommel persistence. |
-| Provider-independent ADO.NET readers | Validated for core behavior | Tests use `DataTableReader` and common ADO.NET contracts. |
-| SQL Server 2022 CU23 (`Microsoft.Data.SqlClient` 7.1.0) | CI certified | Mandatory CI provider lane uses `mcr.microsoft.com/mssql/server:2022-CU23-ubuntu-22.04` and fails if the service or connection string is unavailable. |
-| PostgreSQL 18.6 (`Npgsql` 10.0.3) | CI certified | Mandatory CI provider lane uses `postgres:18.6-bookworm` and fails if the service or connection string is unavailable. |
-| MySQL 8.4.11 (`MySqlConnector` 2.6.2) | CI certified | Mandatory CI provider lane uses `mysql:8.4.11-oraclelinux9` and exercises reads, generated/runtime materialization, multiple results, streaming and Dommel persistence. |
-| MariaDB 11.8.9 (`MySqlConnector` 2.6.2) | CI certified | Mandatory CI provider lane uses `mariadb:11.8.9-ubi9` with the same strict no-skip provider contract. |
-| SQL Server CE | Legacy/upstream-limited | Dommel builder remains registered for compatibility; no modern validation lane is present. |
+- **Dapper-compatible**: Dapper/ADO.NET compatibility is expected, but this repository has no dedicated real-database FluentMap certification evidence.
+- **FluentMap Core certified**: required real-database integration tests exercise FluentMap mapping and materialization; this does not imply Dommel support.
+- **FluentMap + Dommel certified**: required real-database integration tests also exercise the supported Dommel persistence path.
+- **Legacy/upstream-limited**: compatibility is retained because of an upstream or historical integration, without a modern certification lane.
+
+Current support contract:
+
+| Provider | Dapper/ADO.NET | FluentMap Core evidence | FluentMap + Dommel evidence | Tested server/runtime | Tested client |
+| --- | --- | --- | --- | --- | --- |
+| SQLite | Dapper-compatible | FluentMap Core certified | FluentMap + Dommel certified | In-memory | `Microsoft.Data.Sqlite` 10.0.12 |
+| SQL Server | Dapper-compatible | FluentMap Core certified | FluentMap + Dommel certified | 2022 CU23 | `Microsoft.Data.SqlClient` 7.1.0 |
+| PostgreSQL | Dapper-compatible | FluentMap Core certified | FluentMap + Dommel certified | 18.6 | `Npgsql` 10.0.3 |
+| MySQL | Dapper-compatible | FluentMap Core certified | FluentMap + Dommel certified | 8.4.11 | `MySqlConnector` 2.6.2 |
+| MariaDB | Dapper-compatible | FluentMap Core certified | FluentMap + Dommel certified | 11.8.9 | `MySqlConnector` 2.6.2 |
+| Oracle | Dapper-compatible | FluentMap Core certified | Not certified | 23.26.0 Free | `Oracle.ManagedDataAccess.Core` 23.26.301 |
+| Firebird | Dapper-compatible | FluentMap Core certified | Not certified | 5.0.4 | `FirebirdSql.Data.FirebirdClient` 10.3.4 |
+| SQL Server CE | Legacy/upstream-limited | Legacy/upstream-limited | Legacy/upstream-limited | Not certified | Not certified |
+
+Certification evidence:
+
+- SQLite (`Microsoft.Data.Sqlite` 10.0.12) runs in memory and covers basic reads, immutable/nested/value-object reads, generated/runtime materialization, `QueryMultipleMapped`, `QueryMultipleMappedAsync`, sync/async streaming and Dommel persistence.
+- SQL Server 2022 CU23 (`Microsoft.Data.SqlClient` 7.1.0) uses `mcr.microsoft.com/mssql/server:2022-CU23-ubuntu-22.04` in mandatory CI.
+- PostgreSQL 18.6 (`Npgsql` 10.0.3) uses `postgres:18.6-bookworm` in mandatory CI.
+- MySQL 8.4.11 (`MySqlConnector` 2.6.2) uses `mysql:8.4.11-oraclelinux9` in mandatory CI.
+- MariaDB 11.8.9 (`MySqlConnector` 2.6.2) uses `mariadb:11.8.9-ubi9` in mandatory CI.
+- Oracle Database Free 23.26.0 (`Oracle.ManagedDataAccess.Core` 23.26.301) uses `gvenzl/oracle-free:23.26.0-slim-faststart` in a mandatory Core-only CI lane. It covers explicit mapping, immutable/nested/value-object and generated/runtime materialization, sync/async streaming, parameter binding and null handling. ODP.NET does not expose the suite's multi-statement `QueryMultiple` shape, and no Oracle Dommel SQL builder is claimed.
+- Firebird 5.0.4 (`FirebirdSql.Data.FirebirdClient` 10.3.4) uses the official `firebirdsql/firebird:5.0.4` image in a mandatory Core-only CI lane. It covers explicit mapping, immutable/nested/value-object and generated/runtime materialization, sync/async streaming, parameter binding and null handling. The ADO.NET provider does not expose the suite's multi-statement `QueryMultiple` shape through an ordinary Dapper command, and no Firebird Dommel SQL builder is claimed.
+- Provider-independent Core tests additionally use `DataTableReader` and common ADO.NET contracts, but that evidence alone never certifies a database provider.
+
+The Oracle and Firebird providers and database images are test-only dependencies, are publicly retrievable without repository credentials, and retain their respective upstream license terms. CI creates ephemeral databases/users with run-scoped credentials rather than depending on private infrastructure.
 
 `MySqlConnector` 2.6.2 is used only by the provider-certification test project because one async ADO.NET driver can exercise both pinned MySQL and MariaDB services, targets `netstandard2.0`, and is distributed under the MIT license. This choice does not add a runtime dependency to the FluentMap packages or certify any server, driver version, or feature outside the matrix above.
 
-Provider certification requires real integration tests against that provider and database. A Dommel SQL builder being registered is not the same as provider certification.
+Provider certification requires executable integration tests against that provider and database in the required matrix. A registered or theoretically implementable Dommel SQL builder is not certification evidence.
 
 ## Experimental Compatibility Canaries
 

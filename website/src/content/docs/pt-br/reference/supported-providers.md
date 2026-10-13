@@ -34,6 +34,26 @@ public sealed class CustomerMap : EntityMap<Customer>
 
 O FluentMap registra metadados tipados e os aplica no caminho de materialização correspondente. O SQL, a conexão, os parâmetros e o ciclo de vida continuam sob responsabilidade da aplicação e do Dapper.
 
+## Níveis de suporte
+
+- **Compatível com Dapper:** funcionamento esperado via Dapper/ADO.NET, sem certificação dedicada do FluentMap em banco real.
+- **FluentMap Core certificado:** testes obrigatórios em banco real cobrem mapping e materialização do FluentMap, independentemente do Dommel.
+- **FluentMap + Dommel certificado:** testes obrigatórios em banco real também cobrem o caminho de persistência suportado pelo Dommel.
+- **Legado/limitado pelo upstream:** mantido por compatibilidade, sem uma lane moderna de certificação.
+
+| Provider | Core | Dommel | Servidor/runtime testado | Cliente testado |
+| --- | --- | --- | --- | --- |
+| SQLite | Certificado | Certificado | Em memória | `Microsoft.Data.Sqlite` 10.0.12 |
+| SQL Server | Certificado | Certificado | 2022 CU23 | `Microsoft.Data.SqlClient` 7.1.0 |
+| PostgreSQL | Certificado | Certificado | 18.6 | `Npgsql` 10.0.3 |
+| MySQL | Certificado | Certificado | 8.4.11 | `MySqlConnector` 2.6.2 |
+| MariaDB | Certificado | Certificado | 11.8.9 | `MySqlConnector` 2.6.2 |
+| Oracle | Certificado | Não certificado | 23.26.0 Free | `Oracle.ManagedDataAccess.Core` 23.26.301 |
+| Firebird | Certificado | Não certificado | 5.0.4 | `FirebirdSql.Data.FirebirdClient` 10.3.4 |
+| SQL Server CE | Legado/limitado pelo upstream | Legado/limitado pelo upstream | Não certificado | Não certificado |
+
+Essas versões fixadas e suas evidências também são mantidas no contrato de compatibilidade legível por máquina.
+
 ## Restrições
 
 :::caution
