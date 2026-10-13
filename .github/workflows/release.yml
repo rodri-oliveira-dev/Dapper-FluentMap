@@ -46,11 +46,6 @@ jobs:
           persist-credentials: false
           show-progress: false
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
-        with:
-          global-json-file: global.json
-
       - name: Validate release version and availability
         id: version
         shell: pwsh
@@ -169,6 +164,13 @@ jobs:
           Write-Host "Release tag: $releaseTag"
           Write-Host "Release commit: $validatedCommit"
           Write-Host 'Preflight passed: tag state is compatible and NuGet.org returned only expected package-version states.'
+
+      # Version validation selects and checks out the immutable release commit.
+      # Install the SDK from that commit's global.json, not the newer main.
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
 
       - name: Show .NET info
         run: dotnet --info
@@ -363,6 +365,17 @@ jobs:
           persist-credentials: false
           show-progress: false
 
+      # The package catalog must match the immutable artifact source.
+      # Publishing logic intentionally comes from the current workflow revision:
+      # running an old tagged script would reintroduce fixed release defects.
+      - name: Checkout validated release catalog
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.build-and-pack.outputs.release-commit }}
+          path: validated-source
+          persist-credentials: false
+          show-progress: false
+
       - name: Setup .NET
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
@@ -399,7 +412,8 @@ jobs:
             -Version $env:PACKAGE_VERSION `
             -Source 'https://api.nuget.org/v3/index.json' `
             -ApiKey $env:NUGET_API_KEY `
-            -Registry NuGetOrg
+            -Registry NuGetOrg `
+            -CatalogPath './validated-source/eng/package-catalog.json'
 
   publish-github-packages:
     name: Publish to GitHub Packages
@@ -416,6 +430,17 @@ jobs:
       - name: Checkout release tooling
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          persist-credentials: false
+          show-progress: false
+
+      # The package catalog must match the immutable artifact source.
+      # Publishing logic intentionally comes from the current workflow revision:
+      # running an old tagged script would reintroduce fixed release defects.
+      - name: Checkout validated release catalog
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.build-and-pack.outputs.release-commit }}
+          path: validated-source
           persist-credentials: false
           show-progress: false
 
@@ -453,7 +478,8 @@ jobs:
             -ApiKey $env:GITHUB_PACKAGE_TOKEN `
             -Registry GitHubPackages `
             -RepositoryOwner $env:REPOSITORY_OWNER `
-            -GitHubToken $env:GITHUB_PACKAGE_TOKEN
+            -GitHubToken $env:GITHUB_PACKAGE_TOKEN `
+            -CatalogPath './validated-source/eng/package-catalog.json'
 
   github-release:
     name: Create GitHub Release
