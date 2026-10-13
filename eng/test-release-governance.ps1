@@ -141,6 +141,7 @@ function Invoke-PublishScenario {
     [hashtable]$StatusSequences,
     [string[]]$DifferentRemotePackages = @(),
     [int]$MaxAttempts = 3,
+    [switch]$RequireNuGetConvergence,
     [ValidateSet('NuGetOrg', 'GitHubPackages')]
     [string]$Registry = 'NuGetOrg'
   )
@@ -343,6 +344,7 @@ function Invoke-PublishScenario {
       CatalogPath = $catalogPath
       NuGetConvergenceMaxAttempts = $MaxAttempts
       NuGetConvergenceDelaySeconds = 0
+      RequireNuGetConvergence = [bool]$RequireNuGetConvergence
     }
 
     if ($Registry -eq 'GitHubPackages') {
@@ -1014,6 +1016,19 @@ Invoke-Test 'normal release redirects partial published versions to recovery' {
 }
 
 
+Invoke-Test 'normal release uses tag catalog and SDK while retaining corrected publishing tooling' {
+  $sdkSetup = $releaseWorkflow.IndexOf('      - name: Setup .NET', [System.StringComparison]::Ordinal)
+  $tagCheckout = $releaseWorkflow.IndexOf('git checkout --detach $validatedCommit', [System.StringComparison]::Ordinal)
+  Assert-True ($sdkSetup -gt $tagCheckout) 'SDK setup must follow immutable release commit checkout.'
+  Assert-True (@([regex]::Matches($releaseWorkflow, [regex]::Escape('ref: ${{ needs.build-and-pack.outputs.release-commit }}'))).Count -eq 2) 'Both publishing jobs must check out the immutable release source.'
+  Assert-True (@([regex]::Matches($releaseWorkflow, [regex]::Escape("-CatalogPath './validated-source/eng/package-catalog.json'"))).Count -eq 2) 'Both publishing jobs must pass the immutable package catalog.'
+  Assert-Contains $releaseWorkflow 'Publishing logic intentionally comes from the current workflow revision' 'The intentional publishing-tool version choice must be explained.'
+}
+
+Invoke-Test 'recovery requires confirmed NuGet.org convergence' {
+  Assert-Contains $recoveryWorkflow '-RequireNuGetConvergence' 'Recovery must reject indexing timeouts that cannot verify remote package bytes.'
+}
+
 Invoke-Test 'recovery workflow reconciles governed release state' {
   foreach ($expected in @(
       'source_type',
@@ -1299,6 +1314,28 @@ Invoke-Test 'NuGet.org final convergence times out with precise missing identiti
   Assert-Contains $result.Output 'Still missing from the Flat Container: A, B' 'warning should list the exact pending package IDs.'
   Assert-True (@($result.PushLog | Where-Object { $_ -like 'A.9.9.9-test.1.snupkg|*--skip-duplicate*' }).Count -eq 1) 'Symbol packages must still be published after indexing timeout.'
   Assert-True (@($result.PushLog | Where-Object { $_ -like '*.nupkg|*--skip-duplicate*' }).Count -eq 2) 'Primary retries must tolerate an accepted but not-yet-indexed duplicate.'
+}
+
+Invoke-Test 'NuGet.org recovery refuses to complete while any primary package remains unverified' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('404')
+    B = @('404')
+  } -MaxAttempts 2 -RequireNuGetConvergence
+
+  Assert-True (-not $result.Succeeded) 'Recovery must fail closed when NuGet indexing does not converge.'
+  Assert-Contains $result.Output 'NuGet.org primary package convergence timed out' 'Recovery must report strict convergence failure.'
+  Assert-Contains $result.Output 'Still missing from the Flat Container: A, B' 'Recovery must identify unverified packages.'
+  Assert-True (@($result.PushLog | Where-Object { $_ -like '*.snupkg|*' }).Count -eq 0) 'Recovery must not proceed to symbols before primary package convergence.'
+}
+
+Invoke-Test 'NuGet.org recovery strict mode succeeds after package content verification' {
+  $result = Invoke-PublishScenario -Packages $twoPackages -StatusSequences @{
+    A = @('404', '200')
+    B = @('404', '200')
+  } -RequireNuGetConvergence
+
+  Assert-True $result.Succeeded "strict recovery should pass once all packages converge: $($result.Output)"
+  Assert-Contains $result.Output 'all 2 primary package identities converged and match the expected artifacts' 'Strict recovery must compare all primary package contents.'
 }
 
 Invoke-Test 'NuGet.org unexpected HTTP status fails closed' {
