@@ -21,6 +21,8 @@ param(
 
   [string]$CatalogPath,
 
+  [switch]$RequireNuGetConvergence,
+
   [int]$NuGetConvergenceMaxAttempts = 60,
 
   [int]$NuGetConvergenceDelaySeconds = 10
@@ -442,7 +444,17 @@ function Wait-NuGetOrgPackageSetConverged {
 
   $notConverged = Get-NotConvergedPackageIds -ExpectedPackages $ExpectedPackages -Validated $validated
 
-  Fail "NuGet.org primary package convergence timed out for $Version. Still missing from the Flat Container: $($notConverged -join ', ')."
+  $pendingList = $notConverged -join ', '
+  if ($RequireNuGetConvergence) {
+    Fail "NuGet.org primary package convergence timed out for $Version. Still missing from the Flat Container: $pendingList."
+  }
+
+  $warning = "NuGet.org indexing is still pending for $Version after $NuGetConvergenceMaxAttempts checks. Still missing from the Flat Container: $pendingList. Package uploads were accepted or treated as duplicates; verify availability after indexing completes."
+  Write-Output "::warning title=NuGet.org indexing pending::$warning"
+  if (-not [string]::IsNullOrWhiteSpace($env:GITHUB_STEP_SUMMARY)) {
+    Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value "### NuGet.org indexing pending for $Version"
+    Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value "The NuGet.org Flat Container has not confirmed these packages: $pendingList. Check package visibility after NuGet.org finishes processing. This is a warning, not proof of successful indexing."
+  }
 }
 
 function Wait-GitHubPackageVisible {
@@ -504,7 +516,7 @@ if ($Registry -eq 'NuGetOrg') {
     $packageId = [string]$package.packageId
     $packagePath = $packagePaths[$packageId]
     Write-Output "NuGet.org: submitting missing primary package $packageId $Version without waiting for indexing."
-    Invoke-DotNetNuGetPush -PackageId $packageId -PackagePath $packagePath -AdditionalArguments @('--no-symbols')
+    Invoke-DotNetNuGetPush -PackageId $packageId -PackagePath $packagePath -AdditionalArguments @('--no-symbols', '--skip-duplicate')
     Write-Output "NuGet.org: accepted primary package $packageId $Version; validation and indexing continue asynchronously."
   }
 
@@ -522,7 +534,7 @@ if ($Registry -eq 'NuGetOrg') {
     Invoke-DotNetNuGetPush -PackageId "$packageId symbols" -PackagePath $symbolPath -AdditionalArguments @('--skip-duplicate')
   }
 
-  Write-Output "NuGet.org publication completed for $($packages.Count) primary package identities and $($symbolPackages.Count) symbol package identities. Primary packages were converged and content-validated; symbol packages were submitted through NuGet.org V3 tooling."
+  Write-Output "NuGet.org submission completed for $($packages.Count) primary package identities and $($symbolPackages.Count) symbol package identities. Existing visible packages were content-validated; any indexing delay was reported as a GitHub Actions warning. Symbol packages were submitted through NuGet.org V3 tooling."
   return
 }
 

@@ -34,6 +34,7 @@ jobs:
       contents: read
     outputs:
       package-version: ${{ steps.version.outputs.package_version }}
+      release-commit: ${{ steps.version.outputs.release_commit }}
       release-tag: ${{ steps.version.outputs.release_tag }}
       is-prerelease: ${{ steps.version.outputs.is_prerelease }}
 
@@ -45,11 +46,6 @@ jobs:
           persist-credentials: false
           show-progress: false
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
-        with:
-          global-json-file: global.json
-
       - name: Validate release version and availability
         id: version
         shell: pwsh
@@ -57,8 +53,6 @@ jobs:
           VERSION: ${{ inputs.version }}
         run: |
           $ErrorActionPreference = 'Stop'
-          Import-Module './eng/PackageCatalog.psm1' -Force
-
           if ($env:GITHUB_REF -ne 'refs/heads/main') {
             Write-Error "Releases must be started from the main branch. Current ref: $env:GITHUB_REF"
             exit 1
@@ -87,6 +81,7 @@ jobs:
 
           $releaseTag = "v$env:VERSION"
           $isPrerelease = if ($env:VERSION.Contains('-')) { 'true' } else { 'false' }
+          $validatedCommit = $env:GITHUB_SHA
 
           Write-Host "Checking release tag '$releaseTag'..."
           git fetch --tags
@@ -95,16 +90,26 @@ jobs:
           if ($LASTEXITCODE -eq 0) {
             $tagExists = $true
             $tagSha = (& git rev-list -n 1 $releaseTag).Trim()
-            if ($tagSha -ne $env:GITHUB_SHA) {
-              Write-Error "Release tag '$releaseTag' points to $tagSha instead of validated commit $env:GITHUB_SHA. Refusing to move the tag."
+            & git merge-base --is-ancestor $tagSha $env:GITHUB_SHA
+            if ($LASTEXITCODE -ne 0) {
+              Write-Error "Release tag '$releaseTag' points to $tagSha, which is not an ancestor of the selected main commit $env:GITHUB_SHA. Refusing to publish unrelated artifacts."
               exit 1
             }
 
-            Write-Host "Release tag '$releaseTag' already points to the validated commit; accepting it."
+            $validatedCommit = $tagSha
+            Write-Host "Release tag '$releaseTag' already exists at $validatedCommit; reusing the original release commit."
           }
           else {
-            Write-Host "Release tag '$releaseTag' does not currently exist."
+            Write-Host "Release tag '$releaseTag' does not currently exist; using current main commit."
           }
+
+          # Repeated versions must rebuild from their immutable tag, not from a newer main.
+          & git checkout --detach $validatedCommit
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Unable to check out validated release commit $validatedCommit."
+            exit 1
+          }
+          Import-Module './eng/PackageCatalog.psm1' -Force
 
           $versionLower = $env:VERSION.ToLowerInvariant()
           foreach ($package in @(Get-FluentMapPackages)) {
@@ -150,13 +155,22 @@ jobs:
             }
           }
 
+          "release_commit=$validatedCommit" >> $env:GITHUB_OUTPUT
           "package_version=$env:VERSION" >> $env:GITHUB_OUTPUT
           "release_tag=$releaseTag" >> $env:GITHUB_OUTPUT
           "is_prerelease=$isPrerelease" >> $env:GITHUB_OUTPUT
           "tag_exists=$tagExists" >> $env:GITHUB_OUTPUT
           Write-Host "Release version: $env:VERSION"
           Write-Host "Release tag: $releaseTag"
+          Write-Host "Release commit: $validatedCommit"
           Write-Host 'Preflight passed: tag state is compatible and NuGet.org returned only expected package-version states.'
+
+      # Version validation selects and checks out the immutable release commit.
+      # Install the SDK from that commit's global.json, not the newer main.
+      - name: Setup .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
 
       - name: Show .NET info
         run: dotnet --info
@@ -176,13 +190,14 @@ jobs:
       - name: Build release
         env:
           PACKAGE_VERSION: ${{ steps.version.outputs.package_version }}
+          VALIDATED_COMMIT: ${{ steps.version.outputs.release_commit }}
         run: >-
           dotnet build ./Dapper.FluentMap.slnx
           --configuration Release
           --no-restore
-          -p:Version=${PACKAGE_VERSION}
-          -p:RepositoryCommit=${GITHUB_SHA}
-          -p:RepositoryBranch=${GITHUB_REF}
+          -p:Version="${PACKAGE_VERSION}"
+          -p:RepositoryCommit="${VALIDATED_COMMIT}"
+          -p:RepositoryBranch="${GITHUB_REF}"
           -p:ContinuousIntegrationBuild=true
 
       - name: Run tests
@@ -191,15 +206,16 @@ jobs:
       - name: Pack release
         env:
           PACKAGE_VERSION: ${{ steps.version.outputs.package_version }}
+          VALIDATED_COMMIT: ${{ steps.version.outputs.release_commit }}
         run: >-
           dotnet pack ./Dapper.FluentMap.slnx
           --configuration Release
           --no-build
           --no-restore
           --output ./artifacts/packages
-          -p:Version=${PACKAGE_VERSION}
-          -p:RepositoryCommit=${GITHUB_SHA}
-          -p:RepositoryBranch=${GITHUB_REF}
+          -p:Version="${PACKAGE_VERSION}"
+          -p:RepositoryCommit="${VALIDATED_COMMIT}"
+          -p:RepositoryBranch="${GITHUB_REF}"
           -p:ContinuousIntegrationBuild=true
 
       - name: Validate release artifacts and write manifest
@@ -208,7 +224,7 @@ jobs:
           PACKAGE_VERSION: ${{ steps.version.outputs.package_version }}
           REPOSITORY: ${{ github.repository }}
           REPOSITORY_URL: https://github.com/${{ github.repository }}
-          COMMIT: ${{ github.sha }}
+          COMMIT: ${{ steps.version.outputs.release_commit }}
           BRANCH: ${{ github.ref }}
         run: |
           $ErrorActionPreference = 'Stop'
@@ -244,7 +260,7 @@ jobs:
         env:
           PACKAGE_VERSION: ${{ steps.version.outputs.package_version }}
           REPOSITORY: ${{ github.repository }}
-          COMMIT: ${{ github.sha }}
+          COMMIT: ${{ steps.version.outputs.release_commit }}
         run: |
           $ErrorActionPreference = 'Stop'
           $createdUtc = (& git show -s --format=%cI $env:COMMIT).Trim()
@@ -310,7 +326,7 @@ jobs:
         shell: bash
         env:
           RELEASE_TAG: ${{ needs.build-and-pack.outputs.release-tag }}
-          VALIDATED_SHA: ${{ github.sha }}
+          VALIDATED_SHA: ${{ needs.build-and-pack.outputs.release-commit }}
         run: |
           set -euo pipefail
 
@@ -346,6 +362,17 @@ jobs:
       - name: Checkout release tooling
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          persist-credentials: false
+          show-progress: false
+
+      # The package catalog must match the immutable artifact source.
+      # Publishing logic intentionally comes from the current workflow revision:
+      # running an old tagged script would reintroduce fixed release defects.
+      - name: Checkout validated release catalog
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.build-and-pack.outputs.release-commit }}
+          path: validated-source
           persist-credentials: false
           show-progress: false
 
@@ -385,7 +412,8 @@ jobs:
             -Version $env:PACKAGE_VERSION `
             -Source 'https://api.nuget.org/v3/index.json' `
             -ApiKey $env:NUGET_API_KEY `
-            -Registry NuGetOrg
+            -Registry NuGetOrg `
+            -CatalogPath './validated-source/eng/package-catalog.json'
 
   publish-github-packages:
     name: Publish to GitHub Packages
@@ -402,6 +430,17 @@ jobs:
       - name: Checkout release tooling
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          persist-credentials: false
+          show-progress: false
+
+      # The package catalog must match the immutable artifact source.
+      # Publishing logic intentionally comes from the current workflow revision:
+      # running an old tagged script would reintroduce fixed release defects.
+      - name: Checkout validated release catalog
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ needs.build-and-pack.outputs.release-commit }}
+          path: validated-source
           persist-credentials: false
           show-progress: false
 
@@ -439,7 +478,8 @@ jobs:
             -ApiKey $env:GITHUB_PACKAGE_TOKEN `
             -Registry GitHubPackages `
             -RepositoryOwner $env:REPOSITORY_OWNER `
-            -GitHubToken $env:GITHUB_PACKAGE_TOKEN
+            -GitHubToken $env:GITHUB_PACKAGE_TOKEN `
+            -CatalogPath './validated-source/eng/package-catalog.json'
 
   github-release:
     name: Create GitHub Release
