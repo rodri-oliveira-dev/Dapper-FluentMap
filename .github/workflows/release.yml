@@ -195,9 +195,9 @@ jobs:
           dotnet build ./Dapper.FluentMap.slnx
           --configuration Release
           --no-restore
-          -p:Version=${PACKAGE_VERSION}
-          -p:RepositoryCommit=${VALIDATED_COMMIT}
-          -p:RepositoryBranch=${GITHUB_REF}
+          -p:Version="${PACKAGE_VERSION}"
+          -p:RepositoryCommit="${VALIDATED_COMMIT}"
+          -p:RepositoryBranch="${GITHUB_REF}"
           -p:ContinuousIntegrationBuild=true
 
       - name: Run tests
@@ -213,9 +213,9 @@ jobs:
           --no-build
           --no-restore
           --output ./artifacts/packages
-          -p:Version=${PACKAGE_VERSION}
-          -p:RepositoryCommit=${VALIDATED_COMMIT}
-          -p:RepositoryBranch=${GITHUB_REF}
+          -p:Version="${PACKAGE_VERSION}"
+          -p:RepositoryCommit="${VALIDATED_COMMIT}"
+          -p:RepositoryBranch="${GITHUB_REF}"
           -p:ContinuousIntegrationBuild=true
 
       - name: Validate release artifacts and write manifest
