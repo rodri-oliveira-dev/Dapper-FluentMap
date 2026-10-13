@@ -459,6 +459,7 @@ jobs:
             -Source 'https://api.nuget.org/v3/index.json' `
             -ApiKey $env:NUGET_API_KEY `
             -Registry NuGetOrg `
+            -RequireNuGetConvergence `
             -CatalogPath './validated-source/eng/package-catalog.json'
 
       - name: Recover and verify GitHub Packages
