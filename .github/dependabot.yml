@@ -64,6 +64,11 @@ updates:
       time: "09:45"
       timezone: "America/Sao_Paulo"
     open-pull-requests-limit: 5
+    # Await Astro checker support before adopting TypeScript 7.
+    ignore:
+      - dependency-name: "typescript"
+        versions:
+          - ">=7.0.0"
     groups:
       npm-minor-patch:
         applies-to: "version-updates"
