@@ -6,6 +6,9 @@ import lighthouse from 'lighthouse';
 const require = createRequire(import.meta.url);
 const { ci } = require('../lighthouserc.cjs');
 const assertions = ci.assert.assertions;
+const auditedCategories = Object.keys(assertions)
+  .filter((assertion) => assertion.startsWith('categories:'))
+  .map((assertion) => assertion.replace('categories:', ''));
 const failures = [];
 const configuredChromeFlags = ci.collect.settings.chromeFlags.split(/\s+/).filter(Boolean);
 
@@ -20,7 +23,8 @@ try {
       const result = await lighthouse(url, {
         logLevel: 'info',
         output: 'json',
-        port: chrome.port
+        port: chrome.port,
+        onlyCategories: auditedCategories
       });
 
       if (!result) {
