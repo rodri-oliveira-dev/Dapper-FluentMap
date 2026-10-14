@@ -74,7 +74,7 @@ Current support contract:
 | Provider | Dapper/ADO.NET | FluentMap Core evidence | FluentMap + Dommel evidence | Tested server/runtime | Tested client |
 | --- | --- | --- | --- | --- | --- |
 | SQLite | Dapper-compatible | FluentMap Core certified | FluentMap + Dommel certified | In-memory | `Microsoft.Data.Sqlite` 10.0.12 |
-| SQL Server | Dapper-compatible | FluentMap Core certified | FluentMap + Dommel certified | 2022 CU23 | `Microsoft.Data.SqlClient` 7.1.0 |
+| SQL Server | Dapper-compatible | FluentMap Core certified | FluentMap + Dommel certified | 2022 CU23 | `Microsoft.Data.SqlClient` 7.1.1 |
 | PostgreSQL | Dapper-compatible | FluentMap Core certified | FluentMap + Dommel certified | 18.6 | `Npgsql` 10.0.3 |
 | MySQL | Dapper-compatible | FluentMap Core certified | FluentMap + Dommel certified | 8.4.11 | `MySqlConnector` 2.6.2 |
 | MariaDB | Dapper-compatible | FluentMap Core certified | FluentMap + Dommel certified | 11.8.9 | `MySqlConnector` 2.6.2 |
@@ -85,7 +85,7 @@ Current support contract:
 Certification evidence:
 
 - SQLite (`Microsoft.Data.Sqlite` 10.0.12) runs in memory and covers basic reads, immutable/nested/value-object reads, generated/runtime materialization, `QueryMultipleMapped`, `QueryMultipleMappedAsync`, sync/async streaming and Dommel persistence.
-- SQL Server 2022 CU23 (`Microsoft.Data.SqlClient` 7.1.0) uses `mcr.microsoft.com/mssql/server:2022-CU23-ubuntu-22.04` in mandatory CI.
+- SQL Server 2022 CU23 (`Microsoft.Data.SqlClient` 7.1.1) uses `mcr.microsoft.com/mssql/server:2022-CU23-ubuntu-22.04` in mandatory CI.
 - PostgreSQL 18.6 (`Npgsql` 10.0.3) uses `postgres:18.6-bookworm` in mandatory CI.
 - MySQL 8.4.11 (`MySqlConnector` 2.6.2) uses `mysql:8.4.11-oraclelinux9` in mandatory CI.
 - MariaDB 11.8.9 (`MySqlConnector` 2.6.2) uses `mariadb:11.8.9-ubi9` in mandatory CI.
