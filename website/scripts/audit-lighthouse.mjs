@@ -7,9 +7,10 @@ const require = createRequire(import.meta.url);
 const { ci } = require('../lighthouserc.cjs');
 const assertions = ci.assert.assertions;
 const failures = [];
+const configuredChromeFlags = ci.collect.settings.chromeFlags.split(/\s+/).filter(Boolean);
 
 const chrome = await launch({
-  chromeFlags: ci.collect.settings.chromeFlags.split(/\s+/).filter(Boolean),
+  chromeFlags: ['--headless=new', ...configuredChromeFlags],
   chromePath: process.env.CHROME_PATH || process.env.PUPPETEER_EXECUTABLE_PATH
 });
 
