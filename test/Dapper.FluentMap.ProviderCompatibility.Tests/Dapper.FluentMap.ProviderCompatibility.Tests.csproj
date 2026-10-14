@@ -19,7 +19,7 @@
     <PackageReference Include="Oracle.ManagedDataAccess.Core" Version="$(OracleManagedDataAccessPackageVersion)" />
     <PackageReference Include="FirebirdSql.Data.FirebirdClient" Version="$(FirebirdClientPackageVersion)" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.5" PrivateAssets="all" />
-    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="9.0.21" PrivateAssets="all" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" PrivateAssets="all" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
     <PackageReference Include="xunit.v3" Version="4.0.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="4.0.1">
