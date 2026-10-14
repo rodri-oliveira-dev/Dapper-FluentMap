@@ -35,7 +35,7 @@
         "ciFilter": "SQL Server",
         "serverVersion": "2022 CU23",
         "clientPackage": "Microsoft.Data.SqlClient",
-        "clientVersion": "7.1.0"
+        "clientVersion": "7.1.1"
       },
       {
         "id": "postgresql",
