@@ -28,18 +28,18 @@
   },
   "dependencies": {
     "@astrojs/sitemap": "3.7.4",
-    "@astrojs/starlight": "0.42.6",
-    "astro": "7.3.8",
+    "@astrojs/starlight": "0.42.7",
+    "astro": "7.4.2",
     "sharp": "0.35.5"
   },
   "devDependencies": {
-    "@astrojs/check": "0.9.10",
+    "@astrojs/check": "0.9.12",
     "chrome-launcher": "1.2.2",
-    "html-validate": "11.16.2",
+    "html-validate": "11.17.0",
     "lighthouse": "13.5.0",
     "pa11y-ci": "5.0.0",
     "typescript": "6.0.3",
-    "vitest": "5.0.3"
+    "vitest": "5.0.5"
   },
   "overrides": {
     "postcss-selector-parser": "7.1.6"
