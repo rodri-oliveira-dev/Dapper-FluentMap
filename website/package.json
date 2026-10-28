@@ -38,7 +38,7 @@
     "html-validate": "11.16.2",
     "lighthouse": "13.5.0",
     "pa11y-ci": "5.0.0",
-    "typescript": "5.9.3",
+    "typescript": "6.0.3",
     "vitest": "5.0.3"
   },
   "overrides": {
