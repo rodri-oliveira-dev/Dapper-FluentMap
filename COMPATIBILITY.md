@@ -23,15 +23,14 @@ The machine-readable source of truth is `eng/compatibility-contract.json`. CI ve
 Current package range:
 
 ```text
-Dapper [2.1.79,3.0.0)
+Dapper [2.1.89,3.0.0)
 ```
 
 Validated in the current matrix:
 
 | Dapper | Status | Notes |
 | --- | --- | --- |
-| `2.1.79` | Validated | Current minimum supported version and minimum CI matrix lane. |
-| `2.1.89` | Validated | Current latest-stable CI matrix lane. |
+| `2.1.89` | Validated | Current minimum supported and latest-stable version; validated by one non-duplicated CI lane. |
 
 Known risk: `Dapper.FluentMap` uses public Dapper APIs for type maps/readers, but TypeHandler interoperability depends on resolving `SqlMapper.TypeHandlerCache<T>.Parse(object)` by reflection. This is covered by tests and remains the highest-risk Dapper compatibility boundary.
 
@@ -47,7 +46,7 @@ Validated in the current matrix:
 
 | Dommel | Dapper | Status |
 | --- | --- | --- |
-| `3.5.3` | `2.1.79` | Validated by the current Dommel integration tests. |
+| `3.5.3` | `2.1.89` | Validated by the current Dommel integration tests. |
 
 Dommel integration is optional and process-wide. It uses global `DommelMapper` resolvers/builders and does not participate in isolated `FluentMapRuntime` configuration.
 
@@ -73,23 +72,23 @@ Current support contract:
 
 | Provider | Dapper/ADO.NET | FluentMap Core evidence | FluentMap + Dommel evidence | Tested server/runtime | Tested client |
 | --- | --- | --- | --- | --- | --- |
-| SQLite | Dapper-compatible | FluentMap Core certified | FluentMap + Dommel certified | In-memory | `Microsoft.Data.Sqlite` 10.0.12 |
+| SQLite | Dapper-compatible | FluentMap Core certified | FluentMap + Dommel certified | In-memory | `Microsoft.Data.Sqlite` 10.0.14 |
 | SQL Server | Dapper-compatible | FluentMap Core certified | FluentMap + Dommel certified | 2022 CU23 | `Microsoft.Data.SqlClient` 7.1.1 |
 | PostgreSQL | Dapper-compatible | FluentMap Core certified | FluentMap + Dommel certified | 18.6 | `Npgsql` 10.0.3 |
 | MySQL | Dapper-compatible | FluentMap Core certified | FluentMap + Dommel certified | 8.4.11 | `MySqlConnector` 2.6.2 |
 | MariaDB | Dapper-compatible | FluentMap Core certified | FluentMap + Dommel certified | 11.8.9 | `MySqlConnector` 2.6.2 |
-| Oracle | Dapper-compatible | FluentMap Core certified | Not certified | 23.26.0 Free | `Oracle.ManagedDataAccess.Core` 23.26.301 |
+| Oracle | Dapper-compatible | FluentMap Core certified | Not certified | 23.26.0 Free | `Oracle.ManagedDataAccess.Core` 23.26.400 |
 | Firebird | Dapper-compatible | FluentMap Core certified | Not certified | 5.0.4 | `FirebirdSql.Data.FirebirdClient` 10.3.4 |
 | SQL Server CE | Legacy/upstream-limited | Legacy/upstream-limited | Legacy/upstream-limited | Not certified | Not certified |
 
 Certification evidence:
 
-- SQLite (`Microsoft.Data.Sqlite` 10.0.12) runs in memory and covers basic reads, immutable/nested/value-object reads, generated/runtime materialization, `QueryMultipleMapped`, `QueryMultipleMappedAsync`, sync/async streaming and Dommel persistence.
+- SQLite (`Microsoft.Data.Sqlite` 10.0.14) runs in memory and covers basic reads, immutable/nested/value-object reads, generated/runtime materialization, `QueryMultipleMapped`, `QueryMultipleMappedAsync`, sync/async streaming and Dommel persistence.
 - SQL Server 2022 CU23 (`Microsoft.Data.SqlClient` 7.1.1) uses `mcr.microsoft.com/mssql/server:2022-CU23-ubuntu-22.04` in mandatory CI.
 - PostgreSQL 18.6 (`Npgsql` 10.0.3) uses `postgres:18.6-bookworm` in mandatory CI.
 - MySQL 8.4.11 (`MySqlConnector` 2.6.2) uses `mysql:8.4.11-oraclelinux9` in mandatory CI.
 - MariaDB 11.8.9 (`MySqlConnector` 2.6.2) uses `mariadb:11.8.9-ubi9` in mandatory CI.
-- Oracle Database Free 23.26.0 (`Oracle.ManagedDataAccess.Core` 23.26.301) uses `gvenzl/oracle-free:23.26.0-slim-faststart` in a mandatory Core-only CI lane. It covers explicit mapping, immutable/nested/value-object and generated/runtime materialization, sync/async streaming, parameter binding and null handling. ODP.NET does not expose the suite's multi-statement `QueryMultiple` shape, and no Oracle Dommel SQL builder is claimed.
+- Oracle Database Free 23.26.0 (`Oracle.ManagedDataAccess.Core` 23.26.400) uses `gvenzl/oracle-free:23.26.0-slim-faststart` in a mandatory Core-only CI lane. It covers explicit mapping, immutable/nested/value-object and generated/runtime materialization, sync/async streaming, parameter binding and null handling. ODP.NET does not expose the suite's multi-statement `QueryMultiple` shape, and no Oracle Dommel SQL builder is claimed.
 - Firebird 5.0.4 (`FirebirdSql.Data.FirebirdClient` 10.3.4) uses the official `firebirdsql/firebird:5.0.4` image in a mandatory Core-only CI lane. It covers explicit mapping, immutable/nested/value-object and generated/runtime materialization, sync/async streaming, parameter binding and null handling. The ADO.NET provider does not expose the suite's multi-statement `QueryMultiple` shape through an ordinary Dapper command, and no Firebird Dommel SQL builder is claimed.
 - Provider-independent Core tests additionally use `DataTableReader` and common ADO.NET contracts, but that evidence alone never certifies a database provider.
 
@@ -164,7 +163,7 @@ Checked-in `PublicAPI.Shipped.txt`/`PublicAPI.Unshipped.txt` files govern every 
 
 ## Unsupported Environments Or Claims
 
-- Dapper major versions outside `[2.1.79,3.0.0)` are not currently supported.
+- Dapper versions outside `[2.1.89,3.0.0)` are not currently supported.
 - Dommel major versions outside `[3.5.3,4.0.0)` are not currently supported.
 - Full Native AOT support is not claimed.
 - Provider behavior outside the exact tested server/client versions listed above is not certified.

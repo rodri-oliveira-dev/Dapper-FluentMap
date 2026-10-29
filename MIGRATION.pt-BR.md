@@ -56,7 +56,7 @@ Antes de alterar as versões dos pacotes FluentMap:
 As faixas suportadas atualmente ficam documentadas em [COMPATIBILITY.md](COMPATIBILITY.md). Os valores do Dapper são governados por `eng/compatibility-contract.json` e validados contra metadata de pacote e CI. No momento deste guia:
 
 ```text
-Dapper [2.1.79,3.0.0)
+Dapper [2.1.89,3.0.0)
 Dommel [3.5.3,4.0.0)
 ```
 

@@ -36,6 +36,36 @@ function Assert-Contains {
   }
 }
 
+function Assert-LaneMatrix {
+  param(
+    [string]$RelativePath,
+    [string]$Text,
+    [string]$LabelKey,
+    [string]$VersionKey,
+    [object[]]$ExpectedLanes
+  )
+
+  $labelPattern = [Regex]::Escape($LabelKey)
+  $versionPattern = [Regex]::Escape($VersionKey)
+  $matches = [Regex]::Matches(
+    $Text,
+    "(?m)^\s*-\s+${labelPattern}:\s*(?<label>[^\r\n#]+)\r?\n\s+${versionPattern}:\s*(?<version>[^\r\n#]+)")
+  $actualLanes = @(
+    $matches | ForEach-Object {
+      [pscustomobject]@{
+        Label = $_.Groups['label'].Value.Trim().Trim('"', "'")
+        Version = $_.Groups['version'].Value.Trim().Trim('"', "'")
+      }
+    }
+  )
+
+  $actual = @($actualLanes | ForEach-Object { "$($_.Label)=$($_.Version)" })
+  $expected = @($ExpectedLanes | ForEach-Object { "$($_.Label)=$($_.Version)" })
+  if (($actual -join ',') -ne ($expected -join ',')) {
+    Fail "$RelativePath supported Dapper lane matrix '$($actual -join ', ')' differs from contract-derived matrix '$($expected -join ', ')'."
+  }
+}
+
 $manifestPath = Join-Path $RepositoryRoot 'eng/compatibility-contract.json'
 if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
   Fail "The source-of-truth manifest 'eng/compatibility-contract.json' was not found."
@@ -51,6 +81,10 @@ $latest = [string]$contract.dapper.latestStableVersion
 $packageRange = [string]$contract.dapper.packageRange
 $expectedRange = "[$minimum,3.0.0)"
 
+if ([version]$latest -lt [version]$minimum) {
+  Fail "eng/compatibility-contract.json latestStableVersion '$latest' is lower than minimumSupportedVersion '$minimum'."
+}
+
 if ($packageRange -ne $expectedRange) {
   Fail "eng/compatibility-contract.json declares Dapper packageRange '$packageRange', expected '$expectedRange' from minimumSupportedVersion."
 }
@@ -61,8 +95,30 @@ Assert-Contains 'Directory.Build.props' $props "<DapperLatestStableVersion>$late
 Assert-Contains 'Directory.Build.props' $props '<DapperPackageVersion Condition="''$(DapperPackageVersion)'' == ''''">[$(DapperMinimumSupportedVersion),3.0.0)</DapperPackageVersion>' 'Dapper package range derivation'
 
 $ci = Read-RequiredText '.github/workflows/ci.yml'
-Assert-Contains '.github/workflows/ci.yml' $ci "dapper-version: $minimum" 'Dapper minimum compatibility lane'
-Assert-Contains '.github/workflows/ci.yml' $ci "dapper-version: $latest" 'Dapper latest-stable compatibility lane'
+$expectedCiLanes = if ($minimum -eq $latest) {
+  @([pscustomobject]@{ Label = 'minimum-and-latest-stable'; Version = $minimum })
+} else {
+  @(
+    [pscustomobject]@{ Label = 'minimum'; Version = $minimum }
+    [pscustomobject]@{ Label = 'latest-stable'; Version = $latest }
+  )
+}
+Assert-LaneMatrix '.github/workflows/ci.yml' $ci 'dapper-lane' 'dapper-version' $expectedCiLanes
+Assert-Contains '.github/workflows/ci.yml' $ci "`$expectedVersion = '`${{ matrix.dapper-version }}'" 'restored Dapper version verification'
+
+$canary = Read-RequiredText '.github/workflows/compatibility-canary.yml'
+$expectedCanaryLanes = if ($minimum -eq $latest) {
+  @([pscustomobject]@{ Label = 'minimum-and-latest-supported'; Version = $minimum })
+} else {
+  @(
+    [pscustomobject]@{ Label = 'minimum-supported'; Version = $minimum }
+    [pscustomobject]@{ Label = 'latest-supported'; Version = $latest }
+  )
+}
+Assert-LaneMatrix '.github/workflows/compatibility-canary.yml' $canary 'label' 'version' $expectedCanaryLanes
+Assert-Contains '.github/workflows/compatibility-canary.yml' $canary "`$supported = '$latest'" 'forward-looking Dapper baseline'
+Assert-Contains '.github/workflows/compatibility-canary.yml' $canary "`$expectedVersion = '`${{ matrix.version }}'" 'restored supported Dapper version verification'
+Assert-Contains '.github/workflows/compatibility-canary.yml' $canary "`$expectedVersion = '`${{ steps.resolve.outputs.version }}'" 'restored experimental Dapper version verification'
 
 $requiredProviderIds = @('sqlite', 'sql-server', 'postgresql', 'mysql', 'mariadb', 'oracle', 'firebird', 'sql-server-ce')
 $supportLevels = @('dapper-compatible', 'core-certified', 'core-dommel-certified', 'legacy-upstream-limited')
@@ -137,6 +193,42 @@ foreach ($provider in $providers) {
   }
 }
 
+$providerPropertyByPackage = @{
+  'Microsoft.Data.Sqlite' = 'SqliteClientPackageVersion'
+  'Microsoft.Data.SqlClient' = 'SqlClientPackageVersion'
+  'Npgsql' = 'NpgsqlPackageVersion'
+  'MySqlConnector' = 'MySqlConnectorPackageVersion'
+  'Oracle.ManagedDataAccess.Core' = 'OracleManagedDataAccessPackageVersion'
+  'FirebirdSql.Data.FirebirdClient' = 'FirebirdClientPackageVersion'
+}
+[xml]$providerProject = Read-RequiredText 'test/Dapper.FluentMap.ProviderCompatibility.Tests/Dapper.FluentMap.ProviderCompatibility.Tests.csproj'
+$validatedProviderPackages = @{}
+foreach ($provider in $providers | Where-Object { [string]$_.coreEvidence -eq 'certified' }) {
+  $package = [string]$provider.clientPackage
+  $version = [string]$provider.clientVersion
+  if ($validatedProviderPackages.ContainsKey($package)) {
+    if ([string]$validatedProviderPackages[$package] -ne $version) {
+      Fail "providers sharing client package '$package' declare conflicting certified versions '$($validatedProviderPackages[$package])' and '$version'."
+    }
+    continue
+  }
+
+  if (-not $providerPropertyByPackage.ContainsKey($package)) {
+    Fail "certified provider '$($provider.id)' uses client package '$package' without a governed test-project property mapping."
+  }
+
+  $propertyName = [string]$providerPropertyByPackage[$package]
+  $propertyNodes = @($providerProject.SelectNodes("//*[local-name()='$propertyName']"))
+  if ($propertyNodes.Count -ne 1) {
+    Fail "provider test project must declare exactly one '$propertyName' property for '$package', found $($propertyNodes.Count)."
+  }
+  if ([string]$propertyNodes[0].InnerText -ne $version) {
+    Fail "provider test project declares $package version '$($propertyNodes[0].InnerText)', expected certified contract version '$version'."
+  }
+
+  $validatedProviderPackages[$package] = $version
+}
+
 $providerLoops = [Regex]::Matches($ci, 'for provider in (?<providers>[^\r\n]+); do')
 if ($providerLoops.Count -eq 0) {
   Fail '.github/workflows/ci.yml does not expose the required provider execution loop.'
@@ -155,7 +247,7 @@ if ((($ciProviders | Sort-Object) -join ',') -ne (($contractCiProviders | Sort-O
   Fail ".github/workflows/ci.yml provider loop '$($ciProviders -join ', ')' differs from required contract '$($contractCiProviders -join ', ')'."
 }
 
-foreach ($document in @('COMPATIBILITY.md', 'MIGRATION.md')) {
+foreach ($document in @('COMPATIBILITY.md', 'MIGRATION.md', 'MIGRATION.pt-BR.md')) {
   $text = Read-RequiredText $document
   Assert-Contains $document $text "Dapper $packageRange" 'documented Dapper package range'
 }

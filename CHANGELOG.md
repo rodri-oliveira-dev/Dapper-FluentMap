@@ -8,12 +8,14 @@ The historical archived package history is not reconstructed here. This changelo
 
 ### Added
 
-- Added mandatory real-database FluentMap Core certification lanes for Oracle Database Free 23.26.0 with `Oracle.ManagedDataAccess.Core` 23.26.301 and Firebird 5.0.4 with `FirebirdSql.Data.FirebirdClient` 10.3.4.
+- Added mandatory real-database FluentMap Core certification lanes for Oracle Database Free 23.26.0 with `Oracle.ManagedDataAccess.Core` 23.26.400 and Firebird 5.0.4 with `FirebirdSql.Data.FirebirdClient` 10.3.4.
 
 ### Changed
 
 - Defined separate Dapper/ADO.NET, FluentMap Core and FluentMap + Dommel provider evidence levels. Oracle and Firebird are Core-only; SQL Server CE remains legacy/upstream-limited; SQLite, SQL Server, PostgreSQL, MySQL and MariaDB retain Core + Dommel certification.
 - Added a machine-readable provider compatibility contract and consistency checks tying pinned provider versions, required CI lanes and public compatibility documentation together.
+- Raised the minimum supported Dapper version to 2.1.89 with package range `[2.1.89,3.0.0)`, and consolidated identical minimum/latest-stable compatibility lanes.
+- Updated certified provider clients to `Microsoft.Data.Sqlite` 10.0.14 and `Oracle.ManagedDataAccess.Core` 23.26.400.
 
 ## [3.5.0] - 2026-10-01
 

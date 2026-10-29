@@ -56,7 +56,7 @@ Before changing FluentMap package versions:
 Current supported package ranges are documented in [COMPATIBILITY.md](COMPATIBILITY.md). The Dapper values are governed by `eng/compatibility-contract.json` and validated against package metadata and CI. At the time of this guide:
 
 ```text
-Dapper [2.1.79,3.0.0)
+Dapper [2.1.89,3.0.0)
 Dommel [3.5.3,4.0.0)
 ```
 
