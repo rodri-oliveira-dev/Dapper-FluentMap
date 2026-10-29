@@ -30,6 +30,10 @@ config.AddGeneratedMappings();
 
 FluentMap registers typed metadata and applies it through the matching materialization path. SQL, connections, parameters, and lifecycle remain responsibilities of the application and Dapper.
 
+## Date/time and strict-generated behavior
+
+For consumer targets with `NET6_0_OR_GREATER`, eligible generated materializers emit the same verified date/time conversions as the runtime path. Older target frameworks receive no invalid `DateOnly` or `TimeOnly` references. Strict-generated Native AOT evidence covers the SQLite generated path, nullable date/time properties and explicit property converters; unsupported shapes fail instead of entering runtime fallback.
+
 ## Constraints
 
 :::caution

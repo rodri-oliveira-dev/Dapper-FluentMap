@@ -422,6 +422,221 @@ namespace Dapper.FluentMap.Tests
             }
         }
 
+        [Fact]
+        public void ReadMappedShouldConvertSupportedDateTimeFamilyShapesIncludingNullableAndDbNull()
+        {
+            PreTest(typeof(DateTimeFamilyCustomer));
+
+            try
+            {
+                FluentMapper.Initialize(configuration => configuration.AddMap(new DateTimeFamilyCustomerMap()));
+
+                using (var reader = CreateReader(CreateTable(
+                    new[]
+                    {
+                        "date_from_datetime",
+                        "nullable_date_from_datetime",
+                        "null_date",
+                        "datetime_from_date",
+                        "time_from_datetime",
+                        "time_from_timespan",
+                        "nullable_time_from_timespan",
+                        "null_time",
+                        "timespan_from_time"
+                    },
+                    new object[]
+                    {
+                        new DateTime(2026, 10, 28, 17, 45, 30),
+                        new DateTime(2026, 10, 29, 9, 15, 0),
+                        DBNull.Value,
+                        new DateOnly(2026, 10, 30),
+                        new DateTime(2026, 10, 28, 18, 20, 15),
+                        new TimeSpan(7, 8, 9),
+                        new TimeSpan(10, 11, 12),
+                        DBNull.Value,
+                        new TimeOnly(13, 14, 15)
+                    })))
+                using (var multi = new MappedGridReader(reader))
+                {
+                    var customer = multi.ReadMappedSingle<DateTimeFamilyCustomer>();
+
+                    Assert.Equal(new DateOnly(2026, 10, 28), customer.DateFromDateTime);
+                    Assert.Equal(new DateOnly(2026, 10, 29), customer.NullableDateFromDateTime);
+                    Assert.Null(customer.NullDate);
+                    Assert.Equal(new DateTime(2026, 10, 30), customer.DateTimeFromDate);
+                    Assert.Equal(new TimeOnly(18, 20, 15), customer.TimeFromDateTime);
+                    Assert.Equal(new TimeOnly(7, 8, 9), customer.TimeFromTimeSpan);
+                    Assert.Equal(new TimeOnly(10, 11, 12), customer.NullableTimeFromTimeSpan);
+                    Assert.Null(customer.NullTime);
+                    Assert.Equal(new TimeSpan(13, 14, 15), customer.TimeSpanFromTime);
+                }
+            }
+            finally
+            {
+                PreTest(typeof(DateTimeFamilyCustomer));
+            }
+        }
+
+        [Fact]
+        public void ReadMappedShouldConvertDateTimeFamilyForProfiledConstructorAndNestedMembers()
+        {
+            PreTest(typeof(ProfiledDateTimeFamilyCustomer));
+
+            try
+            {
+                FluentMapper.Initialize(configuration => configuration.AddProfile<ProfiledDateTimeFamilyCustomerMap>());
+
+                using (var reader = CreateReader(CreateTable(
+                    new[] { "legacy_date", "legacy_start" },
+                    new object[]
+                    {
+                        new DateTime(2026, 11, 1, 23, 59, 59),
+                        new TimeSpan(8, 30, 0)
+                    })))
+                using (var multi = new MappedGridReader(reader))
+                {
+                    var customer = multi.ReadMappedSingle<ProfiledDateTimeFamilyCustomer, DateTimeFamilyProfile>();
+
+                    Assert.Equal(new DateOnly(2026, 11, 1), customer.BusinessDate);
+                    Assert.NotNull(customer.Schedule);
+                    Assert.Equal(new TimeOnly(8, 30), customer.Schedule.StartsAt);
+                }
+            }
+            finally
+            {
+                PreTest(typeof(ProfiledDateTimeFamilyCustomer));
+            }
+        }
+
+        [Fact]
+        public void ReadMappedShouldConvertDateTimeBeforeInvokingPropertyConverter()
+        {
+            PreTest(typeof(DateTimeFamilyConvertedCustomer));
+
+            try
+            {
+                FluentMapper.Initialize(configuration => configuration.AddMap(new DateTimeFamilyConvertedCustomerMap()));
+
+                using (var reader = CreateReader(CreateTable(
+                    new[] { "business_date" },
+                    new object[] { new DateTime(2026, 12, 3, 19, 45, 0) })))
+                using (var multi = new MappedGridReader(reader))
+                {
+                    var customer = multi.ReadMappedSingle<DateTimeFamilyConvertedCustomer>();
+
+                    Assert.Equal("converted:2026-12-03", customer.Label);
+                }
+            }
+            finally
+            {
+                PreTest(typeof(DateTimeFamilyConvertedCustomer));
+            }
+        }
+
+        [Fact]
+        public void ReadMappedShouldPreferRegisteredDapperTypeHandlerOverBuiltInDateConversion()
+        {
+            PreTest(typeof(DateTimeFamilyHandledCustomer));
+
+            try
+            {
+                SqlMapper.AddTypeHandler(new DateOnlyOverrideTypeHandler());
+                FluentMapper.Initialize(configuration => configuration.AddMap(new DateTimeFamilyHandledCustomerMap()));
+
+                using (var reader = CreateReader(CreateTable(
+                    new[] { "business_date" },
+                    new object[] { new DateTime(2026, 12, 4, 11, 0, 0) })))
+                using (var multi = new MappedGridReader(reader))
+                {
+                    var customer = multi.ReadMappedSingle<DateTimeFamilyHandledCustomer>();
+
+                    Assert.Equal(new DateOnly(1999, 12, 31), customer.BusinessDate);
+                }
+            }
+            finally
+            {
+                SqlMapper.ResetTypeHandlers();
+                PreTest(typeof(DateTimeFamilyHandledCustomer));
+            }
+        }
+
+        [Fact]
+        public void ReadMappedShouldRejectUnsupportedDateTimeFamilyConversionWithContext()
+        {
+            PreTest(typeof(DateTimeFamilyHandledCustomer));
+
+            try
+            {
+                FluentMapper.Initialize(configuration => configuration.AddMap(new DateTimeFamilyHandledCustomerMap()));
+
+                using (var reader = CreateReader(CreateTable(
+                    new[] { "business_date" },
+                    new object[] { "2026-12-05" })))
+                using (var multi = new MappedGridReader(reader))
+                {
+                    var exception = Assert.Throws<FluentMapConfigurationException>(
+                        () => multi.ReadMappedSingle<DateTimeFamilyHandledCustomer>());
+
+                    Assert.Contains(typeof(DateTimeFamilyHandledCustomer).FullName, exception.Message);
+                    Assert.Contains(nameof(DateTimeFamilyHandledCustomer.BusinessDate), exception.Message);
+                    Assert.Contains("business_date", exception.Message);
+                    Assert.Contains(typeof(string).FullName, exception.Message);
+                    Assert.Contains(typeof(DateOnly).FullName, exception.Message);
+                    Assert.NotNull(exception.InnerException);
+                }
+            }
+            finally
+            {
+                PreTest(typeof(DateTimeFamilyHandledCustomer));
+            }
+        }
+
+        [Fact]
+        public void DateTimeFamilyConversionShouldKeepCacheKeysDistinctAndReportMissingRuntimeContracts()
+        {
+            var conversionType = typeof(FluentMapper).Assembly.GetType(
+                "Dapper.FluentMap.Compatibility.DateTimeFamilyConversion",
+                throwOnError: true);
+            var keyType = conversionType.GetNestedType(
+                "ConversionKey",
+                System.Reflection.BindingFlags.NonPublic);
+            Assert.NotNull(keyType);
+            var constructor = keyType.GetConstructor(
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
+                binder: null,
+                new[] { typeof(Type), typeof(Type) },
+                modifiers: null);
+            Assert.NotNull(constructor);
+
+            var dateToDate = constructor.Invoke(new object[] { typeof(DateTime), typeof(DateOnly) });
+            var sameDateToDate = constructor.Invoke(new object[] { typeof(DateTime), typeof(DateOnly) });
+            var dateToTime = constructor.Invoke(new object[] { typeof(DateTime), typeof(TimeOnly) });
+            var spanToTime = constructor.Invoke(new object[] { typeof(TimeSpan), typeof(TimeOnly) });
+
+            Assert.True(dateToDate.Equals(sameDateToDate));
+            Assert.False(dateToDate.Equals(dateToTime));
+            Assert.False(dateToTime.Equals(spanToTime));
+            Assert.False(dateToDate.Equals("not-a-conversion-key"));
+
+            var getRequiredMethod = conversionType.GetMethod(
+                "GetRequiredMethod",
+                System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+            Assert.NotNull(getRequiredMethod);
+            var invocation = Assert.Throws<System.Reflection.TargetInvocationException>(() =>
+                getRequiredMethod.Invoke(
+                    null,
+                    new object[]
+                    {
+                        typeof(string),
+                        "MissingDateTimeFamilyContract",
+                        System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance,
+                        Array.Empty<Type>()
+                    }));
+
+            var missingMethod = Assert.IsType<MissingMethodException>(invocation.InnerException);
+            Assert.Contains("MissingDateTimeFamilyContract", missingMethod.Message);
+        }
+
         private static DataTableReader CreateReader(params DataTable[] tables)
         {
             return new DataTableReader(tables);
@@ -756,6 +971,124 @@ namespace Dapper.FluentMap.Tests
             public AccountStatus ConvertFromDatabase(string value)
             {
                 throw new InvalidOperationException("Invalid status.");
+            }
+        }
+
+        private sealed class DateTimeFamilyCustomer
+        {
+            public DateOnly DateFromDateTime { get; set; }
+
+            public DateOnly? NullableDateFromDateTime { get; set; }
+
+            public DateOnly? NullDate { get; set; }
+
+            public DateTime DateTimeFromDate { get; set; }
+
+            public TimeOnly TimeFromDateTime { get; set; }
+
+            public TimeOnly TimeFromTimeSpan { get; set; }
+
+            public TimeOnly? NullableTimeFromTimeSpan { get; set; }
+
+            public TimeOnly? NullTime { get; set; }
+
+            public TimeSpan TimeSpanFromTime { get; set; }
+        }
+
+        private sealed class DateTimeFamilyCustomerMap : EntityMap<DateTimeFamilyCustomer>
+        {
+            public DateTimeFamilyCustomerMap()
+            {
+                Map(customer => customer.DateFromDateTime).ToColumn("date_from_datetime");
+                Map(customer => customer.NullableDateFromDateTime).ToColumn("nullable_date_from_datetime");
+                Map(customer => customer.NullDate).ToColumn("null_date");
+                Map(customer => customer.DateTimeFromDate).ToColumn("datetime_from_date");
+                Map(customer => customer.TimeFromDateTime).ToColumn("time_from_datetime");
+                Map(customer => customer.TimeFromTimeSpan).ToColumn("time_from_timespan");
+                Map(customer => customer.NullableTimeFromTimeSpan).ToColumn("nullable_time_from_timespan");
+                Map(customer => customer.NullTime).ToColumn("null_time");
+                Map(customer => customer.TimeSpanFromTime).ToColumn("timespan_from_time");
+            }
+        }
+
+        private sealed class DateTimeFamilyProfile : IMappingProfile
+        {
+        }
+
+        private sealed class ProfiledDateTimeFamilyCustomer
+        {
+            public ProfiledDateTimeFamilyCustomer(DateOnly businessDate)
+            {
+                BusinessDate = businessDate;
+            }
+
+            public DateOnly BusinessDate { get; }
+
+            public DateTimeFamilySchedule Schedule { get; set; }
+        }
+
+        private sealed class DateTimeFamilySchedule
+        {
+            public TimeOnly StartsAt { get; set; }
+        }
+
+        private sealed class ProfiledDateTimeFamilyCustomerMap :
+            EntityMap<ProfiledDateTimeFamilyCustomer>,
+            IProfileMap<DateTimeFamilyProfile>
+        {
+            public ProfiledDateTimeFamilyCustomerMap()
+            {
+                Map(customer => customer.BusinessDate).ToColumn("legacy_date");
+                Map(customer => customer.Schedule.StartsAt).ToColumn("legacy_start");
+            }
+        }
+
+        private sealed class DateTimeFamilyConvertedCustomer
+        {
+            public string Label { get; set; }
+        }
+
+        private sealed class DateTimeFamilyConvertedCustomerMap : EntityMap<DateTimeFamilyConvertedCustomer>
+        {
+            public DateTimeFamilyConvertedCustomerMap()
+            {
+                Map(customer => customer.Label)
+                    .ToColumn("business_date")
+                    .ConvertFromDatabaseUsing<DateOnlyLabelConverter, DateOnly>();
+            }
+        }
+
+        private sealed class DateOnlyLabelConverter : IReadPropertyConverter<DateOnly, string>
+        {
+            public string ConvertFromDatabase(DateOnly value)
+            {
+                return "converted:" + value.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+            }
+        }
+
+        private sealed class DateTimeFamilyHandledCustomer
+        {
+            public DateOnly BusinessDate { get; set; }
+        }
+
+        private sealed class DateTimeFamilyHandledCustomerMap : EntityMap<DateTimeFamilyHandledCustomer>
+        {
+            public DateTimeFamilyHandledCustomerMap()
+            {
+                Map(customer => customer.BusinessDate).ToColumn("business_date");
+            }
+        }
+
+        private sealed class DateOnlyOverrideTypeHandler : SqlMapper.TypeHandler<DateOnly>
+        {
+            public override DateOnly Parse(object value)
+            {
+                return new DateOnly(1999, 12, 31);
+            }
+
+            public override void SetValue(IDbDataParameter parameter, DateOnly value)
+            {
+                parameter.Value = value.ToDateTime(TimeOnly.MinValue);
             }
         }
     }

@@ -53,6 +53,10 @@ jobs:
         shell: pwsh
         run: ./eng/test-release-governance.ps1
 
+      - name: Validate semantic versioning governance
+        shell: pwsh
+        run: ./eng/test-semantic-versioning.ps1
+
       - name: Validate compatibility contract consistency
         shell: pwsh
         run: ./eng/test-compatibility-consistency.ps1
@@ -74,9 +78,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - dapper-lane: minimum
-            dapper-version: 2.1.79
-          - dapper-lane: latest-stable
+          - dapper-lane: minimum-and-latest-stable
             dapper-version: 2.1.89
 
     steps:
@@ -108,7 +110,13 @@ jobs:
             throw "Expected exactly one resolved Dapper package entry, found $($resolved.Count): $($resolved -join ', ')"
           }
 
-          Write-Host "Resolved $($resolved[0]) for ${{ matrix.dapper-lane }} lane."
+          $resolvedVersion = $resolved[0].Substring('Dapper/'.Length)
+          $expectedVersion = '${{ matrix.dapper-version }}'
+          if ($resolvedVersion -ne $expectedVersion) {
+            throw "Resolved Dapper $resolvedVersion, expected $expectedVersion for ${{ matrix.dapper-lane }} lane."
+          }
+
+          Write-Host "Resolved Dapper $resolvedVersion for ${{ matrix.dapper-lane }} lane."
 
       - name: Audit NuGet dependencies
         run: dotnet list ./Dapper.FluentMap.slnx package --vulnerable --include-transitive
@@ -535,11 +543,35 @@ jobs:
       - name: Restore
         run: dotnet restore ./Dapper.FluentMap.slnx
 
+      - name: Resolve prepared package version
+        id: prepared-version
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Import-Module './eng/SemanticVersioning.psm1' -Force
+          $version = Get-FluentMapConfiguredVersion -SourceRoot $env:GITHUB_WORKSPACE
+          "package_version=$version" >> $env:GITHUB_OUTPUT
+
       - name: Build Release
-        run: dotnet build ./Dapper.FluentMap.slnx --configuration Release --no-restore
+        env:
+          PACKAGE_VERSION: ${{ steps.prepared-version.outputs.package_version }}
+        run: dotnet build ./Dapper.FluentMap.slnx --configuration Release --no-restore -p:Version="${PACKAGE_VERSION}"
 
       - name: Pack Release
-        run: dotnet pack ./Dapper.FluentMap.slnx --configuration Release --no-build --output ./artifacts/packages
+        env:
+          PACKAGE_VERSION: ${{ steps.prepared-version.outputs.package_version }}
+        run: dotnet pack ./Dapper.FluentMap.slnx --configuration Release --no-build --output ./artifacts/packages -p:Version="${PACKAGE_VERSION}"
+
+      - name: Validate explicit package version
+        shell: pwsh
+        env:
+          PACKAGE_VERSION: ${{ steps.prepared-version.outputs.package_version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./eng/validate-semantic-version.ps1 `
+            -Operation ValidatePackages `
+            -SelectedVersion $env:PACKAGE_VERSION `
+            -PackageDirectory './artifacts/packages'
 
       - name: Validate NuGet presentation metadata
         shell: pwsh

@@ -35,6 +35,8 @@ FluentMap provides fluent, strongly typed mappings for applications that use [Da
 
 FluentMap complements Dapper; it does not replace it and is not a full ORM. SQL, connections, transactions, migrations, and entity tracking remain outside its scope.
 
+> **Version status:** `3.6.0` is the latest published stable release. The repository is configured for `3.6.1`, which is the next release being prepared and is not published yet. Until publication, unversioned installation commands resolve to the latest version available on the selected package source.
+
 ## Why FluentMap?
 
 Imagine a .NET application with a `Customer` entity whose properties are `Id` and `Name`, while its database returns `customer_id` and `customer_name`. FluentMap keeps those physical column names in a dedicated, strongly typed map instead of coupling the entity to persistence details.
@@ -117,6 +119,8 @@ The repository-local [usage guide](USAGE.md) remains available as a fallback for
 | [`FluentMap.Generators`](https://www.nuget.org/packages/FluentMap.Generators) | Generated map registration and supported materializers. |
 
 Package IDs are distribution identities. Assemblies, namespaces, and public APIs remain under `Dapper.FluentMap.*` where documented.
+
+The current compatibility contract requires Dapper `[2.1.89,3.0.0)`. This is a minimum-version range, not an exact pin: consumers may resolve a compatible Dapper 2.x release at or above `2.1.89`. See [Compatibility](COMPATIBILITY.md) and [Migration](MIGRATION.md) before upgrading an application that still uses Dapper `2.1.79`.
 
 ## Documentation
 

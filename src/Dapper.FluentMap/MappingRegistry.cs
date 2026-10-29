@@ -8,6 +8,7 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using Dapper.FluentMap.Configuration;
+using Dapper.FluentMap.Compatibility;
 using Dapper.FluentMap.Conventions;
 using Dapper.FluentMap.Diagnostics;
 using Dapper.FluentMap.Mapping;
@@ -378,7 +379,8 @@ namespace Dapper.FluentMap
             var cacheKey = new MaterializationPlanCacheKey(type, profileType, columnNames);
             GeneratedMaterializerEntry entry;
             if (_generatedMaterializers.TryGetValue(cacheKey, out entry) &&
-                GeneratedMaterializerMatchesEffectiveMapping(type, profileType, entry.Columns))
+                GeneratedMaterializerMatchesEffectiveMapping(type, profileType, entry.Columns) &&
+                !GeneratedMaterializerWouldBypassTypeHandler(type, profileType, entry.Columns))
             {
                 materializer = entry.Materialize;
                 return true;
@@ -387,6 +389,12 @@ namespace Dapper.FluentMap
             if (_generatedMaterializerResolutionCache.TryGetValue(cacheKey, out entry))
             {
                 if (ReferenceEquals(entry, NoCompatibleGeneratedMaterializer))
+                {
+                    materializer = null;
+                    return false;
+                }
+
+                if (GeneratedMaterializerWouldBypassTypeHandler(type, profileType, entry.Columns))
                 {
                     materializer = null;
                     return false;
@@ -403,8 +411,14 @@ namespace Dapper.FluentMap
                 out entry))
             {
                 _generatedMaterializerResolutionCache.TryAdd(cacheKey, entry);
-                materializer = entry.Materialize;
-                return true;
+                if (!GeneratedMaterializerWouldBypassTypeHandler(type, profileType, entry.Columns))
+                {
+                    materializer = entry.Materialize;
+                    return true;
+                }
+
+                materializer = null;
+                return false;
             }
 
             _generatedMaterializerResolutionCache.TryAdd(cacheKey, NoCompatibleGeneratedMaterializer);
@@ -875,6 +889,40 @@ namespace Dapper.FluentMap
             }
 
             return true;
+        }
+
+        private bool GeneratedMaterializerWouldBypassTypeHandler(
+            Type type,
+            Type profileType,
+            IReadOnlyList<GeneratedMaterializerColumn> columns)
+        {
+            var defaultTypeMap = new DefaultTypeMap(type);
+            foreach (var column in columns)
+            {
+                if (column.Ignored || column.ReadConverterType != null)
+                {
+                    continue;
+                }
+
+                var fluentMap = GetProfilePropertyMap(type, profileType, column.ColumnName);
+                Type targetType;
+                if (fluentMap != null)
+                {
+                    targetType = PropertyMapIdentity.GetMemberPath(fluentMap).PropertyInfo.PropertyType;
+                }
+                else
+                {
+                    var defaultMember = defaultTypeMap.GetMember(column.ColumnName);
+                    targetType = defaultMember?.Property?.PropertyType ?? defaultMember?.Field?.FieldType;
+                }
+
+                if (targetType != null && DapperTypeHandlerAdapter.HasTypeHandler(targetType))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static bool GeneratedMaterializerColumnMatchesFluentMap(

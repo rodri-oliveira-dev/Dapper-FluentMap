@@ -920,6 +920,36 @@ namespace Dapper.FluentMap.Generators
             builder.AppendLine();
             builder.AppendLine("            var targetType = typeof(T);");
             builder.AppendLine("            var conversionType = global::System.Nullable.GetUnderlyingType(targetType) ?? targetType;");
+            builder.AppendLine(@"#if NET6_0_OR_GREATER
+            if (conversionType == typeof(global::System.DateOnly) && value is global::System.DateTime dateTimeForDate)
+            {
+                return (T)(object)global::System.DateOnly.FromDateTime(dateTimeForDate);
+            }
+
+            if (conversionType == typeof(global::System.TimeOnly))
+            {
+                if (value is global::System.DateTime dateTimeForTime)
+                {
+                    return (T)(object)global::System.TimeOnly.FromDateTime(dateTimeForTime);
+                }
+
+                if (value is global::System.TimeSpan timeSpanForTime)
+                {
+                    return (T)(object)global::System.TimeOnly.FromTimeSpan(timeSpanForTime);
+                }
+            }
+
+            if (conversionType == typeof(global::System.DateTime) && value is global::System.DateOnly dateOnly)
+            {
+                return (T)(object)dateOnly.ToDateTime(default(global::System.TimeOnly));
+            }
+
+            if (conversionType == typeof(global::System.TimeSpan) && value is global::System.TimeOnly timeOnly)
+            {
+                return (T)(object)timeOnly.ToTimeSpan();
+            }
+#endif");
+            builder.AppendLine();
             builder.AppendLine("            if (conversionType.IsEnum)");
             builder.AppendLine("            {");
             builder.AppendLine("                var enumValue = value is string text");
@@ -1737,7 +1767,11 @@ namespace Dapper.FluentMap.Generators
                     return true;
             }
 
-            return IsType(unwrapped as INamedTypeSymbol, "System", "Guid");
+            var namedType = unwrapped as INamedTypeSymbol;
+            return IsType(namedType, "System", "Guid") ||
+                   IsType(namedType, "System", "TimeSpan") ||
+                   IsType(namedType, "System", "DateOnly") ||
+                   IsType(namedType, "System", "TimeOnly");
         }
 
         private static bool IsSupportedComplexType(ITypeSymbol type)

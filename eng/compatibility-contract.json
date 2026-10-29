@@ -1,9 +1,9 @@
 {
   "schemaVersion": "2.0",
   "dapper": {
-    "minimumSupportedVersion": "2.1.79",
+    "minimumSupportedVersion": "2.1.89",
     "latestStableVersion": "2.1.89",
-    "packageRange": "[2.1.79,3.0.0)"
+    "packageRange": "[2.1.89,3.0.0)"
   },
   "providerSupport": {
     "levels": [
@@ -23,7 +23,7 @@
         "ciFilter": "SQLite",
         "serverVersion": "in-memory",
         "clientPackage": "Microsoft.Data.Sqlite",
-        "clientVersion": "10.0.12"
+        "clientVersion": "10.0.14"
       },
       {
         "id": "sql-server",
@@ -83,7 +83,7 @@
         "ciFilter": "Oracle",
         "serverVersion": "23.26.0 Free",
         "clientPackage": "Oracle.ManagedDataAccess.Core",
-        "clientVersion": "23.26.301"
+        "clientVersion": "23.26.400"
       },
       {
         "id": "firebird",

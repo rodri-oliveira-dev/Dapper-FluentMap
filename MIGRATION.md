@@ -53,12 +53,18 @@ Before changing FluentMap package versions:
 - run the existing test suite before and after the upgrade;
 - identify whether the application uses Dommel, `Ignore()` for database-generated columns, assembly scanning, custom Dapper `TypeHandler<T>` implementations, trimming or Native AOT.
 
+The latest published stable FluentMap release is `3.6.0`. Version `3.6.1` is prepared in the repository but is not available as a stable package until publication. Keep installation and upgrade automation on `3.6.0` unless consuming an explicitly built and trusted `3.6.1` artifact from this source.
+
 Current supported package ranges are documented in [COMPATIBILITY.md](COMPATIBILITY.md). The Dapper values are governed by `eng/compatibility-contract.json` and validated against package metadata and CI. At the time of this guide:
 
 ```text
-Dapper [2.1.79,3.0.0)
+Dapper [2.1.89,3.0.0)
 Dommel [3.5.3,4.0.0)
 ```
+
+The Dapper minimum changed from `2.1.79` to `2.1.89`. The range is not an exact pin: `[2.1.89,3.0.0)` allows NuGet to resolve any compatible Dapper 2.x version from `2.1.89` onward, while `[2.1.89]` would require exactly that version. Before upgrading FluentMap, update direct Dapper references, inspect transitive resolution with `dotnet list package --include-transitive`, refresh lock files when applicable, and run provider-backed tests. Applications forced to `2.1.79` are outside the supported contract.
+
+Dapper 2.1.89 brings upstream `DateOnly`/`TimeOnly`, `DynamicParameters`, trimming-diagnostic and separate StrongName-package changes. FluentMap only owns the matching conversion behavior in its `QueryMapped*`/`ReadMapped*` runtime and generated materializers; ordinary `Dapper.Query<T>()` behavior remains Dapper's. The tested FluentMap conversions cover nullable values, immutable constructors, nested objects and property converters. Provider CLR shapes remain significant, so consult the feature-specific matrix in [COMPATIBILITY.md](COMPATIBILITY.md).
 
 Provider certification and exact tested versions are also maintained in [COMPATIBILITY.md](COMPATIBILITY.md).
 
