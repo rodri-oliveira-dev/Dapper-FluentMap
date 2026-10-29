@@ -60,6 +60,10 @@ Dapper [2.1.89,3.0.0)
 Dommel [3.5.3,4.0.0)
 ```
 
+The Dapper minimum changed from `2.1.79` to `2.1.89`. The range is not an exact pin: `[2.1.89,3.0.0)` allows NuGet to resolve any compatible Dapper 2.x version from `2.1.89` onward, while `[2.1.89]` would require exactly that version. Before upgrading FluentMap, update direct Dapper references, inspect transitive resolution with `dotnet list package --include-transitive`, refresh lock files when applicable, and run provider-backed tests. Applications forced to `2.1.79` are outside the supported contract.
+
+Dapper 2.1.89 brings upstream `DateOnly`/`TimeOnly`, `DynamicParameters`, trimming-diagnostic and separate StrongName-package changes. FluentMap only owns the matching conversion behavior in its `QueryMapped*`/`ReadMapped*` runtime and generated materializers; ordinary `Dapper.Query<T>()` behavior remains Dapper's. The tested FluentMap conversions cover nullable values, immutable constructors, nested objects and property converters. Provider CLR shapes remain significant, so consult the feature-specific matrix in [COMPATIBILITY.md](COMPATIBILITY.md).
+
 Provider certification and exact tested versions are also maintained in [COMPATIBILITY.md](COMPATIBILITY.md).
 
 ## Minimal Migration

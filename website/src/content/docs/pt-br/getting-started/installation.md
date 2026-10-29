@@ -27,6 +27,10 @@ dotnet add package Dapper.FluentMap
 
 O FluentMap registra metadados tipados e os aplica no caminho de materialização correspondente. O SQL, a conexão, os parâmetros e o ciclo de vida continuam sob responsabilidade da aplicação e do Dapper.
 
+## Dependência do Dapper
+
+A faixa suportada do Dapper é `[2.1.89,3.0.0)`, tendo `2.1.89` como mínimo e baseline estável validado atual. Essa faixa do NuGet permite versões 2.x compatíveis iguais ou superiores ao mínimo; ela não é o pin exato `[2.1.89]`. Atualize aplicações que ainda resolvem Dapper 2.1.79 antes de adotar este baseline do FluentMap.
+
 ## Restrições
 
 :::caution

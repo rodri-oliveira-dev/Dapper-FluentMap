@@ -27,6 +27,10 @@ dotnet add package Dapper.FluentMap
 
 FluentMap registers typed metadata and applies it through the matching materialization path. SQL, connections, parameters, and lifecycle remain responsibilities of the application and Dapper.
 
+## Dapper dependency
+
+The supported Dapper range is `[2.1.89,3.0.0)`, with `2.1.89` as both the minimum and current validated stable baseline. This NuGet range allows compatible Dapper 2.x versions at or above the minimum; it is not the exact pin `[2.1.89]`. Upgrade applications still resolving Dapper 2.1.79 before adopting this FluentMap baseline.
+
 ## Constraints
 
 :::caution

@@ -154,6 +154,104 @@ const restrictions = {
 };
 
 const pageDetails = {
+  installation: [
+    `## Dapper dependency
+
+The supported Dapper range is \`[2.1.89,3.0.0)\`, with \`2.1.89\` as both the minimum and current validated stable baseline. This NuGet range allows compatible Dapper 2.x versions at or above the minimum; it is not the exact pin \`[2.1.89]\`. Upgrade applications still resolving Dapper 2.1.79 before adopting this FluentMap baseline.`,
+    `## Dependência do Dapper
+
+A faixa suportada do Dapper é \`[2.1.89,3.0.0)\`, tendo \`2.1.89\` como mínimo e baseline estável validado atual. Essa faixa do NuGet permite versões 2.x compatíveis iguais ou superiores ao mínimo; ela não é o pin exato \`[2.1.89]\`. Atualize aplicações que ainda resolvem Dapper 2.1.79 antes de adotar este baseline do FluentMap.`
+  ],
+  dapper: [
+    `## Dapper 2.1.89 boundary
+
+- Dapper owns ordinary \`Query<T>()\` materialization, \`DynamicParameters\`, its IL-diagnostic suppressions and its separate StrongName packages.
+- FluentMap owns mapping metadata and the value assignment performed by \`QueryMapped*\`, \`ReadMapped*\` and eligible generated materializers.
+- FluentMap therefore implements matching verified conversions for \`DateTime\` to \`DateOnly\`, \`DateOnly\` to midnight \`DateTime\`, \`DateTime\`/\`TimeSpan\` to \`TimeOnly\`, and \`TimeOnly\` to \`TimeSpan\`.
+- Nullable values, immutable constructors, nested members and property converters are covered in runtime and generated tests. No other implicit date/time conversion is claimed.
+
+The public \`DynamicParameters.AddParameters(IDbCommand)\` change is upstream Dapper API. FluentMap passes \`DynamicParameters\` through non-strict mapped queries but does not wrap that method. Strict-generated queries use explicit \`GeneratedParameters\` instead.`,
+    `## Limite do Dapper 2.1.89
+
+- O Dapper é responsável pela materialização de \`Query<T>()\` comum, por \`DynamicParameters\`, pelos suppressions de diagnósticos IL e pelos pacotes StrongName separados.
+- O FluentMap é responsável pelos metadados de mapping e pela atribuição de valores realizada por \`QueryMapped*\`, \`ReadMapped*\` e materializadores gerados elegíveis.
+- Por isso, o FluentMap implementa as conversões verificadas correspondentes: \`DateTime\` para \`DateOnly\`, \`DateOnly\` para \`DateTime\` à meia-noite, \`DateTime\`/\`TimeSpan\` para \`TimeOnly\` e \`TimeOnly\` para \`TimeSpan\`.
+- Valores nullable, construtores imutáveis, membros aninhados e property converters possuem cobertura runtime e gerada. Nenhuma outra conversão implícita de data/hora é afirmada.
+
+A mudança pública em \`DynamicParameters.AddParameters(IDbCommand)\` pertence à API upstream do Dapper. O FluentMap repassa \`DynamicParameters\` em queries mapeadas não estritas, mas não encapsula esse método. Queries strict-generated usam \`GeneratedParameters\` explícitos.`
+  ],
+  'property-converters': [
+    `## Provider-specific date/time values
+
+Property converters run before Dapper type handlers and FluentMap default conversion. They are the verified solution when a provider exposes date/time data in another CLR representation, such as SQLite ISO text:
+
+\`\`\`csharp
+Map(x => x.BusinessDate)
+    .ToColumn("business_date")
+    .ConvertFromDatabaseUsing<string, DateOnly>(value =>
+        DateOnly.ParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture));
+\`\`\`
+
+Database \`NULL\` remains null for nullable targets and does not invoke the converter.`,
+    `## Valores de data/hora específicos do provider
+
+Property converters executam antes de type handlers do Dapper e da conversão default do FluentMap. Eles são a solução verificada quando um provider expõe data/hora em outra representação CLR, como texto ISO no SQLite:
+
+\`\`\`csharp
+Map(x => x.BusinessDate)
+    .ToColumn("business_date")
+    .ConvertFromDatabaseUsing<string, DateOnly>(value =>
+        DateOnly.ParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture));
+\`\`\`
+
+\`NULL\` do banco permanece null em targets nullable e não chama o converter.`
+  ],
+  'source-generators': [
+    `## Date/time and strict-generated behavior
+
+For consumer targets with \`NET6_0_OR_GREATER\`, eligible generated materializers emit the same verified date/time conversions as the runtime path. Older target frameworks receive no invalid \`DateOnly\` or \`TimeOnly\` references. Strict-generated Native AOT evidence covers the SQLite generated path, nullable date/time properties and explicit property converters; unsupported shapes fail instead of entering runtime fallback.`,
+    `## Data/hora e comportamento strict-generated
+
+Para targets consumidores com \`NET6_0_OR_GREATER\`, materializadores gerados elegíveis emitem as mesmas conversões verificadas de data/hora do caminho runtime. Targets mais antigos não recebem referências inválidas a \`DateOnly\` ou \`TimeOnly\`. A evidência strict-generated em Native AOT cobre o caminho gerado com SQLite, propriedades nullable de data/hora e property converters explícitos; formatos não suportados falham em vez de entrar no fallback runtime.`
+  ],
+  'compatibility-considerations': [
+    `## Dapper baseline migration
+
+The minimum supported Dapper version is now \`2.1.89\`; \`2.1.79\` is no longer supported. Check direct and transitive package resolution, refresh lock files, and rerun provider-backed tests. The range \`[2.1.89,3.0.0)\` is a minimum constraint, not an exact pin. General provider certification does not automatically certify every provider-specific \`DateOnly\`/\`TimeOnly\` CLR shape.`,
+    `## Migração do baseline do Dapper
+
+A versão mínima suportada do Dapper agora é \`2.1.89\`; \`2.1.79\` deixou de ser suportada. Verifique a resolução direta e transitiva de pacotes, renove lock files e repita testes com os providers reais. A faixa \`[2.1.89,3.0.0)\` é uma restrição mínima, não um pin exato. A certificação geral de um provider não certifica automaticamente todos os seus formatos CLR específicos de \`DateOnly\`/\`TimeOnly\`.`
+  ],
+  'compatibility-matrix': [
+    `## Current dependency contract
+
+| Dependency | Supported range | Validated stable baseline |
+| --- | --- | --- |
+| Dapper | \`[2.1.89,3.0.0)\` | \`2.1.89\` |
+| Dommel | \`[3.5.3,4.0.0)\` | \`3.5.3\` |
+
+The Dapper range accepts compatible 2.x versions from the minimum onward; it does not pin exactly 2.1.89. Package metadata and this portal are checked against \`eng/compatibility-contract.json\`.`,
+    `## Contrato de dependências atual
+
+| Dependência | Faixa suportada | Baseline estável validado |
+| --- | --- | --- |
+| Dapper | \`[2.1.89,3.0.0)\` | \`2.1.89\` |
+| Dommel | \`[3.5.3,4.0.0)\` | \`3.5.3\` |
+
+A faixa do Dapper aceita versões 2.x compatíveis a partir do mínimo; ela não fixa exatamente a 2.1.89. A metadata dos pacotes e este portal são verificados contra \`eng/compatibility-contract.json\`.`
+  ],
+  'trimming-native-aot': [
+    `## Validated boundary
+
+Ordinary runtime materialization may use reflection, expression compilation and Dapper fallback; it is not the certified Native AOT path. Generated materialization normally may also fall back. The validated Native AOT boundary is strict-generated SQLite with generated registration/materializers, explicit \`GeneratedParameters\`, safe column reordering/additions, property converters, nullable \`DateOnly\`/\`TimeOnly\` and deterministic rejection of unsupported shapes.
+
+Dapper 2.1.89 suppresses selected IL diagnostics in upstream runtime fallback code. Suppression alone does not establish universal Native AOT compatibility for Dapper or FluentMap. Assembly scanning, convention-only discovery, arbitrary parameter objects, reflective TypeHandler interop and delegate construction strategies remain outside the strict-generated claim.`,
+    `## Limite validado
+
+A materialização runtime comum pode usar reflection, compilação de expressões e fallback do Dapper; ela não é o caminho Native AOT certificado. A materialização gerada comum também pode usar fallback. O limite Native AOT validado é SQLite strict-generated com registro/materializadores gerados, \`GeneratedParameters\` explícitos, reordenação/adição segura de colunas, property converters, \`DateOnly\`/\`TimeOnly\` nullable e rejeição determinística de formatos não suportados.
+
+O Dapper 2.1.89 suprime alguns diagnósticos IL em seu código upstream de fallback runtime. O suppression isolado não estabelece compatibilidade Native AOT universal para Dapper ou FluentMap. Assembly scanning, descoberta somente por convenção, objetos de parâmetros arbitrários, interoperabilidade reflexiva de TypeHandler e estratégias de construção por delegate ficam fora da afirmação strict-generated.`
+  ],
   dommel: [
     `## Provider boundary
 
@@ -190,16 +288,18 @@ Consumidores avançados podem usar as APIs públicas \`DommelMapper.AddSqlBuilde
 
 | Provider | Core | Dommel | Tested server/runtime | Tested client |
 | --- | --- | --- | --- | --- |
-| SQLite | Certified | Certified | In-memory | \`Microsoft.Data.Sqlite\` 10.0.12 |
-| SQL Server | Certified | Certified | 2022 CU23 | \`Microsoft.Data.SqlClient\` 7.1.0 |
+| SQLite | Certified | Certified | In-memory | \`Microsoft.Data.Sqlite\` 10.0.14 |
+| SQL Server | Certified | Certified | 2022 CU23 | \`Microsoft.Data.SqlClient\` 7.1.1 |
 | PostgreSQL | Certified | Certified | 18.6 | \`Npgsql\` 10.0.3 |
 | MySQL | Certified | Certified | 8.4.11 | \`MySqlConnector\` 2.6.2 |
 | MariaDB | Certified | Certified | 11.8.9 | \`MySqlConnector\` 2.6.2 |
-| Oracle | Certified | Not certified | 23.26.0 Free | \`Oracle.ManagedDataAccess.Core\` 23.26.301 |
+| Oracle | Certified | Not certified | 23.26.0 Free | \`Oracle.ManagedDataAccess.Core\` 23.26.400 |
 | Firebird | Certified | Not certified | 5.0.4 | \`FirebirdSql.Data.FirebirdClient\` 10.3.4 |
 | SQL Server CE | Legacy/upstream-limited | Legacy/upstream-limited | Not certified | Not certified |
 
-These pinned versions and evidence are also maintained in the machine-readable compatibility contract.`,
+These pinned versions and evidence are also maintained in the machine-readable compatibility contract.
+
+The date/time feature has a narrower evidence set: SQLite is verified with ISO text plus property converters, SQL Server with \`DateTime\`/\`TimeSpan\` provider values, and PostgreSQL with native \`DateOnly\`/\`TimeOnly\` values. MySQL, MariaDB, Oracle and Firebird remain Core-certified generally, but their DateOnly/TimeOnly shapes are not certified.`,
     `## Níveis de suporte
 
 - **Compatível com Dapper:** funcionamento esperado via Dapper/ADO.NET, sem certificação dedicada do FluentMap em banco real.
@@ -209,16 +309,18 @@ These pinned versions and evidence are also maintained in the machine-readable c
 
 | Provider | Core | Dommel | Servidor/runtime testado | Cliente testado |
 | --- | --- | --- | --- | --- |
-| SQLite | Certificado | Certificado | Em memória | \`Microsoft.Data.Sqlite\` 10.0.12 |
-| SQL Server | Certificado | Certificado | 2022 CU23 | \`Microsoft.Data.SqlClient\` 7.1.0 |
+| SQLite | Certificado | Certificado | Em memória | \`Microsoft.Data.Sqlite\` 10.0.14 |
+| SQL Server | Certificado | Certificado | 2022 CU23 | \`Microsoft.Data.SqlClient\` 7.1.1 |
 | PostgreSQL | Certificado | Certificado | 18.6 | \`Npgsql\` 10.0.3 |
 | MySQL | Certificado | Certificado | 8.4.11 | \`MySqlConnector\` 2.6.2 |
 | MariaDB | Certificado | Certificado | 11.8.9 | \`MySqlConnector\` 2.6.2 |
-| Oracle | Certificado | Não certificado | 23.26.0 Free | \`Oracle.ManagedDataAccess.Core\` 23.26.301 |
+| Oracle | Certificado | Não certificado | 23.26.0 Free | \`Oracle.ManagedDataAccess.Core\` 23.26.400 |
 | Firebird | Certificado | Não certificado | 5.0.4 | \`FirebirdSql.Data.FirebirdClient\` 10.3.4 |
 | SQL Server CE | Legado/limitado pelo upstream | Legado/limitado pelo upstream | Não certificado | Não certificado |
 
-Essas versões fixadas e suas evidências também são mantidas no contrato de compatibilidade legível por máquina.`
+Essas versões fixadas e suas evidências também são mantidas no contrato de compatibilidade legível por máquina.
+
+O recurso de data/hora possui evidência mais restrita: SQLite é verificado com texto ISO e property converters, SQL Server com valores de provider \`DateTime\`/\`TimeSpan\` e PostgreSQL com valores nativos \`DateOnly\`/\`TimeOnly\`. MySQL, MariaDB, Oracle e Firebird continuam certificados no Core em geral, mas seus formatos DateOnly/TimeOnly não são certificados.`
   ]
 };
 

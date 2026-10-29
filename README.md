@@ -118,6 +118,8 @@ The repository-local [usage guide](USAGE.md) remains available as a fallback for
 
 Package IDs are distribution identities. Assemblies, namespaces, and public APIs remain under `Dapper.FluentMap.*` where documented.
 
+The current compatibility contract requires Dapper `[2.1.89,3.0.0)`. This is a minimum-version range, not an exact pin: consumers may resolve a compatible Dapper 2.x release at or above `2.1.89`. See [Compatibility](COMPATIBILITY.md) and [Migration](MIGRATION.md) before upgrading an application that still uses Dapper `2.1.79`.
+
 ## Documentation
 
 The bilingual documentation portal is planned for `https://rodri-oliveira-dev.github.io/Dapper-FluentMap/`. Until its deployment is confirmed, use the linked repository-local sources as fallbacks.
