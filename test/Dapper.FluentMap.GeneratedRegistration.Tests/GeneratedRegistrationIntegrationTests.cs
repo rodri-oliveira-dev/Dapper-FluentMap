@@ -221,7 +221,43 @@ namespace Dapper.FluentMap.GeneratedRegistration.Tests
         }
 
         [Fact]
-        public void GeneratedRegistrationShouldPreserveDateOnlyTypeHandlersInNonStrictQueries()
+        public void GeneratedDateTimeFamilyMaterializationShouldConvertNonNullNullableDate()
+        {
+            ResetMapper();
+
+            try
+            {
+                GeneratedDateTimeFamilyCustomer generated;
+                FluentMapper.Initialize(configuration => configuration.AddGeneratedMappings());
+
+                using (var table = CreateDateTimeFamilyTableWithOptionalDate())
+                using (var reader = table.CreateDataReader())
+                using (var multi = new MappedGridReader(reader))
+                {
+                    generated = multi.ReadMappedSingle<GeneratedDateTimeFamilyCustomer, GeneratedDateTimeFamilyProfile>();
+                }
+
+                ResetMapper();
+                FluentMapper.Initialize(configuration => configuration.AddProfile<GeneratedDateTimeFamilyCustomerMap>());
+
+                using (var table = CreateDateTimeFamilyTableWithOptionalDate())
+                using (var reader = table.CreateDataReader())
+                using (var multi = new MappedGridReader(reader))
+                {
+                    var runtime = multi.ReadMappedSingle<GeneratedDateTimeFamilyCustomer, GeneratedDateTimeFamilyProfile>();
+
+                    Assert.Equal(new DateOnly(2026, 10, 30), generated.OptionalDate);
+                    Assert.Equal(generated.OptionalDate, runtime.OptionalDate);
+                }
+            }
+            finally
+            {
+                ResetMapper();
+            }
+        }
+
+        [Fact]
+        public void GeneratedRegistrationShouldReevaluateDateOnlyTypeHandlersInNonStrictQueries()
         {
             ResetMapper();
             SqlMapper.AddTypeHandler(new FixedDateOnlyTypeHandler());
@@ -236,6 +272,17 @@ namespace Dapper.FluentMap.GeneratedRegistration.Tests
                     var customer = multi.ReadMappedSingle<GeneratedDateTimeFamilyCustomer, GeneratedDateTimeFamilyProfile>();
 
                     Assert.Equal(new DateOnly(2001, 2, 3), customer.BusinessDate);
+                    Assert.Equal(1, FluentMapper.Registry.MaterializationPlanCacheEntryCount);
+                }
+
+                SqlMapper.ResetTypeHandlers();
+
+                using (var reader = CreateDateTimeFamilyTable().CreateDataReader())
+                using (var multi = new MappedGridReader(reader))
+                {
+                    var customer = multi.ReadMappedSingle<GeneratedDateTimeFamilyCustomer, GeneratedDateTimeFamilyProfile>();
+
+                    Assert.Equal(new DateOnly(2026, 10, 28), customer.BusinessDate);
                     Assert.Equal(1, FluentMapper.Registry.MaterializationPlanCacheEntryCount);
                 }
             }
@@ -593,6 +640,13 @@ namespace Dapper.FluentMap.GeneratedRegistration.Tests
                 DBNull.Value,
                 new TimeSpan(10, 11, 12),
                 new DateTime(2026, 10, 30, 16, 0, 0));
+            return table;
+        }
+
+        private static DataTable CreateDateTimeFamilyTableWithOptionalDate()
+        {
+            var table = CreateDateTimeFamilyTable();
+            table.Rows[0]["optional_date"] = new DateTime(2026, 10, 30, 16, 45, 0);
             return table;
         }
 
@@ -1145,7 +1199,7 @@ namespace Dapper.FluentMap.GeneratedRegistration.Tests
     {
         public string ConvertFromDatabase(DateOnly value)
         {
-            return "converted:" + value.ToString("yyyy-MM-dd");
+            return "converted:" + value.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
         }
     }
 }

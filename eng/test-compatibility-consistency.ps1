@@ -33,6 +33,16 @@ try {
 
   $compatibilityPath = Join-Path $temporaryRoot 'COMPATIBILITY.md'
   $contract = Get-Content -LiteralPath (Join-Path $repoRoot 'eng/compatibility-contract.json') -Raw | ConvertFrom-Json
+  $canaryPath = Join-Path $temporaryRoot '.github/workflows/compatibility-canary.yml'
+  $canaryText = [System.IO.File]::ReadAllText($canaryPath)
+  $reorderedCanary = [Regex]::Replace(
+    $canaryText,
+    '(?m)^(?<indent>\s*)- label: (?<label>[^\r\n]+)\r?\n\s+version: (?<version>[^\r\n]+)',
+    '${indent}- version: ${version}' + [Environment]::NewLine + '${indent}  future-key: accepted' + [Environment]::NewLine + '${indent}  label: ${label}')
+  [System.IO.File]::WriteAllText($canaryPath, $reorderedCanary)
+  & $validator -RepositoryRoot $temporaryRoot
+  Write-Host 'PASS compatibility consistency validator accepts lane keys in a different order with intervening keys.'
+
   $documentedRange = "Dapper $([string]$contract.dapper.packageRange)"
   $drifted = [System.IO.File]::ReadAllText($compatibilityPath).Replace(
     $documentedRange,
@@ -76,8 +86,9 @@ try {
 
   [System.IO.File]::Copy((Join-Path $repoRoot '.github/workflows/ci.yml'), $ciPath, $true)
   $providerProjectPath = Join-Path $temporaryRoot 'test/Dapper.FluentMap.ProviderCompatibility.Tests/Dapper.FluentMap.ProviderCompatibility.Tests.csproj'
+  $sqliteProvider = @($contract.providerSupport.providers | Where-Object { [string]$_.id -eq 'sqlite' })[0]
   $driftedProviderProject = [System.IO.File]::ReadAllText($providerProjectPath).Replace(
-    ">$([string]$contract.providerSupport.providers[0].clientVersion)</SqliteClientPackageVersion>",
+    ">$([string]$sqliteProvider.clientVersion)</SqliteClientPackageVersion>",
     '>0.0.0</SqliteClientPackageVersion>')
   [System.IO.File]::WriteAllText($providerProjectPath, $driftedProviderProject)
 
@@ -94,6 +105,29 @@ try {
   }
 
   Write-Host 'PASS compatibility consistency validator detects intentional provider client version drift.'
+
+  [System.IO.File]::Copy(
+    (Join-Path $repoRoot 'test/Dapper.FluentMap.ProviderCompatibility.Tests/Dapper.FluentMap.ProviderCompatibility.Tests.csproj'),
+    $providerProjectPath,
+    $true)
+  $driftedProviderReference = [System.IO.File]::ReadAllText($providerProjectPath).Replace(
+    'Include="Microsoft.Data.Sqlite" Version="$(SqliteClientPackageVersion)"',
+    'Include="Microsoft.Data.Sqlite" Version="0.0.0"')
+  [System.IO.File]::WriteAllText($providerProjectPath, $driftedProviderReference)
+
+  $detected = $false
+  try {
+    & $validator -RepositoryRoot $temporaryRoot
+  }
+  catch {
+    $detected = $_.Exception.Message -like "*must set 'Microsoft.Data.Sqlite' Version*"
+  }
+
+  if (-not $detected) {
+    throw 'Negative compatibility-consistency proof failed: provider PackageReference drift was not detected.'
+  }
+
+  Write-Host 'PASS compatibility consistency validator detects provider PackageReference drift.'
 
   [System.IO.File]::Copy(
     (Join-Path $repoRoot 'test/Dapper.FluentMap.ProviderCompatibility.Tests/Dapper.FluentMap.ProviderCompatibility.Tests.csproj'),

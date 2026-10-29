@@ -165,7 +165,7 @@ The unversioned installation command resolves the latest version available from 
 
 ## Dapper dependency
 
-The supported Dapper range is \`[2.1.89,3.0.0)\`, with \`2.1.89\` as both the minimum and current validated stable baseline. This NuGet range allows compatible Dapper 2.x versions at or above the minimum; it is not the exact pin \`[2.1.89]\`. Upgrade applications still resolving Dapper 2.1.79 before adopting this FluentMap baseline.`,
+For FluentMap 3.6.1, the supported Dapper range is \`[2.1.89,3.0.0)\`, with \`2.1.89\` as both the minimum and current validated stable baseline. FluentMap 3.6.0 supports \`[2.1.79,3.0.0)\`. The 3.6.1 NuGet range allows compatible Dapper 2.x versions at or above its minimum; it is not the exact pin \`[2.1.89]\`. Upgrade applications still resolving Dapper 2.1.79 before adopting the FluentMap 3.6.1 baseline.`,
     `## Estado da versão
 
 - Última release estável publicada: \`3.6.0\`.
@@ -176,7 +176,7 @@ O comando de instalação sem versão resolve a versão mais recente disponível
 
 ## Dependência do Dapper
 
-A faixa suportada do Dapper é \`[2.1.89,3.0.0)\`, tendo \`2.1.89\` como mínimo e baseline estável validado atual. Essa faixa do NuGet permite versões 2.x compatíveis iguais ou superiores ao mínimo; ela não é o pin exato \`[2.1.89]\`. Atualize aplicações que ainda resolvem Dapper 2.1.79 antes de adotar este baseline do FluentMap.`
+Para o FluentMap 3.6.1, a faixa suportada do Dapper é \`[2.1.89,3.0.0)\`, tendo \`2.1.89\` como mínimo e baseline estável validado atual. O FluentMap 3.6.0 suporta \`[2.1.79,3.0.0)\`. A faixa NuGet da versão 3.6.1 permite versões 2.x compatíveis iguais ou superiores ao seu mínimo; ela não é o pin exato \`[2.1.89]\`. Atualize aplicações que ainda resolvem Dapper 2.1.79 antes de adotar o baseline do FluentMap 3.6.1.`
   ],
   changelog: [
     `## Current release state

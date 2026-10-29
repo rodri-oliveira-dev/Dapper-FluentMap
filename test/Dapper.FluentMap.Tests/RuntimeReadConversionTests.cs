@@ -591,6 +591,52 @@ namespace Dapper.FluentMap.Tests
             }
         }
 
+        [Fact]
+        public void DateTimeFamilyConversionShouldKeepCacheKeysDistinctAndReportMissingRuntimeContracts()
+        {
+            var conversionType = typeof(FluentMapper).Assembly.GetType(
+                "Dapper.FluentMap.Compatibility.DateTimeFamilyConversion",
+                throwOnError: true);
+            var keyType = conversionType.GetNestedType(
+                "ConversionKey",
+                System.Reflection.BindingFlags.NonPublic);
+            Assert.NotNull(keyType);
+            var constructor = keyType.GetConstructor(
+                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
+                binder: null,
+                new[] { typeof(Type), typeof(Type) },
+                modifiers: null);
+            Assert.NotNull(constructor);
+
+            var dateToDate = constructor.Invoke(new object[] { typeof(DateTime), typeof(DateOnly) });
+            var sameDateToDate = constructor.Invoke(new object[] { typeof(DateTime), typeof(DateOnly) });
+            var dateToTime = constructor.Invoke(new object[] { typeof(DateTime), typeof(TimeOnly) });
+            var spanToTime = constructor.Invoke(new object[] { typeof(TimeSpan), typeof(TimeOnly) });
+
+            Assert.True(dateToDate.Equals(sameDateToDate));
+            Assert.False(dateToDate.Equals(dateToTime));
+            Assert.False(dateToTime.Equals(spanToTime));
+            Assert.False(dateToDate.Equals("not-a-conversion-key"));
+
+            var getRequiredMethod = conversionType.GetMethod(
+                "GetRequiredMethod",
+                System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic);
+            Assert.NotNull(getRequiredMethod);
+            var invocation = Assert.Throws<System.Reflection.TargetInvocationException>(() =>
+                getRequiredMethod.Invoke(
+                    null,
+                    new object[]
+                    {
+                        typeof(string),
+                        "MissingDateTimeFamilyContract",
+                        System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance,
+                        Array.Empty<Type>()
+                    }));
+
+            var missingMethod = Assert.IsType<MissingMethodException>(invocation.InnerException);
+            Assert.Contains("MissingDateTimeFamilyContract", missingMethod.Message);
+        }
+
         private static DataTableReader CreateReader(params DataTable[] tables)
         {
             return new DataTableReader(tables);
@@ -1016,7 +1062,7 @@ namespace Dapper.FluentMap.Tests
         {
             public string ConvertFromDatabase(DateOnly value)
             {
-                return "converted:" + value.ToString("yyyy-MM-dd");
+                return "converted:" + value.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
             }
         }
 

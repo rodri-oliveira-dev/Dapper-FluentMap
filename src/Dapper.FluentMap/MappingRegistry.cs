@@ -408,12 +408,17 @@ namespace Dapper.FluentMap
                 type,
                 profileType,
                 columnNames,
-                out entry) &&
-                !GeneratedMaterializerWouldBypassTypeHandler(type, profileType, entry.Columns))
+                out entry))
             {
                 _generatedMaterializerResolutionCache.TryAdd(cacheKey, entry);
-                materializer = entry.Materialize;
-                return true;
+                if (!GeneratedMaterializerWouldBypassTypeHandler(type, profileType, entry.Columns))
+                {
+                    materializer = entry.Materialize;
+                    return true;
+                }
+
+                materializer = null;
+                return false;
             }
 
             _generatedMaterializerResolutionCache.TryAdd(cacheKey, NoCompatibleGeneratedMaterializer);

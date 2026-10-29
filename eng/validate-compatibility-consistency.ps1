@@ -45,19 +45,35 @@ function Assert-LaneMatrix {
     [object[]]$ExpectedLanes
   )
 
-  $labelPattern = [Regex]::Escape($LabelKey)
-  $versionPattern = [Regex]::Escape($VersionKey)
-  $matches = [Regex]::Matches(
-    $Text,
-    "(?m)^\s*-\s+${labelPattern}:\s*(?<label>[^\r\n#]+)\r?\n\s+${versionPattern}:\s*(?<version>[^\r\n#]+)")
-  $actualLanes = @(
-    $matches | ForEach-Object {
-      [pscustomobject]@{
-        Label = $_.Groups['label'].Value.Trim().Trim('"', "'")
-        Version = $_.Groups['version'].Value.Trim().Trim('"', "'")
+  $lines = @($Text -split '\r?\n')
+  $actualLanes = [System.Collections.Generic.List[object]]::new()
+  for ($index = 0; $index -lt $lines.Count; $index++) {
+    if ($lines[$index] -notmatch '^(?<indent>\s*)-\s+(?<content>.*)$') { continue }
+
+    $itemIndent = $Matches['indent'].Length
+    $itemLines = [System.Collections.Generic.List[string]]::new()
+    $itemLines.Add($Matches['content'])
+    for ($itemIndex = $index + 1; $itemIndex -lt $lines.Count; $itemIndex++) {
+      if ([string]::IsNullOrWhiteSpace($lines[$itemIndex])) { continue }
+      if ($lines[$itemIndex] -notmatch '^(?<indent>\s*)') { break }
+      if ($Matches['indent'].Length -le $itemIndent) { break }
+      $itemLines.Add($lines[$itemIndex].Trim())
+    }
+
+    $values = @{}
+    foreach ($itemLine in $itemLines) {
+      if ($itemLine -match '^(?<key>[^:#]+):\s*(?<value>[^#]*)') {
+        $values[$Matches['key'].Trim()] = $Matches['value'].Trim().Trim('"', "'")
       }
     }
-  )
+
+    if ($values.ContainsKey($LabelKey) -and $values.ContainsKey($VersionKey)) {
+      $actualLanes.Add([pscustomobject]@{
+        Label = [string]$values[$LabelKey]
+        Version = [string]$values[$VersionKey]
+      })
+    }
+  }
 
   $actual = @($actualLanes | ForEach-Object { "$($_.Label)=$($_.Version)" })
   $expected = @($ExpectedLanes | ForEach-Object { "$($_.Label)=$($_.Version)" })
@@ -224,6 +240,15 @@ foreach ($provider in $providers | Where-Object { [string]$_.coreEvidence -eq 'c
   }
   if ([string]$propertyNodes[0].InnerText -ne $version) {
     Fail "provider test project declares $package version '$($propertyNodes[0].InnerText)', expected certified contract version '$version'."
+  }
+
+  $referenceNodes = @($providerProject.SelectNodes("//*[local-name()='PackageReference'][@Include='$package']"))
+  if ($referenceNodes.Count -ne 1) {
+    Fail "provider test project must reference '$package' exactly once, found $($referenceNodes.Count)."
+  }
+  $expectedReferenceVersion = '$(' + $propertyName + ')'
+  if ([string]$referenceNodes[0].GetAttribute('Version') -ne $expectedReferenceVersion) {
+    Fail "provider test project must set '$package' Version to '$expectedReferenceVersion'."
   }
 
   $validatedProviderPackages[$package] = $version

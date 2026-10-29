@@ -37,7 +37,7 @@ The unversioned installation command resolves the latest version available from 
 
 ## Dapper dependency
 
-The supported Dapper range is `[2.1.89,3.0.0)`, with `2.1.89` as both the minimum and current validated stable baseline. This NuGet range allows compatible Dapper 2.x versions at or above the minimum; it is not the exact pin `[2.1.89]`. Upgrade applications still resolving Dapper 2.1.79 before adopting this FluentMap baseline.
+For FluentMap 3.6.1, the supported Dapper range is `[2.1.89,3.0.0)`, with `2.1.89` as both the minimum and current validated stable baseline. FluentMap 3.6.0 supports `[2.1.79,3.0.0)`. The 3.6.1 NuGet range allows compatible Dapper 2.x versions at or above its minimum; it is not the exact pin `[2.1.89]`. Upgrade applications still resolving Dapper 2.1.79 before adopting the FluentMap 3.6.1 baseline.
 
 ## Constraints
 
