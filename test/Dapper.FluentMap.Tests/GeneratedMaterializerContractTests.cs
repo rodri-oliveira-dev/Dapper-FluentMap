@@ -330,6 +330,14 @@ namespace Dapper.FluentMap.Tests
                 Assert.Contains(typeof(GeneratedContractCustomer).FullName, exception.Message);
                 Assert.Contains(typeof(GeneratedParameters).FullName, exception.Message);
                 Assert.Contains("QueryMapped", exception.Message);
+
+                var dynamicParametersException = Assert.Throws<NotSupportedException>(() =>
+                    runtime.QueryGeneratedMappedSingle<GeneratedContractCustomer>(
+                        connection,
+                        "SELECT @Id AS customer_id, 'GeneratedOnly' AS full_name;",
+                        new DynamicParameters(new { Id = 86 })));
+
+                Assert.Contains(typeof(GeneratedParameters).FullName, dynamicParametersException.Message);
             }
         }
 

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Globalization;
 using System.Linq;
 using Dapper;
 using Dapper.FluentMap.Dommel.Mapping;
@@ -538,6 +539,66 @@ CREATE TABLE write_conversion_boundary_entities (
             }
         }
 
+        [Fact]
+        public void MappedWritesShouldBindConvertedDateTimeValuesAndNullableFields()
+        {
+            PreTest();
+            SQLitePCL.Batteries_V2.Init();
+
+            FluentMapper.Initialize(config =>
+            {
+                config.AddMap(new DateTimeWriteEntityMap());
+                config.ForDommel();
+            });
+
+            using (var connection = OpenConnection())
+            {
+                connection.Execute(@"
+CREATE TABLE date_time_write_entities (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    business_date TEXT NOT NULL,
+    starts_at TEXT NOT NULL,
+    optional_date TEXT NULL,
+    optional_time TEXT NULL
+);");
+                var entity = new DateTimeWriteEntity
+                {
+                    BusinessDate = new DateOnly(2026, 10, 29),
+                    StartsAt = new TimeOnly(12, 34, 56, 789),
+                    OptionalDate = null,
+                    OptionalTime = new TimeOnly(8, 9, 10)
+                };
+
+                var id = Convert.ToInt32(connection.InsertMapped(entity));
+                var inserted = connection.QuerySingle<DateTimeWriteRow>(@"
+SELECT id AS Id, business_date AS BusinessDate, starts_at AS StartsAt,
+       optional_date AS OptionalDate, optional_time AS OptionalTime
+FROM date_time_write_entities WHERE id = @id;", new { id });
+
+                Assert.Equal("2026-10-29", inserted.BusinessDate);
+                Assert.Equal("12:34:56.789", inserted.StartsAt);
+                Assert.Null(inserted.OptionalDate);
+                Assert.Equal("08:09:10.000", inserted.OptionalTime);
+
+                entity.Id = id;
+                entity.BusinessDate = new DateOnly(2026, 10, 30);
+                entity.StartsAt = new TimeOnly(23, 59, 58, 321);
+                entity.OptionalDate = new DateOnly(2026, 11, 1);
+                entity.OptionalTime = null;
+
+                Assert.True(connection.UpdateMapped(entity));
+
+                var updated = connection.QuerySingle<DateTimeWriteRow>(@"
+SELECT id AS Id, business_date AS BusinessDate, starts_at AS StartsAt,
+       optional_date AS OptionalDate, optional_time AS OptionalTime
+FROM date_time_write_entities WHERE id = @id;", new { id });
+                Assert.Equal("2026-10-30", updated.BusinessDate);
+                Assert.Equal("23:59:58.321", updated.StartsAt);
+                Assert.Equal("2026-11-01", updated.OptionalDate);
+                Assert.Null(updated.OptionalTime);
+            }
+        }
+
         private static void PreTest()
         {
             FluentMapper.EntityMaps.Clear();
@@ -855,6 +916,49 @@ WHERE id = @id;", new { id });
             {
                 parameter.Value = "handler:" + value.Value;
             }
+        }
+
+        private sealed class DateTimeWriteEntity
+        {
+            public int Id { get; set; }
+
+            public DateOnly BusinessDate { get; set; }
+
+            public TimeOnly StartsAt { get; set; }
+
+            public DateOnly? OptionalDate { get; set; }
+
+            public TimeOnly? OptionalTime { get; set; }
+        }
+
+        private sealed class DateTimeWriteEntityMap : DommelEntityMap<DateTimeWriteEntity>
+        {
+            public DateTimeWriteEntityMap()
+            {
+                ToTable("date_time_write_entities");
+                Map(entity => entity.Id).ToColumn("id").IsIdentity();
+                Map(entity => entity.BusinessDate).ToColumn("business_date")
+                    .ConvertToDatabaseUsing<DateOnly, string>(value => value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+                Map(entity => entity.StartsAt).ToColumn("starts_at")
+                    .ConvertToDatabaseUsing<TimeOnly, string>(value => value.ToString("HH:mm:ss.fff", CultureInfo.InvariantCulture));
+                Map(entity => entity.OptionalDate).ToColumn("optional_date")
+                    .ConvertToDatabaseUsing<DateOnly, string>(value => value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture));
+                Map(entity => entity.OptionalTime).ToColumn("optional_time")
+                    .ConvertToDatabaseUsing<TimeOnly, string>(value => value.ToString("HH:mm:ss.fff", CultureInfo.InvariantCulture));
+            }
+        }
+
+        private sealed class DateTimeWriteRow
+        {
+            public int Id { get; set; }
+
+            public string BusinessDate { get; set; }
+
+            public string StartsAt { get; set; }
+
+            public string OptionalDate { get; set; }
+
+            public string OptionalTime { get; set; }
         }
     }
 }
