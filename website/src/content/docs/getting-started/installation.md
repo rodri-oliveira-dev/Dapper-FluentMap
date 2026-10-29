@@ -35,6 +35,10 @@ FluentMap registers typed metadata and applies it through the matching materiali
 
 The unversioned installation command resolves the latest version available from the selected package source. Pin `--version 3.6.0` when the application must remain on the current published stable release. Use `3.6.1` only after it is published or when consuming an explicitly built, trusted artifact from this source. Keep all five FluentMap packages on the same release version.
 
+## Dapper dependency
+
+The supported Dapper range is `[2.1.89,3.0.0)`, with `2.1.89` as both the minimum and current validated stable baseline. This NuGet range allows compatible Dapper 2.x versions at or above the minimum; it is not the exact pin `[2.1.89]`. Upgrade applications still resolving Dapper 2.1.79 before adopting this FluentMap baseline.
+
 ## Constraints
 
 :::caution

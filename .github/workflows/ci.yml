@@ -78,9 +78,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - dapper-lane: minimum
-            dapper-version: 2.1.79
-          - dapper-lane: latest-stable
+          - dapper-lane: minimum-and-latest-stable
             dapper-version: 2.1.89
 
     steps:
@@ -112,7 +110,13 @@ jobs:
             throw "Expected exactly one resolved Dapper package entry, found $($resolved.Count): $($resolved -join ', ')"
           }
 
-          Write-Host "Resolved $($resolved[0]) for ${{ matrix.dapper-lane }} lane."
+          $resolvedVersion = $resolved[0].Substring('Dapper/'.Length)
+          $expectedVersion = '${{ matrix.dapper-version }}'
+          if ($resolvedVersion -ne $expectedVersion) {
+            throw "Resolved Dapper $resolvedVersion, expected $expectedVersion for ${{ matrix.dapper-lane }} lane."
+          }
+
+          Write-Host "Resolved Dapper $resolvedVersion for ${{ matrix.dapper-lane }} lane."
 
       - name: Audit NuGet dependencies
         run: dotnet list ./Dapper.FluentMap.slnx package --vulnerable --include-transitive

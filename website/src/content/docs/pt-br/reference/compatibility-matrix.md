@@ -34,6 +34,15 @@ public sealed class CustomerMap : EntityMap<Customer>
 
 O FluentMap registra metadados tipados e os aplica no caminho de materialização correspondente. O SQL, a conexão, os parâmetros e o ciclo de vida continuam sob responsabilidade da aplicação e do Dapper.
 
+## Contrato de dependências atual
+
+| Dependência | Faixa suportada | Baseline estável validado |
+| --- | --- | --- |
+| Dapper | `[2.1.89,3.0.0)` | `2.1.89` |
+| Dommel | `[3.5.3,4.0.0)` | `3.5.3` |
+
+A faixa do Dapper aceita versões 2.x compatíveis a partir do mínimo; ela não fixa exatamente a 2.1.89. A metadata dos pacotes e este portal são verificados contra `eng/compatibility-contract.json`.
+
 ## Restrições
 
 :::caution

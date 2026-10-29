@@ -221,10 +221,20 @@ namespace Dapper.FluentMap.Materialization
                     conversion.ReadConverter);
             }
 
-            return CreateDefaultConverter(targetType);
+            return CreateDefaultConverter(
+                entityType,
+                profileType,
+                targetType,
+                memberPath,
+                columnName);
         }
 
-        private static Func<object, object> CreateDefaultConverter(Type targetType)
+        private static Func<object, object> CreateDefaultConverter(
+            Type entityType,
+            Type profileType,
+            Type targetType,
+            string memberPath,
+            string columnName)
         {
             var conversionType = Nullable.GetUnderlyingType(targetType) ?? targetType;
             if (DapperTypeHandlerAdapter.HasTypeHandler(conversionType))
@@ -232,7 +242,26 @@ namespace Dapper.FluentMap.Materialization
                 return DapperTypeHandlerAdapter.CreateConverter(targetType);
             }
 
-            return value => ConvertValue(value, targetType);
+            return value =>
+            {
+                try
+                {
+                    return ConvertValue(value, targetType);
+                }
+                catch (Exception exception) when (!(exception is FluentMapConfigurationException))
+                {
+                    var profileContext = profileType == null
+                        ? string.Empty
+                        : $" Profile: '{FormatType(profileType)}'.";
+                    var sourceType = value == null || value == DBNull.Value
+                        ? null
+                        : value.GetType();
+
+                    throw new FluentMapConfigurationException(
+                        $"Materialization conversion failed for entity '{FormatType(entityType)}'.{profileContext} Member path: '{memberPath}'. Column: '{columnName}'. Provider CLR type: '{FormatType(sourceType)}'. Target type: '{FormatType(targetType)}'. See the inner exception for the conversion failure.",
+                        exception);
+                }
+            };
         }
 
         private static Func<object, object> CreatePropertyReadConverter(
@@ -353,6 +382,11 @@ namespace Dapper.FluentMap.Materialization
             if (conversionType.IsInstanceOfType(value))
             {
                 return value;
+            }
+
+            if (DateTimeFamilyConversion.TryConvert(value, conversionType, out var converted))
+            {
+                return converted;
             }
 
             if (conversionType.GetTypeInfo().IsEnum)

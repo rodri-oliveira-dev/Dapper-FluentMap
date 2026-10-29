@@ -29,6 +29,19 @@ Map(x => x.Status)
 
 FluentMap registers typed metadata and applies it through the matching materialization path. SQL, connections, parameters, and lifecycle remain responsibilities of the application and Dapper.
 
+## Provider-specific date/time values
+
+Property converters run before Dapper type handlers and FluentMap default conversion. They are the verified solution when a provider exposes date/time data in another CLR representation, such as SQLite ISO text:
+
+```csharp
+Map(x => x.BusinessDate)
+    .ToColumn("business_date")
+    .ConvertFromDatabaseUsing<string, DateOnly>(value =>
+        DateOnly.ParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture));
+```
+
+Database `NULL` remains null for nullable targets and does not invoke the converter.
+
 ## Constraints
 
 :::caution

@@ -25,9 +25,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - label: minimum-supported
-            version: 2.1.79
-          - label: latest-supported
+          - label: minimum-and-latest-supported
             version: 2.1.89
     steps:
       - name: Checkout
@@ -42,6 +40,24 @@ jobs:
 
       - name: Restore supported lane
         run: dotnet restore ./Dapper.FluentMap.slnx -p:DapperPackageVersion=${{ matrix.version }}
+
+      - name: Validate restored supported Dapper version
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $assets = Get-Content -Raw './src/Dapper.FluentMap/obj/project.assets.json' | ConvertFrom-Json
+          $resolved = @($assets.libraries.PSObject.Properties.Name | Where-Object { $_ -like 'Dapper/*' })
+          if ($resolved.Count -ne 1) {
+            throw "Expected exactly one resolved Dapper package entry, found $($resolved.Count): $($resolved -join ', ')"
+          }
+
+          $resolvedVersion = $resolved[0].Substring('Dapper/'.Length)
+          $expectedVersion = '${{ matrix.version }}'
+          if ($resolvedVersion -ne $expectedVersion) {
+            throw "Resolved Dapper $resolvedVersion, expected $expectedVersion for ${{ matrix.label }} lane."
+          }
+
+          Write-Host "Resolved Dapper $resolvedVersion for ${{ matrix.label }} lane."
 
       - name: Build supported lane
         run: dotnet build ./Dapper.FluentMap.slnx --configuration Release --no-restore -p:DapperPackageVersion=${{ matrix.version }}
@@ -91,6 +107,25 @@ jobs:
       - name: Restore experimental lane
         if: ${{ steps.resolve.outputs.available == 'true' }}
         run: dotnet restore ./Dapper.FluentMap.slnx -p:DapperPackageVersion=${{ steps.resolve.outputs.version }}
+
+      - name: Validate restored experimental Dapper version
+        if: ${{ steps.resolve.outputs.available == 'true' }}
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $assets = Get-Content -Raw './src/Dapper.FluentMap/obj/project.assets.json' | ConvertFrom-Json
+          $resolved = @($assets.libraries.PSObject.Properties.Name | Where-Object { $_ -like 'Dapper/*' })
+          if ($resolved.Count -ne 1) {
+            throw "Expected exactly one resolved Dapper package entry, found $($resolved.Count): $($resolved -join ', ')"
+          }
+
+          $resolvedVersion = $resolved[0].Substring('Dapper/'.Length)
+          $expectedVersion = '${{ steps.resolve.outputs.version }}'
+          if ($resolvedVersion -ne $expectedVersion) {
+            throw "Resolved experimental Dapper $resolvedVersion, expected $expectedVersion."
+          }
+
+          Write-Host "Resolved experimental Dapper $resolvedVersion."
 
       - name: Build experimental lane
         if: ${{ steps.resolve.outputs.available == 'true' }}

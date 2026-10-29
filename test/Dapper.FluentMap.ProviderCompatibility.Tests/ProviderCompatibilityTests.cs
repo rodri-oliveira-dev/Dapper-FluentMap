@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Data;
 using System.Data.Common;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -165,6 +166,213 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
             {
                 PreTest(typeof(BasicProviderCustomer));
             }
+        }
+
+        [Theory]
+        [MemberData(nameof(Providers))]
+        [Trait("Category", "ProviderCompatibility")]
+        [Trait("Capability", "DateTimeInterop")]
+        public void DateTimeInteropShouldMatchProviderClrShapesInRuntimeAndGeneratedMaterializers(string providerName)
+        {
+            var provider = ProviderCase.Create(providerName);
+            if (!provider.SupportsDateTimeInterop)
+            {
+                Assert.Contains(
+                    provider.Name,
+                    new[]
+                    {
+                        ProviderCase.MySqlName,
+                        ProviderCase.MariaDbName,
+                        ProviderCase.OracleName,
+                        ProviderCase.FirebirdName
+                    });
+                return;
+            }
+            provider.SkipIfUnavailable();
+
+            PreTest(typeof(ProviderDateTimeCustomer));
+
+            try
+            {
+                var sql = provider.DateTimeInteropSql();
+                using (var connection = provider.OpenConnection())
+                using (var command = connection.CreateCommand())
+                {
+                    command.CommandText = sql;
+                    using (var reader = command.ExecuteReader())
+                    {
+                        Assert.True(reader.Read());
+                        provider.AssertDateTimeProviderShapes(reader.GetValue(0), reader.GetValue(1));
+                        Assert.Equal(DBNull.Value, reader.GetValue(2));
+                        Assert.Equal(DBNull.Value, reader.GetValue(3));
+                    }
+
+                    FluentMapper.Initialize(configuration =>
+                        configuration.AddMap(new ProviderDateTimeCustomerMap(provider.Dialect == ProviderDialect.Sqlite)));
+                    var runtimeCustomer = connection.QueryMappedSingle<ProviderDateTimeCustomer>(sql);
+
+                    var generatedCalls = 0;
+                    var generatedRuntime = new FluentMapConfigurationBuilder()
+                        .AddMap(new ProviderDateTimeCustomerMap(provider.Dialect == ProviderDialect.Sqlite))
+                        .AddGeneratedMaterializer(
+                            ProviderDateTimeColumns(provider.Dialect == ProviderDialect.Sqlite),
+                            record =>
+                            {
+                                generatedCalls++;
+                                return new ProviderDateTimeCustomer
+                                {
+                                    BusinessDate = ConvertProviderDate(record.GetValue(0)),
+                                    StartsAt = ConvertProviderTime(record.GetValue(1)),
+                                    OptionalDate = record.IsDBNull(2) ? null : ConvertProviderDate(record.GetValue(2)),
+                                    OptionalTime = record.IsDBNull(3) ? null : ConvertProviderTime(record.GetValue(3))
+                                };
+                            })
+                        .UseStrictGeneratedMaterialization()
+                        .Build()
+                        .CreateRuntime();
+                    var generatedCustomer = generatedRuntime.QueryGeneratedMappedSingle<ProviderDateTimeCustomer>(
+                        connection,
+                        sql);
+
+                    Assert.Equal(new DateOnly(2026, 10, 29), runtimeCustomer.BusinessDate);
+                    Assert.Equal(new TimeOnly(12, 34, 56, 789), runtimeCustomer.StartsAt);
+                    Assert.Null(runtimeCustomer.OptionalDate);
+                    Assert.Null(runtimeCustomer.OptionalTime);
+                    Assert.Equal(runtimeCustomer.BusinessDate, generatedCustomer.BusinessDate);
+                    Assert.Equal(runtimeCustomer.StartsAt, generatedCustomer.StartsAt);
+                    Assert.Null(generatedCustomer.OptionalDate);
+                    Assert.Null(generatedCustomer.OptionalTime);
+                    Assert.Equal(1, generatedCalls);
+                }
+            }
+            finally
+            {
+                PreTest(typeof(ProviderDateTimeCustomer));
+            }
+        }
+
+        [Theory]
+        [InlineData(ProviderCase.SqlServerName)]
+        [Trait("Category", "ProviderCompatibility")]
+        [Trait("Capability", "DynamicParametersOutput")]
+        public void SqlServerDynamicParametersShouldPreserveOutputPrecisionAndScale(string providerName)
+        {
+            var filter = Environment.GetEnvironmentVariable("DFM_PROVIDER_FILTER");
+            if (!string.IsNullOrWhiteSpace(filter) && !string.Equals(filter, providerName, StringComparison.Ordinal))
+            {
+                Assert.NotEqual(providerName, filter);
+                return;
+            }
+
+            var provider = ProviderCase.Create(providerName);
+            provider.SkipIfUnavailable();
+            PreTest(typeof(DynamicParameterProviderResult));
+
+            try
+            {
+                FluentMapper.Initialize(configuration => configuration.AddMap(new DynamicParameterProviderResultMap()));
+                var parameters = new DynamicParameters();
+                parameters.Add("Input", 41, DbType.Int32);
+                parameters.Add("Amount", 12.345m, DbType.Decimal, precision: 8, scale: 3);
+                parameters.Add("Output", dbType: DbType.Int32, direction: ParameterDirection.Output);
+
+                using (var connection = provider.OpenConnection())
+                {
+                    var result = connection.QueryMappedSingle<DynamicParameterProviderResult>(@"
+SET @Output = @Input + 1;
+SELECT
+    @Input AS input_value,
+    @Amount AS amount_value,
+    CONVERT(int, SQL_VARIANT_PROPERTY(CAST(@Amount AS sql_variant), 'Precision')) AS precision_value,
+    CONVERT(int, SQL_VARIANT_PROPERTY(CAST(@Amount AS sql_variant), 'Scale')) AS scale_value;",
+                        parameters);
+
+                    Assert.Equal(41, result.Input);
+                    Assert.Equal(12.345m, result.Amount);
+                    Assert.Equal(8, result.Precision);
+                    Assert.Equal(3, result.Scale);
+                    Assert.Equal(42, parameters.Get<int>("Output"));
+                }
+            }
+            finally
+            {
+                PreTest(typeof(DynamicParameterProviderResult));
+            }
+        }
+
+        private static DateOnly ConvertProviderDate(object value)
+        {
+            if (value is DateOnly dateOnly)
+            {
+                return dateOnly;
+            }
+
+            if (value is DateTime dateTime)
+            {
+                return DateOnly.FromDateTime(dateTime);
+            }
+
+            return DateOnly.ParseExact(Convert.ToString(value, CultureInfo.InvariantCulture), "yyyy-MM-dd", CultureInfo.InvariantCulture);
+        }
+
+        private static GeneratedMaterializerColumn[] ProviderDateTimeColumns(bool sqliteTextStorage)
+        {
+            if (!sqliteTextStorage)
+            {
+                return new[]
+                {
+                    GeneratedMaterializerColumn.Map("date_value", nameof(ProviderDateTimeCustomer.BusinessDate)),
+                    GeneratedMaterializerColumn.Map("time_value", nameof(ProviderDateTimeCustomer.StartsAt)),
+                    GeneratedMaterializerColumn.Map("optional_date_value", nameof(ProviderDateTimeCustomer.OptionalDate)),
+                    GeneratedMaterializerColumn.Map("optional_time_value", nameof(ProviderDateTimeCustomer.OptionalTime))
+                };
+            }
+
+            return new[]
+            {
+                GeneratedMaterializerColumn.Map(
+                    "date_value",
+                    nameof(ProviderDateTimeCustomer.BusinessDate),
+                    typeof(ReadPropertyConverter<string, DateOnly>),
+                    typeof(string),
+                    typeof(DateOnly)),
+                GeneratedMaterializerColumn.Map(
+                    "time_value",
+                    nameof(ProviderDateTimeCustomer.StartsAt),
+                    typeof(ReadPropertyConverter<string, TimeOnly>),
+                    typeof(string),
+                    typeof(TimeOnly)),
+                GeneratedMaterializerColumn.Map(
+                    "optional_date_value",
+                    nameof(ProviderDateTimeCustomer.OptionalDate),
+                    typeof(ReadPropertyConverter<string, DateOnly>),
+                    typeof(string),
+                    typeof(DateOnly)),
+                GeneratedMaterializerColumn.Map(
+                    "optional_time_value",
+                    nameof(ProviderDateTimeCustomer.OptionalTime),
+                    typeof(ReadPropertyConverter<string, TimeOnly>),
+                    typeof(string),
+                    typeof(TimeOnly))
+            };
+        }
+
+        private static TimeOnly ConvertProviderTime(object value)
+        {
+            if (value is TimeOnly timeOnly)
+            {
+                return timeOnly;
+            }
+
+            if (value is TimeSpan timeSpan)
+            {
+                return TimeOnly.FromTimeSpan(timeSpan);
+            }
+
+            return TimeOnly.ParseExact(
+                Convert.ToString(value, CultureInfo.InvariantCulture),
+                "HH:mm:ss.fff",
+                CultureInfo.InvariantCulture);
         }
 
         [Theory]
@@ -698,6 +906,7 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
 
         private static void PreTest(params Type[] types)
         {
+            SqlMapper.ResetTypeHandlers();
             FluentMapper.EntityMaps.Clear();
             FluentMapper.TypeConventions.Clear();
             FluentMapper.Initialize(_ => { });
@@ -748,6 +957,11 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
             public bool SupportsMultipleResults { get; }
 
             public bool SupportsPersistence { get; }
+
+            public bool SupportsDateTimeInterop =>
+                Dialect == ProviderDialect.Sqlite ||
+                Dialect == ProviderDialect.SqlServer ||
+                Dialect == ProviderDialect.PostgreSql;
 
             public static ProviderCase Sqlite()
             {
@@ -1019,6 +1233,54 @@ namespace Dapper.FluentMap.ProviderCompatibility.Tests
                     "\nFROM " + tableName + StatementTerminator();
             }
 
+            public string DateTimeInteropSql()
+            {
+                switch (Dialect)
+                {
+                    case ProviderDialect.SqlServer:
+                        return @"SELECT
+    CAST('2026-10-29T17:18:19.1234567' AS datetime2(7)) AS date_value,
+    CAST('12:34:56.789' AS time(3)) AS time_value,
+    CAST(NULL AS date) AS optional_date_value,
+    CAST(NULL AS time) AS optional_time_value;";
+                    case ProviderDialect.PostgreSql:
+                        return @"SELECT
+    DATE '2026-10-29' AS date_value,
+    TIME '12:34:56.789' AS time_value,
+    CAST(NULL AS date) AS optional_date_value,
+    CAST(NULL AS time) AS optional_time_value;";
+                    case ProviderDialect.Sqlite:
+                        return @"SELECT
+    '2026-10-29' AS date_value,
+    '12:34:56.789' AS time_value,
+    NULL AS optional_date_value,
+    NULL AS optional_time_value;";
+                    default:
+                        throw new NotSupportedException(Name + " does not claim DateOnly/TimeOnly certification.");
+                }
+            }
+
+            public void AssertDateTimeProviderShapes(object dateValue, object timeValue)
+            {
+                switch (Dialect)
+                {
+                    case ProviderDialect.SqlServer:
+                        Assert.IsType<DateTime>(dateValue);
+                        Assert.IsType<TimeSpan>(timeValue);
+                        break;
+                    case ProviderDialect.PostgreSql:
+                        Assert.IsType<DateOnly>(dateValue);
+                        Assert.IsType<TimeOnly>(timeValue);
+                        break;
+                    case ProviderDialect.Sqlite:
+                        Assert.IsType<string>(dateValue);
+                        Assert.IsType<string>(timeValue);
+                        break;
+                    default:
+                        throw new NotSupportedException(Name + " does not claim DateOnly/TimeOnly certification.");
+                }
+            }
+
             public string SelectAdvancedSql(
                 string idAlias,
                 string cityAlias,
@@ -1233,6 +1495,62 @@ WHERE code = @Code;";
             public DateTime CreatedAt { get; set; }
 
             public decimal Balance { get; set; }
+        }
+
+        private sealed class ProviderDateTimeCustomer
+        {
+            public DateOnly BusinessDate { get; set; }
+
+            public TimeOnly StartsAt { get; set; }
+
+            public DateOnly? OptionalDate { get; set; }
+
+            public TimeOnly? OptionalTime { get; set; }
+        }
+
+        private sealed class ProviderDateTimeCustomerMap : EntityMap<ProviderDateTimeCustomer>
+        {
+            public ProviderDateTimeCustomerMap(bool sqliteTextStorage)
+            {
+                var date = Map(customer => customer.BusinessDate).ToColumn("date_value");
+                var time = Map(customer => customer.StartsAt).ToColumn("time_value");
+                var optionalDate = Map(customer => customer.OptionalDate).ToColumn("optional_date_value");
+                var optionalTime = Map(customer => customer.OptionalTime).ToColumn("optional_time_value");
+
+                if (sqliteTextStorage)
+                {
+                    date.ConvertFromDatabaseUsing<string, DateOnly>(value =>
+                        DateOnly.ParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture));
+                    time.ConvertFromDatabaseUsing<string, TimeOnly>(value =>
+                        TimeOnly.ParseExact(value, "HH:mm:ss.fff", CultureInfo.InvariantCulture));
+                    optionalDate.ConvertFromDatabaseUsing<string, DateOnly>(value =>
+                        DateOnly.ParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture));
+                    optionalTime.ConvertFromDatabaseUsing<string, TimeOnly>(value =>
+                        TimeOnly.ParseExact(value, "HH:mm:ss.fff", CultureInfo.InvariantCulture));
+                }
+            }
+        }
+
+        private sealed class DynamicParameterProviderResult
+        {
+            public int Input { get; set; }
+
+            public decimal Amount { get; set; }
+
+            public int Precision { get; set; }
+
+            public int Scale { get; set; }
+        }
+
+        private sealed class DynamicParameterProviderResultMap : EntityMap<DynamicParameterProviderResult>
+        {
+            public DynamicParameterProviderResultMap()
+            {
+                Map(result => result.Input).ToColumn("input_value");
+                Map(result => result.Amount).ToColumn("amount_value");
+                Map(result => result.Precision).ToColumn("precision_value");
+                Map(result => result.Scale).ToColumn("scale_value");
+            }
         }
 
         private sealed class BasicProviderCustomerMap : EntityMap<BasicProviderCustomer>

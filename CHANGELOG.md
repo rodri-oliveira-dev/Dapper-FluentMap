@@ -14,6 +14,7 @@ No package changes are recorded beyond the prepared 3.6.1 release.
 
 - Added permanent semantic-versioning governance with deterministic recommendation, selected-version and five-package artifact validation.
 - Added automated coverage for compatible fixes and features, documentation-only work, prepared-release idempotency, package divergence, downgrades, existing tags and major-version authorization.
+- Added verified runtime and generated date/time-family conversions for `DateOnly`, `TimeOnly`, `DateTime` and `TimeSpan`, including nullable, immutable-constructor, nested, profile, property-converter and provider-backed coverage.
 
 ### Fixed
 
@@ -24,6 +25,11 @@ No package changes are recorded beyond the prepared 3.6.1 release.
 
 - Release preflight now rejects a selected version that diverges from the repository's prepared version while retaining explicit `-p:Version` build and pack inputs.
 - Documented the distinction between the latest published release (`3.6.0`) and the prepared, unpublished release (`3.6.1`).
+- Raised the minimum supported Dapper version to 2.1.89 with package range `[2.1.89,3.0.0)`, and consolidated identical minimum/latest-stable compatibility lanes.
+- Updated certified provider clients to `Microsoft.Data.Sqlite` 10.0.14 and `Oracle.ManagedDataAccess.Core` 23.26.400.
+- Aligned FluentMap-controlled runtime and generated materialization with Dapper 2.1.89 while preserving `netstandard2.0` and the strict-generated Native AOT boundary.
+- Documented the consumer migration from Dapper 2.1.79, the minimum-version range rather than an exact pin, and the upstream ownership of `DynamicParameters`, trimming diagnostics and separate StrongName-package fixes.
+- Limited provider-specific `DateOnly`/`TimeOnly` claims to verified SQLite text conversion, SQL Server `DateTime`/`TimeSpan` values and PostgreSQL native CLR values; no broader provider or universal Native AOT claim is made.
 
 ## [3.6.0] - 2026-10-13
 
@@ -36,7 +42,7 @@ No package changes are recorded beyond the prepared 3.6.1 release.
 
 - Defined separate Dapper/ADO.NET, FluentMap Core and FluentMap + Dommel provider evidence levels. Oracle and Firebird are Core-only; SQL Server CE remains legacy/upstream-limited; SQLite, SQL Server, PostgreSQL, MySQL and MariaDB retain Core + Dommel certification.
 - Added a machine-readable provider compatibility contract and consistency checks tying pinned provider versions, required CI lanes and public compatibility documentation together.
-- Retained `netstandard2.0`, Dapper `[2.1.79,3.0.0)` and Dommel `[3.5.3,4.0.0)` compatibility boundaries across all five packages.
+- Retained `netstandard2.0` for all five packages, Dapper `[2.1.79,3.0.0)` for `Dapper.FluentMap` and `Dapper.FluentMap.Dommel` (transitively available through `FluentMap.DependencyInjection`), and Dommel `[3.5.3,4.0.0)` for `Dapper.FluentMap.Dommel`.
 
 ## [3.5.0] - 2026-10-01
 

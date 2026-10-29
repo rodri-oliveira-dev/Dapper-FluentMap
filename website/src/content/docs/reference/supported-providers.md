@@ -43,16 +43,18 @@ FluentMap registers typed metadata and applies it through the matching materiali
 
 | Provider | Core | Dommel | Tested server/runtime | Tested client |
 | --- | --- | --- | --- | --- |
-| SQLite | Certified | Certified | In-memory | `Microsoft.Data.Sqlite` 10.0.12 |
-| SQL Server | Certified | Certified | 2022 CU23 | `Microsoft.Data.SqlClient` 7.1.0 |
+| SQLite | Certified | Certified | In-memory | `Microsoft.Data.Sqlite` 10.0.14 |
+| SQL Server | Certified | Certified | 2022 CU23 | `Microsoft.Data.SqlClient` 7.1.1 |
 | PostgreSQL | Certified | Certified | 18.6 | `Npgsql` 10.0.3 |
 | MySQL | Certified | Certified | 8.4.11 | `MySqlConnector` 2.6.2 |
 | MariaDB | Certified | Certified | 11.8.9 | `MySqlConnector` 2.6.2 |
-| Oracle | Certified | Not certified | 23.26.0 Free | `Oracle.ManagedDataAccess.Core` 23.26.301 |
+| Oracle | Certified | Not certified | 23.26.0 Free | `Oracle.ManagedDataAccess.Core` 23.26.400 |
 | Firebird | Certified | Not certified | 5.0.4 | `FirebirdSql.Data.FirebirdClient` 10.3.4 |
 | SQL Server CE | Legacy/upstream-limited | Legacy/upstream-limited | Not certified | Not certified |
 
 These pinned versions and evidence are also maintained in the machine-readable compatibility contract.
+
+The date/time feature has a narrower evidence set: SQLite is verified with ISO text plus property converters, SQL Server with `DateTime`/`TimeSpan` provider values, and PostgreSQL with native `DateOnly`/`TimeOnly` values. MySQL, MariaDB, Oracle and Firebird remain Core-certified generally, but their DateOnly/TimeOnly shapes are not certified.
 
 ## Constraints
 

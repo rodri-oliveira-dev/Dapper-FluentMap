@@ -171,6 +171,10 @@ jobs:
           PACKAGE_VERSION: ${{ steps.version.outputs.package_version }}
         run: |
           $ErrorActionPreference = 'Stop'
+          if (-not (Test-Path -LiteralPath './eng/validate-semantic-version.ps1' -PathType Leaf)) {
+            Write-Warning 'The immutable release commit predates semantic-versioning governance; continuing under the existing tag and NuGet.org rerun checks.'
+            exit 0
+          }
           ./eng/validate-semantic-version.ps1 `
             -Operation Validate `
             -SelectedVersion $env:PACKAGE_VERSION `

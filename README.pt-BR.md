@@ -120,6 +120,8 @@ O [guia de uso](USAGE.pt-BR.md) no repositório permanece disponível como alter
 
 Os PackageIds são identidades de distribuição. Assemblies, namespaces e APIs públicas permanecem sob `Dapper.FluentMap.*` onde documentado.
 
+O contrato de compatibilidade atual exige Dapper `[2.1.89,3.0.0)`. Essa é uma faixa com versão mínima, não um pin exato: consumidores podem resolver uma versão 2.x compatível igual ou superior à `2.1.89`. Consulte [Compatibilidade](COMPATIBILITY.md) e [Migração](MIGRATION.pt-BR.md) antes de atualizar uma aplicação que ainda usa Dapper `2.1.79`.
+
 ## Documentação
 
 O portal bilíngue de documentação está planejado para `https://rodri-oliveira-dev.github.io/Dapper-FluentMap/pt-br/`. Enquanto a publicação não estiver confirmada, use como alternativa os arquivos locais indicados.

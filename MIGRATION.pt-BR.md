@@ -56,9 +56,13 @@ Antes de alterar as versões dos pacotes FluentMap:
 As faixas suportadas atualmente ficam documentadas em [COMPATIBILITY.md](COMPATIBILITY.md). Os valores do Dapper são governados por `eng/compatibility-contract.json` e validados contra metadata de pacote e CI. No momento deste guia:
 
 ```text
-Dapper [2.1.79,3.0.0)
+Dapper [2.1.89,3.0.0)
 Dommel [3.5.3,4.0.0)
 ```
+
+O mínimo do Dapper mudou de `2.1.79` para `2.1.89`. A faixa não é um pin exato: `[2.1.89,3.0.0)` permite ao NuGet resolver qualquer versão 2.x compatível a partir da `2.1.89`, enquanto `[2.1.89]` exigiria exatamente essa versão. Antes de atualizar o FluentMap, atualize referências diretas ao Dapper, inspecione a resolução transitiva com `dotnet list package --include-transitive`, renove lock files quando aplicável e execute testes com os providers reais. Aplicações obrigadas a usar `2.1.79` ficam fora do contrato suportado.
+
+O Dapper 2.1.89 traz mudanças upstream em `DateOnly`/`TimeOnly`, `DynamicParameters`, diagnósticos de trimming e nos pacotes StrongName separados. O FluentMap é responsável apenas pelo comportamento de conversão correspondente em seus materializadores runtime e gerados de `QueryMapped*`/`ReadMapped*`; o comportamento de `Dapper.Query<T>()` comum continua pertencendo ao Dapper. As conversões testadas do FluentMap cobrem valores nullable, construtores imutáveis, objetos aninhados e property converters. Os tipos CLR retornados pelo provider continuam relevantes; consulte a matriz específica em [COMPATIBILITY.md](COMPATIBILITY.md).
 
 A certificação de providers e as versões exatas testadas também são mantidas em [COMPATIBILITY.md](COMPATIBILITY.md).
 

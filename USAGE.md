@@ -326,6 +326,21 @@ connection.UpdateMapped(product);
 
 Only properties participating in the selected operation are converted. Converter output is then passed to Dapper, so a registered Dapper type handler for the converter output type runs after the property converter. Converter failures include entity, property, column and operation context and never retry with the original value. Historical Dommel `Insert`/`Update` remain unchanged because Dommel exposes no per-property parameter hook.
 
+### DateOnly and TimeOnly
+
+On .NET 6 or later, FluentMap-controlled runtime and eligible generated materializers support the verified Dapper 2.1.89 date/time conversions: `DateTime` to `DateOnly`, `DateOnly` to midnight `DateTime`, `DateTime` or `TimeSpan` to `TimeOnly`, and `TimeOnly` to `TimeSpan`. Nullable targets preserve `NULL`; the same conversion layer is used for mutable properties, immutable constructor parameters and nested members.
+
+When a provider returns a different CLR representation, configure a property converter explicitly:
+
+```csharp
+Map(schedule => schedule.BusinessDate)
+    .ToColumn("business_date")
+    .ConvertFromDatabaseUsing<string, DateOnly>(value =>
+        DateOnly.ParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture));
+```
+
+The Core package remains `netstandard2.0`; it activates these runtime types only when the application target provides them. Generated `DateOnly`/`TimeOnly` code is emitted only for `NET6_0_OR_GREATER`. SQLite text, SQL Server `DateTime`/`TimeSpan`, and PostgreSQL native values are the certified provider shapes. See [COMPATIBILITY.md](COMPATIBILITY.md) for the exact matrix and Native AOT boundary.
+
 ## Persistence Metadata And Dommel
 
 Persistence metadata controls write participation while keeping values readable:

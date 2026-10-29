@@ -25,17 +25,52 @@ The machine-readable source of truth is `eng/compatibility-contract.json`. CI ve
 Current package range:
 
 ```text
-Dapper [2.1.79,3.0.0)
+Dapper [2.1.89,3.0.0)
 ```
+
+This is a NuGet minimum-version range, not an exact pin. `2.1.89` is the lowest version accepted, while any compatible Dapper `2.x` below `3.0.0` may be selected by NuGet dependency resolution. An exact pin would be written `[2.1.89]` and is intentionally not used. Consumers that still resolve Dapper `2.1.79` must upgrade before adopting the FluentMap release that carries this contract. Review direct and transitive Dapper references, regenerate lock files when used, and rerun application/provider tests.
 
 Validated in the current matrix:
 
 | Dapper | Status | Notes |
 | --- | --- | --- |
-| `2.1.79` | Validated | Current minimum supported version and minimum CI matrix lane. |
-| `2.1.89` | Validated | Current latest-stable CI matrix lane. |
+| `2.1.89` | Validated | Current minimum supported and latest-stable version; validated by one non-duplicated CI lane. |
 
 Known risk: `Dapper.FluentMap` uses public Dapper APIs for type maps/readers, but TypeHandler interoperability depends on resolving `SqlMapper.TypeHandlerCache<T>.Parse(object)` by reflection. This is covered by tests and remains the highest-risk Dapper compatibility boundary.
+
+### What comes from Dapper 2.1.89
+
+The baseline includes upstream Dapper changes; they should not be attributed to FluentMap:
+
+- Dapper restored and expanded `DateOnly`/`TimeOnly` conversion behavior in 2.1.86. FluentMap separately implements the matching conversions in its own runtime and generated materializers because those paths do not delegate value assignment to Dapper.
+- Dapper made `DynamicParameters.AddParameters(IDbCommand)` public. FluentMap passes `DynamicParameters` through ordinary `QueryMapped*` calls and tests input/output metadata, but does not wrap or reimplement that new method. Strict-generated queries continue to use `GeneratedParameters`.
+- Dapper 2.1.89 suppresses selected trimming/Native AOT diagnostics in runtime fallback paths. Suppression is not proof that every Dapper or FluentMap shape is Native AOT compatible.
+- Dapper fixed signing for its separately distributed StrongName packages. FluentMap's normal Dapper dependency is unaffected and FluentMap does not add StrongName-package support of its own.
+
+### DateOnly and TimeOnly materialization
+
+FluentMap-controlled runtime and generated materialization support the same date/time-family conversions as the Dapper 2.1.89 baseline: `DateTime` to `DateOnly`, `DateOnly` to `DateTime` at midnight, `DateTime` to `TimeOnly`, `TimeSpan` to `TimeOnly`, and `TimeOnly` to `TimeSpan`. No other implicit date/time conversions are claimed. Nullable targets and database `NULL` retain their existing semantics, configured property converters take precedence, and registered Dapper TypeHandlers remain ahead of built-in runtime conversion.
+
+The Core package remains `netstandard2.0` and therefore does not reference `DateOnly` or `TimeOnly` directly. Runtime materialization activates these conversions only when the consumer runtime exposes those framework types. Generated materializers emit strongly typed conversions behind `NET6_0_OR_GREATER`; consumers targeting older frameworks receive no invalid references and cannot use model shapes whose framework does not define these types. Strict-generated conversion adds no reflection or dynamic-code requirement; Dapper TypeHandler interoperability remains the separately documented runtime compatibility boundary.
+
+The verified FluentMap-owned paths include mutable properties, nullable values and `DBNull`, immutable constructor parameters, nested members, mapping profiles and property read converters. Ordinary `Dapper.Query<T>()` remains Dapper-owned; FluentMap's parity work applies to `QueryMapped*`, `ReadMapped*` and eligible generated materializers. Provider CLR values still matter: SQL Server is verified with `DateTime`/`TimeSpan`, PostgreSQL with native `DateOnly`/`TimeOnly`, and SQLite text storage with explicit property converters. MySQL, MariaDB, Oracle and Firebird remain Core-certified for the general matrix below, but this repository does not certify their `DateOnly`/`TimeOnly` shapes.
+
+Example for a provider that returns ISO text:
+
+```csharp
+public sealed class ScheduleMap : EntityMap<Schedule>
+{
+    public ScheduleMap()
+    {
+        Map(x => x.BusinessDate)
+            .ToColumn("business_date")
+            .ConvertFromDatabaseUsing<string, DateOnly>(value =>
+                DateOnly.ParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture));
+    }
+}
+
+var schedule = connection.QueryMappedSingle<Schedule>(sql);
+```
 
 ## Dommel
 
@@ -49,7 +84,7 @@ Validated in the current matrix:
 
 | Dommel | Dapper | Status |
 | --- | --- | --- |
-| `3.5.3` | `2.1.79` | Validated by the current Dommel integration tests. |
+| `3.5.3` | `2.1.89` | Validated by the current Dommel integration tests. |
 
 Dommel integration is optional and process-wide. It uses global `DommelMapper` resolvers/builders and does not participate in isolated `FluentMapRuntime` configuration.
 
@@ -75,23 +110,33 @@ Current support contract:
 
 | Provider | Dapper/ADO.NET | FluentMap Core evidence | FluentMap + Dommel evidence | Tested server/runtime | Tested client |
 | --- | --- | --- | --- | --- | --- |
-| SQLite | Dapper-compatible | FluentMap Core certified | FluentMap + Dommel certified | In-memory | `Microsoft.Data.Sqlite` 10.0.12 |
+| SQLite | Dapper-compatible | FluentMap Core certified | FluentMap + Dommel certified | In-memory | `Microsoft.Data.Sqlite` 10.0.14 |
 | SQL Server | Dapper-compatible | FluentMap Core certified | FluentMap + Dommel certified | 2022 CU23 | `Microsoft.Data.SqlClient` 7.1.1 |
 | PostgreSQL | Dapper-compatible | FluentMap Core certified | FluentMap + Dommel certified | 18.6 | `Npgsql` 10.0.3 |
 | MySQL | Dapper-compatible | FluentMap Core certified | FluentMap + Dommel certified | 8.4.11 | `MySqlConnector` 2.6.2 |
 | MariaDB | Dapper-compatible | FluentMap Core certified | FluentMap + Dommel certified | 11.8.9 | `MySqlConnector` 2.6.2 |
-| Oracle | Dapper-compatible | FluentMap Core certified | Not certified | 23.26.0 Free | `Oracle.ManagedDataAccess.Core` 23.26.301 |
+| Oracle | Dapper-compatible | FluentMap Core certified | Not certified | 23.26.0 Free | `Oracle.ManagedDataAccess.Core` 23.26.400 |
 | Firebird | Dapper-compatible | FluentMap Core certified | Not certified | 5.0.4 | `FirebirdSql.Data.FirebirdClient` 10.3.4 |
 | SQL Server CE | Legacy/upstream-limited | Legacy/upstream-limited | Legacy/upstream-limited | Not certified | Not certified |
 
+Date/time interoperability has a narrower feature-specific matrix:
+
+| Provider | DateOnly/TimeOnly evidence |
+| --- | --- |
+| SQLite | Certified with ISO text and explicit property converters. |
+| SQL Server | Certified with provider `DateTime`/`TimeSpan` CLR values. |
+| PostgreSQL | Certified with native `DateOnly`/`TimeOnly` CLR values. |
+| MySQL, MariaDB, Oracle, Firebird | Not certified for this feature; general Core status above is unchanged. |
+| SQL Server CE | Legacy/upstream-limited; not certified. |
+
 Certification evidence:
 
-- SQLite (`Microsoft.Data.Sqlite` 10.0.12) runs in memory and covers basic reads, immutable/nested/value-object reads, generated/runtime materialization, `QueryMultipleMapped`, `QueryMultipleMappedAsync`, sync/async streaming and Dommel persistence.
+- SQLite (`Microsoft.Data.Sqlite` 10.0.14) runs in memory and covers basic reads, immutable/nested/value-object reads, generated/runtime materialization, `QueryMultipleMapped`, `QueryMultipleMappedAsync`, sync/async streaming and Dommel persistence.
 - SQL Server 2022 CU23 (`Microsoft.Data.SqlClient` 7.1.1) uses `mcr.microsoft.com/mssql/server:2022-CU23-ubuntu-22.04` in mandatory CI.
 - PostgreSQL 18.6 (`Npgsql` 10.0.3) uses `postgres:18.6-bookworm` in mandatory CI.
 - MySQL 8.4.11 (`MySqlConnector` 2.6.2) uses `mysql:8.4.11-oraclelinux9` in mandatory CI.
 - MariaDB 11.8.9 (`MySqlConnector` 2.6.2) uses `mariadb:11.8.9-ubi9` in mandatory CI.
-- Oracle Database Free 23.26.0 (`Oracle.ManagedDataAccess.Core` 23.26.301) uses `gvenzl/oracle-free:23.26.0-slim-faststart` in a mandatory Core-only CI lane. It covers explicit mapping, immutable/nested/value-object and generated/runtime materialization, sync/async streaming, parameter binding and null handling. ODP.NET does not expose the suite's multi-statement `QueryMultiple` shape, and no Oracle Dommel SQL builder is claimed.
+- Oracle Database Free 23.26.0 (`Oracle.ManagedDataAccess.Core` 23.26.400) uses `gvenzl/oracle-free:23.26.0-slim-faststart` in a mandatory Core-only CI lane. It covers explicit mapping, immutable/nested/value-object and generated/runtime materialization, sync/async streaming, parameter binding and null handling. ODP.NET does not expose the suite's multi-statement `QueryMultiple` shape, and no Oracle Dommel SQL builder is claimed.
 - Firebird 5.0.4 (`FirebirdSql.Data.FirebirdClient` 10.3.4) uses the official `firebirdsql/firebird:5.0.4` image in a mandatory Core-only CI lane. It covers explicit mapping, immutable/nested/value-object and generated/runtime materialization, sync/async streaming, parameter binding and null handling. The ADO.NET provider does not expose the suite's multi-statement `QueryMultiple` shape through an ordinary Dapper command, and no Firebird Dommel SQL builder is claimed.
 - Provider-independent Core tests additionally use `DataTableReader` and common ADO.NET contracts, but that evidence alone never certifies a database provider.
 
@@ -119,6 +164,8 @@ Current status:
 | Full Native AOT compatibility | Not claimed. |
 
 Trimmed smoke tests cover explicit, generated and DI scenarios. The CI Native AOT lane publishes and runs the strict generated SQLite smoke on `windows-latest`/`win-x64`, treating relevant trimming and AOT warnings as errors. Local Native AOT publishing still requires the Visual C++ linker toolchain and full Native AOT compatibility is not claimed.
+
+The validated Native AOT boundary is the strict-generated SQLite smoke: generated startup registration, eligible generated materializers, explicit `GeneratedParameters`, reordered/safe additional columns, property converters, nullable `DateOnly`/`TimeOnly` values and deterministic rejection of unsupported shapes. Ordinary runtime materialization can use reflection, expression compilation and Dapper runtime fallback and therefore is not the certified Native AOT path. Upstream Dapper IL-warning suppressions do not widen this boundary.
 
 Generated materializers accept their exact registered shape, safe permutations and additional reader columns that do not resolve to explicitly configured FluentMap members. Missing required columns, duplicate/ambiguous names and additional columns that would resolve to an explicit FluentMap member remain unsupported and use runtime fallback unless strict generated materialization is enabled. The strict path deliberately does not reflect over convention-only entity members; callers that need Dapper's default-member discovery must use the non-strict API. Resolution is based on reader metadata, not SQL parsing.
 
@@ -166,7 +213,7 @@ Checked-in `PublicAPI.Shipped.txt`/`PublicAPI.Unshipped.txt` files govern every 
 
 ## Unsupported Environments Or Claims
 
-- Dapper major versions outside `[2.1.79,3.0.0)` are not currently supported.
+- Dapper versions outside `[2.1.89,3.0.0)` are not currently supported.
 - Dommel major versions outside `[3.5.3,4.0.0)` are not currently supported.
 - Full Native AOT support is not claimed.
 - Provider behavior outside the exact tested server/client versions listed above is not certified.

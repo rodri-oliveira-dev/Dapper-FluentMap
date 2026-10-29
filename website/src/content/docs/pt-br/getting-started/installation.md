@@ -35,6 +35,10 @@ O FluentMap registra metadados tipados e os aplica no caminho de materializaçã
 
 O comando de instalação sem versão resolve a versão mais recente disponível na fonte de pacotes selecionada. Fixe `--version 3.6.0` quando a aplicação precisar permanecer na release estável atualmente publicada. Use `3.6.1` somente após sua publicação ou ao consumir um artefato confiável, explicitamente compilado a partir deste código-fonte. Mantenha os cinco pacotes FluentMap na mesma versão de release.
 
+## Dependência do Dapper
+
+A faixa suportada do Dapper é `[2.1.89,3.0.0)`, tendo `2.1.89` como mínimo e baseline estável validado atual. Essa faixa do NuGet permite versões 2.x compatíveis iguais ou superiores ao mínimo; ela não é o pin exato `[2.1.89]`. Atualize aplicações que ainda resolvem Dapper 2.1.79 antes de adotar este baseline do FluentMap.
+
 ## Restrições
 
 :::caution

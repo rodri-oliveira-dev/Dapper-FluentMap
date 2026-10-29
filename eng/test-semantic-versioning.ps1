@@ -46,6 +46,11 @@ Invoke-Test 'SemVer validation and comparison' {
   Assert-True $threw 'A leading v must be rejected as a package version.'
 }
 
+Invoke-Test 'SemVer supports arbitrarily large numeric identifiers' {
+  Assert-True ((Compare-FluentMapSemanticVersion '2147483648.0.0' '2147483647.999999999999999999999.0') -gt 0) 'Core numeric identifiers must not be limited to Int32.'
+  Assert-True ((Compare-FluentMapSemanticVersion '3.6.1-999999999999' '3.6.1-1000000000000') -lt 0) 'Large numeric prerelease identifiers must compare numerically.'
+}
+
 Invoke-Test 'Compatible fix after 3.6.1 recommends 3.6.2' {
   $result = Get-FluentMapVersionRecommendation -ChangeType Patch -PublishedVersion 3.6.1 -PreparedVersion 3.6.1
   Assert-True ($result.RecommendedVersion -eq '3.6.2') 'Expected 3.6.2.'
@@ -91,6 +96,39 @@ Invoke-Test 'Version already in preparation is idempotent' {
   $result = Get-FluentMapVersionRecommendation -ChangeType Patch -PublishedVersion 3.6.0 -PreparedVersion 3.6.1
   Assert-True ($result.RecommendedVersion -eq '3.6.1') 'Prepared 3.6.1 must be preserved.'
   Assert-True $result.PreparationPreserved 'The report must identify preparation reuse.'
+}
+
+Invoke-Test 'Prepared major cannot be reused without authorization and analysis' {
+  $blocked = Get-FluentMapVersionRecommendation -ChangeType Patch -PublishedVersion 3.6.1 -PreparedVersion 4.0.0
+  Assert-True ($blocked.Status -eq 'Blocked') 'An unapproved prepared major must be blocked even for a patch change.'
+
+  $review = Get-FluentMapVersionRecommendation -ChangeType Minor -PublishedVersion 3.6.1 -PreparedVersion 4.0.0 -AllowMajor
+  Assert-True ($review.Status -eq 'ReviewRequired') 'Major authorization without formal analysis must still require review.'
+}
+
+Invoke-Test 'Stable tag discovery ignores tags unreachable from HEAD' {
+  $root = Join-Path ([System.IO.Path]::GetTempPath()) "semver-tags-$([System.Guid]::NewGuid().ToString('N'))"
+  New-Item -ItemType Directory -Path $root | Out-Null
+  try {
+    & git -C $root init --initial-branch=main | Out-Null
+    & git -C $root config user.email 'semver-tests@example.invalid'
+    & git -C $root config user.name 'SemVer Tests'
+    Set-Content -LiteralPath (Join-Path $root 'main.txt') -Value 'main'
+    & git -C $root add main.txt
+    & git -C $root commit -m 'main' | Out-Null
+    & git -C $root tag v3.6.0
+    & git -C $root switch --orphan unrelated | Out-Null
+    Remove-Item -LiteralPath (Join-Path $root 'main.txt') -Force -ErrorAction SilentlyContinue
+    Set-Content -LiteralPath (Join-Path $root 'unrelated.txt') -Value 'unrelated'
+    & git -C $root add unrelated.txt
+    & git -C $root commit -m 'unrelated' | Out-Null
+    & git -C $root tag v9.0.0
+    & git -C $root switch main | Out-Null
+
+    $versions = @(Get-FluentMapStableTagVersions -SourceRoot $root)
+    Assert-True ($versions.Count -eq 1 -and $versions[0] -eq '3.6.0') 'Only stable tags reachable from HEAD should be considered published history.'
+  }
+  finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
 }
 
 Invoke-Test 'Downgrade and unapproved major are rejected' {

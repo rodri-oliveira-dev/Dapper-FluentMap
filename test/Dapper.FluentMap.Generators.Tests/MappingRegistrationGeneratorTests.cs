@@ -169,6 +169,41 @@ public sealed class CustomerMap : EntityMap<Customer>
         }
 
         [Fact]
+        public void DateTimeFamilyConversionsShouldBeFrameworkGuardedAndStronglyTyped()
+        {
+            var source = @"
+using System;
+using Dapper.FluentMap.Mapping;
+
+public sealed class Customer
+{
+    public DateOnly BusinessDate { get; set; }
+    public TimeOnly StartsAt { get; set; }
+}
+
+public sealed class CustomerMap : EntityMap<Customer>
+{
+    public CustomerMap()
+    {
+        Map(customer => customer.BusinessDate).ToColumn(""business_date"");
+        Map(customer => customer.StartsAt).ToColumn(""starts_at"");
+    }
+}";
+
+            var result = RunGenerator(source);
+
+            Assert.Empty(result.DfmDiagnostics);
+            Assert.Contains("#if NET6_0_OR_GREATER", result.GeneratedSource, StringComparison.Ordinal);
+            Assert.Contains("global::System.DateOnly.FromDateTime", result.GeneratedSource, StringComparison.Ordinal);
+            Assert.Contains("global::System.TimeOnly.FromDateTime", result.GeneratedSource, StringComparison.Ordinal);
+            Assert.Contains("global::System.TimeOnly.FromTimeSpan", result.GeneratedSource, StringComparison.Ordinal);
+            Assert.Contains("dateOnly.ToDateTime(default(global::System.TimeOnly))", result.GeneratedSource, StringComparison.Ordinal);
+            Assert.Contains("timeOnly.ToTimeSpan()", result.GeneratedSource, StringComparison.Ordinal);
+            Assert.DoesNotContain("GetMethod", result.GeneratedSource, StringComparison.Ordinal);
+            Assert.DoesNotContain("DynamicInvoke", result.GeneratedSource, StringComparison.Ordinal);
+        }
+
+        [Fact]
         public void IgnoredPropertiesShouldGenerateIgnoredColumnDescriptor()
         {
             var source = @"

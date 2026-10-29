@@ -14,9 +14,9 @@ function ConvertTo-FluentMapSemanticVersion {
 
   [pscustomobject]@{
     Original = $Version
-    Major = [int]$match.Groups[1].Value
-    Minor = [int]$match.Groups[2].Value
-    Patch = [int]$match.Groups[3].Value
+    Major = [System.Numerics.BigInteger]::Parse($match.Groups[1].Value, [System.Globalization.CultureInfo]::InvariantCulture)
+    Minor = [System.Numerics.BigInteger]::Parse($match.Groups[2].Value, [System.Globalization.CultureInfo]::InvariantCulture)
+    Patch = [System.Numerics.BigInteger]::Parse($match.Groups[3].Value, [System.Globalization.CultureInfo]::InvariantCulture)
     PreRelease = if ($match.Groups[4].Success) { $match.Groups[4].Value } else { $null }
   }
 }
@@ -46,13 +46,14 @@ function Compare-FluentMapSemanticVersion {
     if ($index -ge $leftIdentifiers.Count) { return -1 }
     if ($index -ge $rightIdentifiers.Count) { return 1 }
 
-    $leftNumber = 0
-    $rightNumber = 0
-    $leftIsNumber = [int]::TryParse($leftIdentifiers[$index], [ref]$leftNumber)
-    $rightIsNumber = [int]::TryParse($rightIdentifiers[$index], [ref]$rightNumber)
+    $leftIsNumber = $leftIdentifiers[$index] -match '^[0-9]+$'
+    $rightIsNumber = $rightIdentifiers[$index] -match '^[0-9]+$'
     if ($leftIsNumber -and $rightIsNumber) {
-      if ($leftNumber -lt $rightNumber) { return -1 }
-      if ($leftNumber -gt $rightNumber) { return 1 }
+      if ($leftIdentifiers[$index].Length -lt $rightIdentifiers[$index].Length) { return -1 }
+      if ($leftIdentifiers[$index].Length -gt $rightIdentifiers[$index].Length) { return 1 }
+      $numericComparison = [string]::CompareOrdinal($leftIdentifiers[$index], $rightIdentifiers[$index])
+      if ($numericComparison -lt 0) { return -1 }
+      if ($numericComparison -gt 0) { return 1 }
       continue
     }
 
@@ -90,7 +91,7 @@ function Get-FluentMapStableTagVersions {
   [CmdletBinding()]
   param([Parameter(Mandatory = $true)][string]$SourceRoot)
 
-  $tagOutput = & git -C $SourceRoot tag --list 'v*' 2>$null
+  $tagOutput = & git -C $SourceRoot tag --merged HEAD --list 'v*' 2>$null
   if ($LASTEXITCODE -ne 0) {
     throw "Unable to read Git tags from '$SourceRoot'."
   }
@@ -143,6 +144,24 @@ function Get-FluentMapVersionRecommendation {
       Status = 'NoReleaseRequired'; RecommendedVersion = $null; ChangeType = $ChangeType
       PublishedVersion = $PublishedVersion; PreparedVersion = $PreparedVersion; PreparationPreserved = $false
       Reason = 'Documentation, changelog-only, test-only, comment-only, or administrative changes do not require a package release by themselves.'
+    }
+  }
+
+  if ($prepared.Major -gt $published.Major) {
+    if (-not $AllowMajor) {
+      return [pscustomobject]@{
+        Status = 'Blocked'; RecommendedVersion = $null; ChangeType = $ChangeType
+        PublishedVersion = $PublishedVersion; PreparedVersion = $PreparedVersion; PreparationPreserved = $false
+        Reason = "Prepared version $PreparedVersion crosses the current major boundary and requires explicit user authorization."
+      }
+    }
+
+    if (-not (Test-FluentMapBreakingAnalysis $BreakingAnalysisPath)) {
+      return [pscustomobject]@{
+        Status = 'ReviewRequired'; RecommendedVersion = $null; ChangeType = $ChangeType
+        PublishedVersion = $PublishedVersion; PreparedVersion = $PreparedVersion; PreparationPreserved = $false
+        Reason = "Prepared version $PreparedVersion crosses the current major boundary and requires a complete formal breaking-change analysis."
+      }
     }
   }
 
