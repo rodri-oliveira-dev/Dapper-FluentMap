@@ -107,3 +107,6 @@ else {
 }
 
 if ($failed) { exit 1 }
+
+# Do not leak the exit code from the earlier git tag probe into the pwsh action.
+exit 0
