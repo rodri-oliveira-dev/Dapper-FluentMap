@@ -30,6 +30,10 @@ config.AddGeneratedMappings();
 
 O FluentMap registra metadados tipados e os aplica no caminho de materialização correspondente. O SQL, a conexão, os parâmetros e o ciclo de vida continuam sob responsabilidade da aplicação e do Dapper.
 
+## Data/hora e comportamento strict-generated
+
+Para targets consumidores com `NET6_0_OR_GREATER`, materializadores gerados elegíveis emitem as mesmas conversões verificadas de data/hora do caminho runtime. Targets mais antigos não recebem referências inválidas a `DateOnly` ou `TimeOnly`. A evidência strict-generated em Native AOT cobre o caminho gerado com SQLite, propriedades nullable de data/hora e property converters explícitos; formatos não suportados falham em vez de entrar no fallback runtime.
+
 ## Restrições
 
 :::caution

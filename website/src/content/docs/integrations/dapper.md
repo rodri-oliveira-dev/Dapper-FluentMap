@@ -34,6 +34,15 @@ public sealed class CustomerMap : EntityMap<Customer>
 
 FluentMap registers typed metadata and applies it through the matching materialization path. SQL, connections, parameters, and lifecycle remain responsibilities of the application and Dapper.
 
+## Dapper 2.1.89 boundary
+
+- Dapper owns ordinary `Query<T>()` materialization, `DynamicParameters`, its IL-diagnostic suppressions and its separate StrongName packages.
+- FluentMap owns mapping metadata and the value assignment performed by `QueryMapped*`, `ReadMapped*` and eligible generated materializers.
+- FluentMap therefore implements matching verified conversions for `DateTime` to `DateOnly`, `DateOnly` to midnight `DateTime`, `DateTime`/`TimeSpan` to `TimeOnly`, and `TimeOnly` to `TimeSpan`.
+- Nullable values, immutable constructors, nested members and property converters are covered in runtime and generated tests. No other implicit date/time conversion is claimed.
+
+The public `DynamicParameters.AddParameters(IDbCommand)` change is upstream Dapper API. FluentMap passes `DynamicParameters` through non-strict mapped queries but does not wrap that method. Strict-generated queries use explicit `GeneratedParameters` instead.
+
 ## Constraints
 
 :::caution

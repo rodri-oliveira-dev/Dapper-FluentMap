@@ -35,6 +35,8 @@ FluentMap fornece mapeamentos fluentes e fortemente tipados para aplicações qu
 
 FluentMap complementa o Dapper; não o substitui e não é um ORM completo. SQL, conexões, transações, migrations e tracking de entidades permanecem fora do seu escopo.
 
+> **Estado da versão:** `3.6.0` é a última release estável publicada. O repositório está configurado para `3.6.1`, a próxima release em preparação, que ainda não foi publicada. Até a publicação, comandos de instalação sem versão resolvem a versão mais recente disponível na fonte de pacotes selecionada.
+
 ## Por que FluentMap?
 
 Imagine uma aplicação .NET com uma entidade `Customer` cujas propriedades são `Id` e `Name`, enquanto o banco retorna `customer_id` e `customer_name`. O FluentMap mantém esses nomes físicos em um map dedicado e fortemente tipado, sem acoplar a entidade aos detalhes de persistência.
@@ -117,6 +119,8 @@ O [guia de uso](USAGE.pt-BR.md) no repositório permanece disponível como alter
 | [`FluentMap.Generators`](https://www.nuget.org/packages/FluentMap.Generators) | Registro gerado de maps e materializadores compatíveis. |
 
 Os PackageIds são identidades de distribuição. Assemblies, namespaces e APIs públicas permanecem sob `Dapper.FluentMap.*` onde documentado.
+
+O contrato de compatibilidade atual exige Dapper `[2.1.89,3.0.0)`. Essa é uma faixa com versão mínima, não um pin exato: consumidores podem resolver uma versão 2.x compatível igual ou superior à `2.1.89`. Consulte [Compatibilidade](COMPATIBILITY.md) e [Migração](MIGRATION.pt-BR.md) antes de atualizar uma aplicação que ainda usa Dapper `2.1.79`.
 
 ## Documentação
 

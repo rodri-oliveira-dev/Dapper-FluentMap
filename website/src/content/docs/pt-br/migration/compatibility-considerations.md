@@ -34,6 +34,10 @@ public sealed class CustomerMap : EntityMap<Customer>
 
 O FluentMap registra metadados tipados e os aplica no caminho de materialização correspondente. O SQL, a conexão, os parâmetros e o ciclo de vida continuam sob responsabilidade da aplicação e do Dapper.
 
+## Migração do baseline do Dapper
+
+A versão mínima suportada do Dapper agora é `2.1.89`; `2.1.79` deixou de ser suportada. Verifique a resolução direta e transitiva de pacotes, renove lock files e repita testes com os providers reais. A faixa `[2.1.89,3.0.0)` é uma restrição mínima, não um pin exato. A certificação geral de um provider não certifica automaticamente todos os seus formatos CLR específicos de `DateOnly`/`TimeOnly`.
+
 ## Restrições
 
 :::caution

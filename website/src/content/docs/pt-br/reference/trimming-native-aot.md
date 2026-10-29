@@ -34,6 +34,12 @@ public sealed class CustomerMap : EntityMap<Customer>
 
 O FluentMap registra metadados tipados e os aplica no caminho de materialização correspondente. O SQL, a conexão, os parâmetros e o ciclo de vida continuam sob responsabilidade da aplicação e do Dapper.
 
+## Limite validado
+
+A materialização runtime comum pode usar reflection, compilação de expressões e fallback do Dapper; ela não é o caminho Native AOT certificado. A materialização gerada comum também pode usar fallback. O limite Native AOT validado é SQLite strict-generated com registro/materializadores gerados, `GeneratedParameters` explícitos, reordenação/adição segura de colunas, property converters, `DateOnly`/`TimeOnly` nullable e rejeição determinística de formatos não suportados.
+
+O Dapper 2.1.89 suprime alguns diagnósticos IL em seu código upstream de fallback runtime. O suppression isolado não estabelece compatibilidade Native AOT universal para Dapper ou FluentMap. Assembly scanning, descoberta somente por convenção, objetos de parâmetros arbitrários, interoperabilidade reflexiva de TypeHandler e estratégias de construção por delegate ficam fora da afirmação strict-generated.
+
 ## Restrições
 
 :::caution

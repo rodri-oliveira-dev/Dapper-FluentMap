@@ -6,14 +6,43 @@ The historical archived package history is not reconstructed here. This changelo
 
 ## [Unreleased]
 
+No package changes are recorded beyond the prepared 3.6.1 release.
+
+## [3.6.1] - Prepared for release, not published
+
+### Added
+
+- Added permanent semantic-versioning governance with deterministic recommendation, selected-version and five-package artifact validation.
+- Added automated coverage for compatible fixes and features, documentation-only work, prepared-release idempotency, package divergence, downgrades, existing tags and major-version authorization.
+- Added verified runtime and generated date/time-family conversions for `DateOnly`, `TimeOnly`, `DateTime` and `TimeSpan`, including nullable, immutable-constructor, nested, profile, property-converter and provider-backed coverage.
+
+### Fixed
+
+- Aligned the shared package version and local development suffix with `3.6.1`; explicit release builds continue to produce stable `3.6.1` artifacts without `-dev`.
+- Corrected version documentation that still treated `3.5.0` as the current development baseline after `3.6.0` had been published.
+
+### Changed
+
+- Release preflight now rejects a selected version that diverges from the repository's prepared version while retaining explicit `-p:Version` build and pack inputs.
+- Documented the distinction between the latest published release (`3.6.0`) and the prepared, unpublished release (`3.6.1`).
+- Raised the minimum supported Dapper version to 2.1.89 with package range `[2.1.89,3.0.0)`, and consolidated identical minimum/latest-stable compatibility lanes.
+- Updated certified provider clients to `Microsoft.Data.Sqlite` 10.0.14 and `Oracle.ManagedDataAccess.Core` 23.26.400.
+- Aligned FluentMap-controlled runtime and generated materialization with Dapper 2.1.89 while preserving `netstandard2.0` and the strict-generated Native AOT boundary.
+- Documented the consumer migration from Dapper 2.1.79, the minimum-version range rather than an exact pin, and the upstream ownership of `DynamicParameters`, trimming diagnostics and separate StrongName-package fixes.
+- Limited provider-specific `DateOnly`/`TimeOnly` claims to verified SQLite text conversion, SQL Server `DateTime`/`TimeSpan` values and PostgreSQL native CLR values; no broader provider or universal Native AOT claim is made.
+
+## [3.6.0] - 2026-10-13
+
 ### Added
 
 - Added mandatory real-database FluentMap Core certification lanes for Oracle Database Free 23.26.0 with `Oracle.ManagedDataAccess.Core` 23.26.301 and Firebird 5.0.4 with `FirebirdSql.Data.FirebirdClient` 10.3.4.
+- Added the bilingual Astro/Starlight documentation portal with English and Brazilian Portuguese content and automated link, translation, accessibility and SEO validation.
 
 ### Changed
 
 - Defined separate Dapper/ADO.NET, FluentMap Core and FluentMap + Dommel provider evidence levels. Oracle and Firebird are Core-only; SQL Server CE remains legacy/upstream-limited; SQLite, SQL Server, PostgreSQL, MySQL and MariaDB retain Core + Dommel certification.
 - Added a machine-readable provider compatibility contract and consistency checks tying pinned provider versions, required CI lanes and public compatibility documentation together.
+- Retained `netstandard2.0` for all five packages, Dapper `[2.1.79,3.0.0)` for `Dapper.FluentMap` and `Dapper.FluentMap.Dommel` (transitively available through `FluentMap.DependencyInjection`), and Dommel `[3.5.3,4.0.0)` for `Dapper.FluentMap.Dommel`.
 
 ## [3.5.0] - 2026-10-01
 
@@ -127,7 +156,9 @@ The first fork release candidate used a prerelease version such as `3.0.0-rc.1`;
 
 Do not reuse `2.0.0` for the fork line because `Dapper.FluentMap` and `Dapper.FluentMap.Dommel` already have historical `2.0.0` packages.
 
-[Unreleased]: https://github.com/rodri-oliveira-dev/Dapper-FluentMap/compare/v3.5.0...HEAD
+[Unreleased]: https://github.com/rodri-oliveira-dev/Dapper-FluentMap/compare/v3.6.0...HEAD
+[3.6.1]: https://github.com/rodri-oliveira-dev/Dapper-FluentMap/compare/v3.6.0...HEAD
+[3.6.0]: https://github.com/rodri-oliveira-dev/Dapper-FluentMap/compare/v3.5.0...v3.6.0
 [3.5.0]: https://github.com/rodri-oliveira-dev/Dapper-FluentMap/compare/v3.4.0...v3.5.0
 [3.4.0]: https://github.com/rodri-oliveira-dev/Dapper-FluentMap/compare/v3.0.3...v3.4.0
 [3.0.3]: https://github.com/rodri-oliveira-dev/Dapper-FluentMap/compare/v2.0.0...v3.0.3

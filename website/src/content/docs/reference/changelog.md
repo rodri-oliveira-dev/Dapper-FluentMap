@@ -34,6 +34,10 @@ public sealed class CustomerMap : EntityMap<Customer>
 
 FluentMap registers typed metadata and applies it through the matching materialization path. SQL, connections, parameters, and lifecycle remain responsibilities of the application and Dapper.
 
+## Current release state
+
+Version `3.6.0` is the latest published stable release. Version `3.6.1` is configured and prepared in the repository but has not been published. The authoritative changelog linked below records the 3.6.1 preparation separately from the historical 3.6.0 release.
+
 ## Constraints
 
 :::caution

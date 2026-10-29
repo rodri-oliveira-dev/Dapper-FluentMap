@@ -34,6 +34,12 @@ public sealed class CustomerMap : EntityMap<Customer>
 
 FluentMap registers typed metadata and applies it through the matching materialization path. SQL, connections, parameters, and lifecycle remain responsibilities of the application and Dapper.
 
+## Validated boundary
+
+Ordinary runtime materialization may use reflection, expression compilation and Dapper fallback; it is not the certified Native AOT path. Generated materialization normally may also fall back. The validated Native AOT boundary is strict-generated SQLite with generated registration/materializers, explicit `GeneratedParameters`, safe column reordering/additions, property converters, nullable `DateOnly`/`TimeOnly` and deterministic rejection of unsupported shapes.
+
+Dapper 2.1.89 suppresses selected IL diagnostics in upstream runtime fallback code. Suppression alone does not establish universal Native AOT compatibility for Dapper or FluentMap. Assembly scanning, convention-only discovery, arbitrary parameter objects, reflective TypeHandler interop and delegate construction strategies remain outside the strict-generated claim.
+
 ## Constraints
 
 :::caution

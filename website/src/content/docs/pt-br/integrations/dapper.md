@@ -34,6 +34,15 @@ public sealed class CustomerMap : EntityMap<Customer>
 
 O FluentMap registra metadados tipados e os aplica no caminho de materialização correspondente. O SQL, a conexão, os parâmetros e o ciclo de vida continuam sob responsabilidade da aplicação e do Dapper.
 
+## Limite do Dapper 2.1.89
+
+- O Dapper é responsável pela materialização de `Query<T>()` comum, por `DynamicParameters`, pelos suppressions de diagnósticos IL e pelos pacotes StrongName separados.
+- O FluentMap é responsável pelos metadados de mapping e pela atribuição de valores realizada por `QueryMapped*`, `ReadMapped*` e materializadores gerados elegíveis.
+- Por isso, o FluentMap implementa as conversões verificadas correspondentes: `DateTime` para `DateOnly`, `DateOnly` para `DateTime` à meia-noite, `DateTime`/`TimeSpan` para `TimeOnly` e `TimeOnly` para `TimeSpan`.
+- Valores nullable, construtores imutáveis, membros aninhados e property converters possuem cobertura runtime e gerada. Nenhuma outra conversão implícita de data/hora é afirmada.
+
+A mudança pública em `DynamicParameters.AddParameters(IDbCommand)` pertence à API upstream do Dapper. O FluentMap repassa `DynamicParameters` em queries mapeadas não estritas, mas não encapsula esse método. Queries strict-generated usam `GeneratedParameters` explícitos.
+
 ## Restrições
 
 :::caution

@@ -2,6 +2,14 @@
 
 This document defines the review process for public API, nullable contracts, compatibility canaries and performance evidence. These checks supplement package validation, provider certification, security analysis and the normal test suite.
 
+## Semantic versioning
+
+Use `.agents/skills/semantic-versioning/SKILL.md` for every release-affecting API, feature, fix, dependency, compatibility, package or changelog change. Determine the last published stable release independently from `Directory.Build.props`; the latter represents only the version in preparation.
+
+Run `./eng/validate-semantic-version.ps1 -Operation Recommend -ChangeType <None|Patch|Minor|Refactor|Breaking>` to produce a deterministic recommendation, and run `./eng/test-semantic-versioning.ps1` after governance changes. The release workflow validates that its explicit MSBuild `Version` equals the prepared version before building. Artifact validation remains separate and must verify all five package identities and their `.nuspec` versions.
+
+Never select a major version automatically. A potential breaking change requires explicit user authorization and a formal review of source and binary compatibility, observable behavior, target frameworks, dependency requirements and migration impact. Calculation, file updates, validation and publication are separate operations; none of the semantic-versioning scripts publish or mutate release state.
+
 ## Public API baselines
 
 Every shipped project under `src/` has `PublicAPI.Shipped.txt` and `PublicAPI.Unshipped.txt`. `Microsoft.CodeAnalysis.PublicApiAnalyzers` validates their union during every build, including the dedicated `Public API and nullable contracts` CI job.

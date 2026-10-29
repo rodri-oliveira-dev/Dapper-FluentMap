@@ -1,6 +1,7 @@
 using System;
 using System.Data;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Linq;
 #if !AOT_SMOKE_GENERATED && !AOT_SMOKE_DI_GENERATED && !AOT_SMOKE_DI_EXPLICIT
 using Dapper;
@@ -261,6 +262,17 @@ static void AssertStrictGeneratedQueryMappedMaterializer(FluentMapRuntime runtim
         throw new InvalidOperationException("Generated property converter materializer was not used correctly.");
     }
 
+    var dateTime = runtime.QueryGeneratedMappedSingle<SqliteDateTimeCustomer>(
+        connection,
+        "SELECT '2026-10-29' AS business_date, '12:34:56.789' AS starts_at, NULL AS optional_date, NULL AS optional_time;");
+    if (dateTime.BusinessDate != new DateOnly(2026, 10, 29) ||
+        dateTime.StartsAt != new TimeOnly(12, 34, 56, 789) ||
+        dateTime.OptionalDate != null ||
+        dateTime.OptionalTime != null)
+    {
+        throw new InvalidOperationException("Generated SQLite DateOnly/TimeOnly materializer was not used correctly.");
+    }
+
     try
     {
         runtime.QueryGeneratedMappedSingle<Customer>(
@@ -402,5 +414,47 @@ public sealed class AccountStatusConverter : IReadPropertyConverter<string, Acco
     public AccountStatus ConvertFromDatabase(string value)
     {
         return value == "A" ? AccountStatus.Active : AccountStatus.Unknown;
+    }
+}
+
+public sealed class SqliteDateTimeCustomer
+{
+    public DateOnly BusinessDate { get; set; }
+
+    public TimeOnly StartsAt { get; set; }
+
+    public DateOnly? OptionalDate { get; set; }
+
+    public TimeOnly? OptionalTime { get; set; }
+}
+
+public sealed class SqliteDateTimeCustomerMap : EntityMap<SqliteDateTimeCustomer>
+{
+    public SqliteDateTimeCustomerMap()
+    {
+        Map(customer => customer.BusinessDate).ToColumn("business_date")
+            .ConvertFromDatabaseUsing<SqliteDateOnlyConverter, string>();
+        Map(customer => customer.StartsAt).ToColumn("starts_at")
+            .ConvertFromDatabaseUsing<SqliteTimeOnlyConverter, string>();
+#pragma warning disable CS8603 // Null is an expected generated-materializer input for nullable properties.
+        Map(customer => customer.OptionalDate).ToColumn("optional_date");
+        Map(customer => customer.OptionalTime).ToColumn("optional_time");
+#pragma warning restore CS8603
+    }
+}
+
+public sealed class SqliteDateOnlyConverter : IReadPropertyConverter<string, DateOnly>
+{
+    public DateOnly ConvertFromDatabase(string value)
+    {
+        return DateOnly.ParseExact(value, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+    }
+}
+
+public sealed class SqliteTimeOnlyConverter : IReadPropertyConverter<string, TimeOnly>
+{
+    public TimeOnly ConvertFromDatabase(string value)
+    {
+        return TimeOnly.ParseExact(value, "HH:mm:ss.fff", CultureInfo.InvariantCulture);
     }
 }
