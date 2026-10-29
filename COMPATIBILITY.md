@@ -34,6 +34,10 @@ Validated in the current matrix:
 
 Known risk: `Dapper.FluentMap` uses public Dapper APIs for type maps/readers, but TypeHandler interoperability depends on resolving `SqlMapper.TypeHandlerCache<T>.Parse(object)` by reflection. This is covered by tests and remains the highest-risk Dapper compatibility boundary.
 
+FluentMap-controlled runtime and generated materialization support the same date/time-family conversions as the Dapper 2.1.89 baseline: `DateTime` to `DateOnly`, `DateOnly` to `DateTime` at midnight, `DateTime` to `TimeOnly`, `TimeSpan` to `TimeOnly`, and `TimeOnly` to `TimeSpan`. No other implicit date/time conversions are claimed. Nullable targets and database `NULL` retain their existing semantics, configured property converters take precedence, and registered Dapper TypeHandlers remain ahead of built-in runtime conversion.
+
+The Core package remains `netstandard2.0` and therefore does not reference `DateOnly` or `TimeOnly` directly. Runtime materialization activates these conversions only when the consumer runtime exposes those framework types. Generated materializers emit strongly typed conversions behind `NET6_0_OR_GREATER`; consumers targeting older frameworks receive no invalid references and cannot use model shapes whose framework does not define these types. Strict-generated conversion adds no reflection or dynamic-code requirement; Dapper TypeHandler interoperability remains the separately documented runtime compatibility boundary.
+
 ## Dommel
 
 Current package range for `Dapper.FluentMap.Dommel`:

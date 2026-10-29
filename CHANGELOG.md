@@ -16,6 +16,7 @@ The historical archived package history is not reconstructed here. This changelo
 - Added a machine-readable provider compatibility contract and consistency checks tying pinned provider versions, required CI lanes and public compatibility documentation together.
 - Raised the minimum supported Dapper version to 2.1.89 with package range `[2.1.89,3.0.0)`, and consolidated identical minimum/latest-stable compatibility lanes.
 - Updated certified provider clients to `Microsoft.Data.Sqlite` 10.0.14 and `Oracle.ManagedDataAccess.Core` 23.26.400.
+- Aligned FluentMap-controlled runtime and generated materialization with Dapper 2.1.89 date/time-family conversions for `DateOnly`, `TimeOnly`, `DateTime` and `TimeSpan`, while preserving `netstandard2.0` and the strict-generated Native AOT boundary.
 
 ## [3.5.0] - 2026-10-01
 

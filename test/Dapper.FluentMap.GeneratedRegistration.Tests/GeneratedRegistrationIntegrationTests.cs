@@ -1,4 +1,5 @@
 using System;
+using System.Data;
 using System.Linq;
 using Dapper;
 using Dapper.FluentMap.Configuration;
@@ -160,6 +161,103 @@ namespace Dapper.FluentMap.GeneratedRegistration.Tests
                             "SELECT 'not-an-integer' AS age, 'Invalid' AS note;"));
                     Assert.Contains(typeof(GeneratedNullableCustomer).FullName, incompatibleValue.Message);
                     Assert.Contains(nameof(GeneratedNullableCustomer.Age), incompatibleValue.Message);
+                }
+            }
+            finally
+            {
+                ResetMapper();
+            }
+        }
+
+        [Fact]
+        public void GeneratedDateTimeFamilyMaterializationShouldMatchRuntimeFallback()
+        {
+            ResetMapper();
+
+            try
+            {
+                GeneratedDateTimeFamilyCustomer generated;
+                FluentMapper.Initialize(configuration => configuration.AddGeneratedMappings());
+
+                using (var reader = CreateDateTimeFamilyTable().CreateDataReader())
+                using (var multi = new MappedGridReader(reader))
+                {
+                    generated = multi.ReadMappedSingle<GeneratedDateTimeFamilyCustomer, GeneratedDateTimeFamilyProfile>();
+                    Assert.Equal(0, FluentMapper.Registry.MaterializationPlanCacheEntryCount);
+                }
+
+                ResetMapper();
+                FluentMapper.Initialize(configuration => configuration.AddProfile<GeneratedDateTimeFamilyCustomerMap>());
+
+                using (var reader = CreateDateTimeFamilyTable().CreateDataReader())
+                using (var multi = new MappedGridReader(reader))
+                {
+                    var runtime = multi.ReadMappedSingle<GeneratedDateTimeFamilyCustomer, GeneratedDateTimeFamilyProfile>();
+
+                    Assert.Equal(new DateOnly(2026, 10, 28), generated.BusinessDate);
+                    Assert.Equal(generated.BusinessDate, runtime.BusinessDate);
+                    Assert.Equal(new DateTime(2026, 10, 29), generated.LegacyDate);
+                    Assert.Equal(generated.LegacyDate, runtime.LegacyDate);
+                    Assert.Equal(new TimeOnly(18, 20, 15), generated.TimeFromDateTime);
+                    Assert.Equal(generated.TimeFromDateTime, runtime.TimeFromDateTime);
+                    Assert.NotNull(generated.Schedule);
+                    Assert.Equal(new TimeOnly(7, 8, 9), generated.Schedule.StartsAt);
+                    Assert.Equal(generated.Schedule.StartsAt, runtime.Schedule.StartsAt);
+                    Assert.Equal(new TimeSpan(13, 14, 15), generated.LegacyTime);
+                    Assert.Equal(generated.LegacyTime, runtime.LegacyTime);
+                    Assert.Null(generated.OptionalDate);
+                    Assert.Null(runtime.OptionalDate);
+                    Assert.Equal(new TimeOnly(10, 11, 12), generated.OptionalTime);
+                    Assert.Equal(generated.OptionalTime, runtime.OptionalTime);
+                    Assert.Equal("converted:2026-10-30", generated.ConvertedLabel);
+                    Assert.Equal(generated.ConvertedLabel, runtime.ConvertedLabel);
+                    Assert.Equal(1, FluentMapper.Registry.MaterializationPlanCacheEntryCount);
+                }
+            }
+            finally
+            {
+                ResetMapper();
+            }
+        }
+
+        [Fact]
+        public void GeneratedDateTimeFamilyMaterializationShouldRejectUnsupportedInputWithContext()
+        {
+            ResetMapper();
+
+            try
+            {
+                FluentMapper.Initialize(configuration => configuration.AddGeneratedMappings());
+                var table = new DataTable();
+                table.Columns.Add("business_date", typeof(object));
+                table.Columns.Add("legacy_date", typeof(object));
+                table.Columns.Add("time_from_datetime", typeof(object));
+                table.Columns.Add("schedule_time", typeof(object));
+                table.Columns.Add("legacy_time", typeof(object));
+                table.Columns.Add("optional_date", typeof(object));
+                table.Columns.Add("optional_time", typeof(object));
+                table.Columns.Add("converted_date", typeof(object));
+                table.Rows.Add(
+                    "not-a-date",
+                    new DateOnly(2026, 10, 29),
+                    new DateTime(2026, 10, 28, 18, 20, 15),
+                    new TimeSpan(7, 8, 9),
+                    new TimeOnly(13, 14, 15),
+                    DBNull.Value,
+                    new TimeSpan(10, 11, 12),
+                    new DateTime(2026, 10, 30));
+
+                using (var reader = table.CreateDataReader())
+                using (var multi = new MappedGridReader(reader))
+                {
+                    var exception = Assert.Throws<FluentMapConfigurationException>(() =>
+                        multi.ReadMappedSingle<GeneratedDateTimeFamilyCustomer, GeneratedDateTimeFamilyProfile>());
+
+                    Assert.Contains(typeof(GeneratedDateTimeFamilyCustomer).FullName, exception.Message);
+                    Assert.Contains(nameof(GeneratedDateTimeFamilyCustomer.BusinessDate), exception.Message);
+                    Assert.Contains("business_date", exception.Message);
+                    Assert.Contains(typeof(string).FullName, exception.Message);
+                    Assert.Contains(typeof(DateOnly).FullName, exception.Message);
                 }
             }
             finally
@@ -440,6 +538,36 @@ namespace Dapper.FluentMap.GeneratedRegistration.Tests
             var connection = new SqliteConnection("Data Source=:memory:");
             connection.Open();
             return connection;
+        }
+
+        private static DataTable CreateDateTimeFamilyTable()
+        {
+            var table = new DataTable();
+            foreach (var column in new[]
+            {
+                "business_date",
+                "legacy_date",
+                "time_from_datetime",
+                "schedule_time",
+                "legacy_time",
+                "optional_date",
+                "optional_time",
+                "converted_date"
+            })
+            {
+                table.Columns.Add(column, typeof(object));
+            }
+
+            table.Rows.Add(
+                new DateTime(2026, 10, 28, 22, 45, 0),
+                new DateOnly(2026, 10, 29),
+                new DateTime(2026, 10, 28, 18, 20, 15),
+                new TimeSpan(7, 8, 9),
+                new TimeOnly(13, 14, 15),
+                DBNull.Value,
+                new TimeSpan(10, 11, 12),
+                new DateTime(2026, 10, 30, 16, 0, 0));
+            return table;
         }
 
         private static void ResetMapper()
@@ -919,6 +1047,66 @@ namespace Dapper.FluentMap.GeneratedRegistration.Tests
         public GeneratedAccountStatus ConvertFromDatabase(string value)
         {
             throw new InvalidOperationException("Invalid status.");
+        }
+    }
+
+    public sealed class GeneratedDateTimeFamilyProfile : IMappingProfile
+    {
+    }
+
+    public sealed class GeneratedDateTimeFamilyCustomer
+    {
+        public GeneratedDateTimeFamilyCustomer(DateOnly businessDate)
+        {
+            BusinessDate = businessDate;
+        }
+
+        public DateOnly BusinessDate { get; }
+
+        public DateTime LegacyDate { get; set; }
+
+        public TimeOnly TimeFromDateTime { get; set; }
+
+        public GeneratedDateTimeFamilySchedule Schedule { get; set; }
+
+        public TimeSpan LegacyTime { get; set; }
+
+        public DateOnly? OptionalDate { get; set; }
+
+        public TimeOnly? OptionalTime { get; set; }
+
+        public string ConvertedLabel { get; set; }
+    }
+
+    public sealed class GeneratedDateTimeFamilySchedule
+    {
+        public TimeOnly StartsAt { get; set; }
+    }
+
+    public sealed class GeneratedDateTimeFamilyCustomerMap :
+        EntityMap<GeneratedDateTimeFamilyCustomer>,
+        IProfileMap<GeneratedDateTimeFamilyProfile>
+    {
+        public GeneratedDateTimeFamilyCustomerMap()
+        {
+            Map(customer => customer.BusinessDate).ToColumn("business_date");
+            Map(customer => customer.LegacyDate).ToColumn("legacy_date");
+            Map(customer => customer.TimeFromDateTime).ToColumn("time_from_datetime");
+            Map(customer => customer.Schedule.StartsAt).ToColumn("schedule_time");
+            Map(customer => customer.LegacyTime).ToColumn("legacy_time");
+            Map(customer => customer.OptionalDate).ToColumn("optional_date");
+            Map(customer => customer.OptionalTime).ToColumn("optional_time");
+            Map(customer => customer.ConvertedLabel)
+                .ToColumn("converted_date")
+                .ConvertFromDatabaseUsing<GeneratedDateOnlyLabelConverter, DateOnly>();
+        }
+    }
+
+    public sealed class GeneratedDateOnlyLabelConverter : IReadPropertyConverter<DateOnly, string>
+    {
+        public string ConvertFromDatabase(DateOnly value)
+        {
+            return "converted:" + value.ToString("yyyy-MM-dd");
         }
     }
 }
