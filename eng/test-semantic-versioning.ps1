@@ -161,6 +161,28 @@ Invoke-Test 'Existing release tag cannot be reused outside governed rerun' {
   Assert-True $olderRerun.IsValid 'An immutable tagged release may be rerun after a newer release exists.'
 }
 
+Invoke-Test 'CLI validation succeeds after an absent release tag probe' {
+  $root = Join-Path ([System.IO.Path]::GetTempPath()) "semver-cli-$([System.Guid]::NewGuid().ToString('N'))"
+  New-Item -ItemType Directory -Path $root | Out-Null
+  try {
+    & git -C $root init --initial-branch=main | Out-Null
+    $validator = Join-Path $PSScriptRoot 'validate-semantic-version.ps1'
+    $runnerScript = Join-Path $root 'run-validator.ps1'
+    @"
+& '$validator' -Operation Validate -SelectedVersion 3.6.1 -PublishedVersion 3.6.0 -PreparedVersion 3.6.1 -SourceRoot '$root' -AllowExistingPublishedVersion
+if (Test-Path -LiteralPath variable:LASTEXITCODE) { exit `$LASTEXITCODE }
+"@ | Set-Content -LiteralPath $runnerScript
+
+    # GitHub's pwsh runner propagates LASTEXITCODE from native commands at step end.
+    # Probing a missing tag is expected, so successful validation must reset it.
+    $output = @(& pwsh -NoProfile -File $runnerScript 2>&1)
+    $exitCode = $LASTEXITCODE
+    Assert-True ($exitCode -eq 0) "Successful validation must exit zero after the git tag probe. Output: $($output -join ' | ')"
+    Assert-True (@($output | Where-Object { $_ -like '*Semantic version validation passed.*' }).Count -gt 0) 'Expected successful validation message.'
+  }
+  finally { Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
 Invoke-Test 'Divergent package versions fail alignment validation' {
   Add-Type -AssemblyName System.IO.Compression.FileSystem
   $root = Join-Path ([System.IO.Path]::GetTempPath()) "semver-packages-$([System.Guid]::NewGuid().ToString('N'))"
