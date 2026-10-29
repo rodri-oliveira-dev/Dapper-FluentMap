@@ -27,6 +27,14 @@ dotnet add package Dapper.FluentMap
 
 FluentMap registers typed metadata and applies it through the matching materialization path. SQL, connections, parameters, and lifecycle remain responsibilities of the application and Dapper.
 
+## Version status
+
+- Latest published stable release: `3.6.0`.
+- Version configured in the current source: `3.6.1`.
+- Next package prepared for publication: `3.6.1` (not published yet).
+
+The unversioned installation command resolves the latest version available from the selected package source. Pin `--version 3.6.0` when the application must remain on the current published stable release. Use `3.6.1` only after it is published or when consuming an explicitly built, trusted artifact from this source. Keep all five FluentMap packages on the same release version.
+
 ## Constraints
 
 :::caution

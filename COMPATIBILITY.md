@@ -2,6 +2,8 @@
 
 This document describes what is currently validated by this repository. It avoids claims that are only supported by design intent.
 
+Version `3.6.0` is the latest published stable release. The current source and package configuration prepare `3.6.1`; that version is not a published support claim until the governed release workflow completes.
+
 ## Package Matrix
 
 | Package | TFM | Status |

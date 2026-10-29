@@ -34,6 +34,10 @@ public sealed class CustomerMap : EntityMap<Customer>
 
 O FluentMap registra metadados tipados e os aplica no caminho de materialização correspondente. O SQL, a conexão, os parâmetros e o ciclo de vida continuam sob responsabilidade da aplicação e do Dapper.
 
+## Estado atual das releases
+
+A versão `3.6.0` é a última release estável publicada. A versão `3.6.1` está configurada e preparada no repositório, mas ainda não foi publicada. O changelog autoritativo indicado abaixo registra a preparação da 3.6.1 separadamente da release histórica 3.6.0.
+
 ## Restrições
 
 :::caution

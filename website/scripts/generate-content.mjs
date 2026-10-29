@@ -154,6 +154,30 @@ const restrictions = {
 };
 
 const pageDetails = {
+  installation: [
+    `## Version status
+
+- Latest published stable release: \`3.6.0\`.
+- Version configured in the current source: \`3.6.1\`.
+- Next package prepared for publication: \`3.6.1\` (not published yet).
+
+The unversioned installation command resolves the latest version available from the selected package source. Pin \`--version 3.6.0\` when the application must remain on the current published stable release. Use \`3.6.1\` only after it is published or when consuming an explicitly built, trusted artifact from this source. Keep all five FluentMap packages on the same release version.`,
+    `## Estado da versão
+
+- Última release estável publicada: \`3.6.0\`.
+- Versão configurada no código-fonte atual: \`3.6.1\`.
+- Próximo pacote preparado para publicação: \`3.6.1\` (ainda não publicado).
+
+O comando de instalação sem versão resolve a versão mais recente disponível na fonte de pacotes selecionada. Fixe \`--version 3.6.0\` quando a aplicação precisar permanecer na release estável atualmente publicada. Use \`3.6.1\` somente após sua publicação ou ao consumir um artefato confiável, explicitamente compilado a partir deste código-fonte. Mantenha os cinco pacotes FluentMap na mesma versão de release.`
+  ],
+  changelog: [
+    `## Current release state
+
+Version \`3.6.0\` is the latest published stable release. Version \`3.6.1\` is configured and prepared in the repository but has not been published. The authoritative changelog linked below records the 3.6.1 preparation separately from the historical 3.6.0 release.`,
+    `## Estado atual das releases
+
+A versão \`3.6.0\` é a última release estável publicada. A versão \`3.6.1\` está configurada e preparada no repositório, mas ainda não foi publicada. O changelog autoritativo indicado abaixo registra a preparação da 3.6.1 separadamente da release histórica 3.6.0.`
+  ],
   dommel: [
     `## Provider boundary
 

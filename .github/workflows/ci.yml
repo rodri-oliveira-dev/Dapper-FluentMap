@@ -53,6 +53,10 @@ jobs:
         shell: pwsh
         run: ./eng/test-release-governance.ps1
 
+      - name: Validate semantic versioning governance
+        shell: pwsh
+        run: ./eng/test-semantic-versioning.ps1
+
       - name: Validate compatibility contract consistency
         shell: pwsh
         run: ./eng/test-compatibility-consistency.ps1
@@ -535,11 +539,35 @@ jobs:
       - name: Restore
         run: dotnet restore ./Dapper.FluentMap.slnx
 
+      - name: Resolve prepared package version
+        id: prepared-version
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Import-Module './eng/SemanticVersioning.psm1' -Force
+          $version = Get-FluentMapConfiguredVersion -SourceRoot $env:GITHUB_WORKSPACE
+          "package_version=$version" >> $env:GITHUB_OUTPUT
+
       - name: Build Release
-        run: dotnet build ./Dapper.FluentMap.slnx --configuration Release --no-restore
+        env:
+          PACKAGE_VERSION: ${{ steps.prepared-version.outputs.package_version }}
+        run: dotnet build ./Dapper.FluentMap.slnx --configuration Release --no-restore -p:Version="${PACKAGE_VERSION}"
 
       - name: Pack Release
-        run: dotnet pack ./Dapper.FluentMap.slnx --configuration Release --no-build --output ./artifacts/packages
+        env:
+          PACKAGE_VERSION: ${{ steps.prepared-version.outputs.package_version }}
+        run: dotnet pack ./Dapper.FluentMap.slnx --configuration Release --no-build --output ./artifacts/packages -p:Version="${PACKAGE_VERSION}"
+
+      - name: Validate explicit package version
+        shell: pwsh
+        env:
+          PACKAGE_VERSION: ${{ steps.prepared-version.outputs.package_version }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          ./eng/validate-semantic-version.ps1 `
+            -Operation ValidatePackages `
+            -SelectedVersion $env:PACKAGE_VERSION `
+            -PackageDirectory './artifacts/packages'
 
       - name: Validate NuGet presentation metadata
         shell: pwsh

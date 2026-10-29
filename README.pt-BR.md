@@ -35,6 +35,8 @@ FluentMap fornece mapeamentos fluentes e fortemente tipados para aplicações qu
 
 FluentMap complementa o Dapper; não o substitui e não é um ORM completo. SQL, conexões, transações, migrations e tracking de entidades permanecem fora do seu escopo.
 
+> **Estado da versão:** `3.6.0` é a última release estável publicada. O repositório está configurado para `3.6.1`, a próxima release em preparação, que ainda não foi publicada. Até a publicação, comandos de instalação sem versão resolvem a versão mais recente disponível na fonte de pacotes selecionada.
+
 ## Por que FluentMap?
 
 Imagine uma aplicação .NET com uma entidade `Customer` cujas propriedades são `Id` e `Name`, enquanto o banco retorna `customer_id` e `customer_name`. O FluentMap mantém esses nomes físicos em um map dedicado e fortemente tipado, sem acoplar a entidade aos detalhes de persistência.

@@ -62,6 +62,8 @@ Dommel [3.5.3,4.0.0)
 
 A certificação de providers e as versões exatas testadas também são mantidas em [COMPATIBILITY.md](COMPATIBILITY.md).
 
+A última release estável publicada do FluentMap é `3.6.0`. A versão `3.6.1` está preparada no repositório, mas não estará disponível como pacote estável até a publicação. Mantenha instalações e atualizações automatizadas em `3.6.0`, salvo quando consumir um artefato `3.6.1` explicitamente compilado e confiável a partir deste código-fonte.
+
 ## Migração Mínima
 
 Para aplicações que usam apenas o modelo histórico de mapping no nível raiz, o primeiro passo recomendado é intencionalmente pequeno.

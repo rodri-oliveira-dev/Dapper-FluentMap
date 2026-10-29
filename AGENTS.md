@@ -62,6 +62,7 @@ Read `AGENTS.md` first. Load only the skills relevant to the current task; do no
 | Behavior-preserving refactoring | `dotnet-refactoring-engineer` |
 | Pull request/diff review | `dotnet-pr-review` |
 | CI, packaging, NuGet, versioning, release or recovery semantics | `ci-release-governance` |
+| Determine or validate a package version for release-affecting work | `semantic-versioning` |
 | GitHub Actions YAML authoring/structural validation | `authoring-github-workflows` |
 | NuGet.org OIDC/trusted-publishing review or diagnosis | `nuget-trusted-publishing` |
 | Find caller-visible behaviors existing tests would miss | `test-gap-analysis` |
@@ -72,6 +73,7 @@ Read `AGENTS.md` first. Load only the skills relevant to the current task; do no
 Pair skills when concerns overlap. Examples:
 
 - release workflow change: `ci-release-governance` + `authoring-github-workflows`; add `nuget-trusted-publishing` when NuGet.org OIDC is involved;
+- release-affecting API, feature, fix, dependency, compatibility, changelog or package work: the relevant implementation skill + `semantic-versioning`; pair with `ci-release-governance` for packaging/release automation;
 - performance-sensitive library change: `dotnet-library-change` + `microbenchmarking` when measurement is required;
 - implementation with uncertain test protection: implementation/refactoring skill + `test-gap-analysis`;
 - build-property refactor: `directory-build-organization` + `dotnet-library-change` when package/public compatibility can be affected;
@@ -185,7 +187,7 @@ The repository currently publishes multiple NuGet packages:
 - `FluentMap.Analyzers`
 - `FluentMap.Generators`
 
-`eng/package-catalog.json` is the package identity catalog and separates project identity from NuGet `PackageId`. `Directory.Build.props` defines shared package metadata and `FluentMapPackageVersionPrefix` (currently `3.5.0`) with a local/dev suffix when no explicit version is supplied. The repository currently uses explicit `PackageReference` versions rather than Central Package Management. `Directory.Build.targets` blocks unsafe historical package versions. Release behavior lives in the actual workflows under `.github/workflows/`; inspect them before changing or documenting release behavior.
+`eng/package-catalog.json` is the package identity catalog and separates project identity from NuGet `PackageId`. `Directory.Build.props` defines shared package metadata and `FluentMapPackageVersionPrefix` (currently `3.6.1`) with a local/dev suffix when no explicit version is supplied. The repository currently uses explicit `PackageReference` versions rather than Central Package Management. `Directory.Build.targets` blocks unsafe historical package versions. Release behavior lives in the actual workflows under `.github/workflows/`; inspect them before changing or documenting release behavior.
 
 NuGet.org publishing uses OIDC Trusted Publishing through `NuGet/login`, a protected `release` environment, and job-scoped `id-token: write`. Preserve this model; do not introduce a long-lived NuGet API key as a shortcut.
 
@@ -201,4 +203,4 @@ Use Conventional Commits (`fix:`, `feat:`, `refactor:`, `test:`, `docs:`, `chore
 
 ## Final Report
 
-When finishing a task, report the objective, files changed, behavior preserved or changed, validations performed and results, build/test/pack status when applicable, remaining risks or limitations, and commit SHA when a commit was created.
+When finishing a task, report the objective, files changed, behavior preserved or changed, validations performed and results, build/test/pack status when applicable, remaining risks or limitations, and commit SHA when a commit was created. For release-affecting implementation work, also report the last published version, version in preparation, change type, whether breaking changes were detected, the recommended version, and the SemVer justification.

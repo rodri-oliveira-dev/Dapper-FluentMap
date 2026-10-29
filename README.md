@@ -35,6 +35,8 @@ FluentMap provides fluent, strongly typed mappings for applications that use [Da
 
 FluentMap complements Dapper; it does not replace it and is not a full ORM. SQL, connections, transactions, migrations, and entity tracking remain outside its scope.
 
+> **Version status:** `3.6.0` is the latest published stable release. The repository is configured for `3.6.1`, which is the next release being prepared and is not published yet. Until publication, unversioned installation commands resolve to the latest version available on the selected package source.
+
 ## Why FluentMap?
 
 Imagine a .NET application with a `Customer` entity whose properties are `Id` and `Name`, while its database returns `customer_id` and `customer_name`. FluentMap keeps those physical column names in a dedicated, strongly typed map instead of coupling the entity to persistence details.

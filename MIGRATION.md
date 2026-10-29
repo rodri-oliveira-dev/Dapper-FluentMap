@@ -53,6 +53,8 @@ Before changing FluentMap package versions:
 - run the existing test suite before and after the upgrade;
 - identify whether the application uses Dommel, `Ignore()` for database-generated columns, assembly scanning, custom Dapper `TypeHandler<T>` implementations, trimming or Native AOT.
 
+The latest published stable FluentMap release is `3.6.0`. Version `3.6.1` is prepared in the repository but is not available as a stable package until publication. Keep installation and upgrade automation on `3.6.0` unless consuming an explicitly built and trusted `3.6.1` artifact from this source.
+
 Current supported package ranges are documented in [COMPATIBILITY.md](COMPATIBILITY.md). The Dapper values are governed by `eng/compatibility-contract.json` and validated against package metadata and CI. At the time of this guide:
 
 ```text
