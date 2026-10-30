@@ -1,0 +1,51 @@
+title: "[Idea] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Share proposals that could improve Dapper FluentMap.
+        Explain the underlying problem and expected benefit, rather than only describing an implementation.
+        Use [Issues](https://github.com/rodri-oliveira-dev/Dapper-FluentMap/issues/new/choose) for reproducible bugs.
+        See the [discussion guidelines](https://github.com/rodri-oliveira-dev/Dapper-FluentMap/blob/main/.github/DISCUSSIONS.md).
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Core mapping and conventions
+        - Immutable objects and materialization
+        - Dommel integration
+        - Dependency Injection
+        - Analyzers and source generators
+        - Documentation and examples
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: Describe the scenario and current limitations.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed improvement
+      description: Explain the desired behavior and how it would help consumers.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives or workarounds considered
+      description: What solutions are available today?
+    validations:
+      required: false
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility considerations
+      description: Mention any expected impact on existing APIs or users, if known.
+    validations:
+      required: false
