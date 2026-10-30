@@ -1,0 +1,68 @@
+name: Enhancement / Engineering Task
+description: Propose actionable, scoped product or engineering work.
+title: "[Enhancement] "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for a concrete, actionable change with a clear outcome.
+        Early-stage ideas and open-ended design conversations belong in
+        [Ideas Discussions](https://github.com/rodri-oliveira-dev/Dapper-FluentMap/discussions).
+        For reproducible defects, use Bug Report instead.
+        Avoid including security-sensitive details in public issues.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - Core mapping / conventions
+        - Immutable objects / materialization
+        - Dommel integration
+        - Dependency Injection
+        - Analyzers / generators
+        - Compatibility / performance
+        - Build / CI / tooling
+        - Documentation / examples
+        - Multiple areas / other
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or opportunity
+      description: Explain the user or maintenance problem this change would address.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Proposed scope
+      description: Describe the desired outcome and key work, without prescribing unnecessary implementation details.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: List objective and verifiable outcomes expected from this issue.
+      placeholder: |
+        - [ ] ...
+        - [ ] ...
+    validations:
+      required: true
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility and migration considerations
+      description: Include potential impact on public APIs, existing consumers, supported .NET versions, or package dependencies.
+    validations:
+      required: false
+  - type: textarea
+    id: references
+    attributes:
+      label: Related issues, docs, or alternatives
+      description: Link to related roadmaps, existing behavior, examples, or relevant discussions.
+    validations:
+      required: false

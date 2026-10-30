@@ -1,0 +1,107 @@
+name: Bug Report
+description: Report a reproducible problem with FluentMap or one of its integrations.
+title: "[Bug] "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a problem. Please search existing issues and check the
+        [documentation](https://github.com/rodri-oliveira-dev/Dapper-FluentMap#documentation) first.
+        For usage questions, use [Discussions](https://github.com/rodri-oliveira-dev/Dapper-FluentMap/discussions).
+        Do not disclose security vulnerabilities, secrets, credentials, or personal data in a public issue.
+        For sensitive security findings, visit the repository's [Security page](https://github.com/rodri-oliveira-dev/Dapper-FluentMap/security).
+  - type: dropdown
+    id: package
+    attributes:
+      label: Affected package
+      description: Select the relevant package or integration.
+      options:
+        - Dapper.FluentMap (core)
+        - Dapper.FluentMap.Dommel
+        - FluentMap.DependencyInjection
+        - FluentMap.Analyzers
+        - FluentMap.Generators
+        - Multiple packages / not sure
+    validations:
+      required: true
+  - type: input
+    id: package-version
+    attributes:
+      label: FluentMap package version
+      description: Specify the affected version, commit, or "not sure" if unknown.
+      placeholder: "e.g. 3.6.1"
+    validations:
+      required: true
+  - type: input
+    id: dotnet
+    attributes:
+      label: .NET version and runtime
+      description: Include the .NET version and target framework when known.
+      placeholder: "e.g. .NET 8, net8.0, Windows 11"
+    validations:
+      required: true
+  - type: input
+    id: dapper
+    attributes:
+      label: Dapper version
+      description: Include the resolved Dapper version, or "not sure".
+      placeholder: "e.g. 2.1.89"
+    validations:
+      required: false
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Database provider
+      options:
+        - SQL Server
+        - PostgreSQL
+        - MySQL / MariaDB
+        - SQLite
+        - Oracle
+        - Firebird
+        - Other provider
+        - Not applicable / not sure
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Provide a minimal sequence that reliably triggers the problem.
+      placeholder: |
+        1. Configure ...
+        2. Execute ...
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should have happened?
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: example
+    attributes:
+      label: Minimal example
+      description: Share relevant mapping, SQL, test code, or a public reproduction repository. Remove sensitive data.
+      placeholder: "Minimal C# code, a failing test, or a link to a public reproduction"
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error messages or logs
+      description: Include a sanitized stack trace, diagnostic output, or screenshots if available.
+    validations:
+      required: false

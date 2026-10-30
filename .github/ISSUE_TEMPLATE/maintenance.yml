@@ -1,0 +1,61 @@
+name: Maintenance / Technical Debt
+description: Track focused refactoring, build hygiene, reliability, or maintenance work.
+title: "[Maintenance] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this form for a concrete maintenance task with a bounded outcome.
+        Automated issues produced by Sonar or other integrations should continue using
+        their existing automated creation flow; this form does not replace it.
+        Report reproducible consumer-facing defects through Bug Report.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected component
+      options:
+        - Core mapping / materialization
+        - Dommel / Dependency Injection
+        - Analyzers / generators
+        - Test infrastructure
+        - Build / CI / releases
+        - Dependencies / security hardening
+        - Documentation / website
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Current issue or technical debt
+      description: Describe the observed weakness and why it matters.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Proposed work and boundaries
+      description: Explain what needs to change and what is intentionally out of scope.
+    validations:
+      required: true
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation and expected outcome
+      description: Describe tests, CI checks, or observable evidence that will confirm completion.
+    validations:
+      required: true
+  - type: textarea
+    id: risk
+    attributes:
+      label: Risk and compatibility considerations
+      description: Note behavior changes, release impact, API compatibility, rollback, or dependencies if relevant.
+    validations:
+      required: false
+  - type: textarea
+    id: references
+    attributes:
+      label: Related findings or issues
+      description: Link to existing issues, CI logs, source files, or external findings. Do not expose sensitive security details.
+    validations:
+      required: false
