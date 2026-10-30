@@ -1,0 +1,53 @@
+title: "[Question] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ask for help with Dapper FluentMap usage, configuration, or integration.
+        Search existing discussions and review the [documentation](https://github.com/rodri-oliveira-dev/Dapper-FluentMap#documentation) before posting.
+        If you have found a reproducible defect, please [open an issue](https://github.com/rodri-oliveira-dev/Dapper-FluentMap/issues/new/choose) instead.
+        See the [discussion guidelines](https://github.com/rodri-oliveira-dev/Dapper-FluentMap/blob/main/.github/DISCUSSIONS.md).
+  - type: dropdown
+    id: package
+    attributes:
+      label: Package or feature area
+      options:
+        - Dapper.FluentMap (core and mapping)
+        - Dapper.FluentMap.Dommel
+        - FluentMap.DependencyInjection
+        - FluentMap.Analyzers
+        - FluentMap.Generators
+        - Not sure / multiple packages
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Package version
+      description: State the FluentMap package version, or "not sure" if unknown.
+      placeholder: "e.g. 3.6.1"
+    validations:
+      required: true
+  - type: textarea
+    id: question
+    attributes:
+      label: What would you like to know?
+      description: Describe the behavior you want and your specific question.
+      placeholder: "I'm trying to map ...; how should I configure ...?"
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Relevant context or minimal example
+      description: Include relevant C# mapping code, SQL, database provider, and error messages where helpful. Remove credentials and sensitive data.
+      placeholder: "Minimal reproducible usage snippet (if available)"
+    validations:
+      required: false
+  - type: textarea
+    id: attempted
+    attributes:
+      label: What have you already tried?
+      description: Link to relevant documentation or approaches you have tested.
+    validations:
+      required: false

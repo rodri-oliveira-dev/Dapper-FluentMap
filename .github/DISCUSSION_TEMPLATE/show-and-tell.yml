@@ -1,0 +1,50 @@
+title: "[Show and Tell] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Share real-world examples, useful patterns, or integrations built with Dapper FluentMap.
+        Keep examples concise and remove proprietary code, credentials, and personal data.
+        See the [discussion guidelines](https://github.com/rodri-oliveira-dev/Dapper-FluentMap/blob/main/.github/DISCUSSIONS.md).
+  - type: input
+    id: scenario
+    attributes:
+      label: Scenario
+      description: In a sentence, what are you showing?
+      placeholder: "Mapping legacy database columns with conventions"
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Main feature used
+      options:
+        - Core mapping and conventions
+        - Immutable objects and materialization
+        - Dommel integration
+        - Dependency Injection
+        - Analyzers and source generators
+        - Multiple features / other
+    validations:
+      required: true
+  - type: textarea
+    id: implementation
+    attributes:
+      label: Implementation
+      description: Share a code excerpt, architecture note, or explanation of your approach.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Results and lessons learned
+      description: Describe the practical result, trade-offs, or lessons others may find useful.
+    validations:
+      required: true
+  - type: textarea
+    id: links
+    attributes:
+      label: Optional links
+      description: Link to public sample projects, gists, or documentation.
+    validations:
+      required: false

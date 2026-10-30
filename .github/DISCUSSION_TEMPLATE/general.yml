@@ -1,0 +1,30 @@
+title: "[General] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this category for broader conversations about the project and its ecosystem.
+        For usage questions, choose Q&A; for proposals, choose Ideas; for examples, choose Show and Tell.
+        Report reproducible bugs through [Issues](https://github.com/rodri-oliveira-dev/Dapper-FluentMap/issues/new/choose).
+        See the [discussion guidelines](https://github.com/rodri-oliveira-dev/Dapper-FluentMap/blob/main/.github/DISCUSSIONS.md).
+  - type: textarea
+    id: topic
+    attributes:
+      label: Topic
+      description: What would you like to discuss with the community?
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Background
+      description: Provide context or references that would help others participate.
+    validations:
+      required: false
+  - type: textarea
+    id: questions
+    attributes:
+      label: Questions for the community
+      description: Add any specific points you would like to discuss.
+    validations:
+      required: false
