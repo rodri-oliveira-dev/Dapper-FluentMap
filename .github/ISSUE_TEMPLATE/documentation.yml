@@ -1,0 +1,60 @@
+name: Documentation Issue
+description: Report inaccurate, missing, unclear, or outdated documentation.
+title: "[Docs] "
+labels:
+  - documentation
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Report a documentation gap, broken example, or incorrect guidance.
+        If you need help using FluentMap, ask in [Discussions](https://github.com/rodri-oliveira-dev/Dapper-FluentMap/discussions).
+        Do not include credentials, access tokens, or private data.
+  - type: input
+    id: location
+    attributes:
+      label: Documentation location
+      description: Provide a URL, repository path, or section heading.
+      placeholder: "e.g. website/src/content/docs/getting-started/quick-start.md"
+    validations:
+      required: true
+  - type: dropdown
+    id: problem-kind
+    attributes:
+      label: Type of documentation problem
+      options:
+        - Incorrect or outdated information
+        - Missing explanation or example
+        - Unclear instructions
+        - Broken link or formatting
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is wrong or missing?
+      description: Explain where the current guidance falls short.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected documentation
+      description: Describe what readers should be able to understand or accomplish.
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested change
+      description: Share a correction, example, reference, or wording suggestion if you have one.
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: Relevant package or release version
+      placeholder: "e.g. 3.6.1, main, or not applicable"
+    validations:
+      required: false

@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions, usage help, and early-stage ideas
+    url: https://github.com/rodri-oliveira-dev/Dapper-FluentMap/discussions
+    about: Ask questions, share examples, or discuss ideas before proposing scoped changes.
+  - name: Private security reporting
+    url: https://github.com/rodri-oliveira-dev/Dapper-FluentMap/security
+    about: Do not post vulnerabilities in public issues. Check the Security page for private reporting options.
