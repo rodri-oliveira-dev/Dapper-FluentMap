@@ -3,7 +3,7 @@
   "isRoot": true,
   "tools": {
     "dotnet-sonarscanner": {
-      "version": "12.0.0",
+      "version": "12.1.0",
       "commands": [
         "dotnet-sonarscanner"
       ],
@@ -17,7 +17,7 @@
       "rollForward": false
     },
     "rodrioliveira.adrguard": {
-      "version": "1.9.0",
+      "version": "1.11.0",
       "commands": [
         "adr-guard"
       ],
