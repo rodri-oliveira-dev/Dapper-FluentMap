@@ -31,13 +31,27 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Verify consistent CodeQL action versions
+        shell: bash
+        run: |
+          mapfile -t codeql_refs < <(grep -Eo 'github/codeql-action/[^@ ]+@[0-9a-f]{40}' .github/workflows/codeql.yml)
+          if (( ${#codeql_refs[@]} < 2 )); then
+            echo "::error::Expected at least two SHA-pinned CodeQL steps."
+            exit 1
+          fi
+          distinct_sha_count=$(printf '%s\n' "${codeql_refs[@]}" | cut -d@ -f2 | sort -u | wc -l)
+          if (( distinct_sha_count != 1 )); then
+            echo "::error::CodeQL steps must all use the same SHA."
+            exit 1
+          fi
+
       - name: Setup .NET
         uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6
         with:
           global-json-file: global.json
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@4c0873ef8656cb3c50b3f42fb63bc1ade0cfa827 # v4
+        uses: github/codeql-action/init@ce8b5602e2e75eddc698f13db2342ef698999255 # v4
         with:
           languages: csharp
           build-mode: manual
@@ -49,6 +63,6 @@ jobs:
         run: dotnet build ./Dapper.FluentMap.slnx --configuration Release --no-restore
 
       - name: Analyze
-        uses: github/codeql-action/analyze@4c0873ef8656cb3c50b3f42fb63bc1ade0cfa827 # v4
+        uses: github/codeql-action/analyze@ce8b5602e2e75eddc698f13db2342ef698999255 # v4
         with:
           category: '/language:csharp'

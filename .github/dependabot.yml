@@ -9,10 +9,17 @@ updates:
       timezone: "America/Sao_Paulo"
     open-pull-requests-limit: 5
     groups:
+      # Update init and analyze together, including when pinned to commit SHAs.
+      codeql-action:
+        applies-to: "version-updates"
+        patterns:
+          - "github/codeql-action/*"
       github-actions-minor-patch:
         applies-to: "version-updates"
         patterns:
           - "*"
+        exclude-patterns:
+          - "github/codeql-action/*"
         update-types:
           - "minor"
           - "patch"
