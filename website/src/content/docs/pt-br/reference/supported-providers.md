@@ -43,8 +43,8 @@ O FluentMap registra metadados tipados e os aplica no caminho de materializaçã
 
 | Provider | Core | Dommel | Servidor/runtime testado | Cliente testado |
 | --- | --- | --- | --- | --- |
-| SQLite | Certificado | Certificado | Em memória | `Microsoft.Data.Sqlite` 10.0.14 |
-| SQL Server | Certificado | Certificado | 2022 CU23 | `Microsoft.Data.SqlClient` 7.1.1 |
+| SQLite | Certificado | Certificado | Em memória | `Microsoft.Data.Sqlite` 11.0.0 |
+| SQL Server | Certificado | Certificado | 2022 CU23 | `Microsoft.Data.SqlClient` 7.1.2 |
 | PostgreSQL | Certificado | Certificado | 18.6 | `Npgsql` 10.0.3 |
 | MySQL | Certificado | Certificado | 8.4.11 | `MySqlConnector` 2.6.2 |
 | MariaDB | Certificado | Certificado | 11.8.9 | `MySqlConnector` 2.6.2 |

@@ -6,7 +6,11 @@ The historical archived package history is not reconstructed here. This changelo
 
 ## [Unreleased]
 
-No package changes are recorded beyond the prepared 3.6.1 release.
+### Changed
+
+- Consolidated maintenance updates to the build toolchain (SDK 11.0.100, retaining the `netstandard2.0` public targets), pinned CodeQL actions, test tooling and documentation portal.
+- Aligned runtime and test dependencies across the .NET 11 package proposals, including Microsoft.Bcl.AsyncInterfaces, Microsoft.Extensions.DependencyInjection, SQLite, and verified provider-client versions.
+- Updated certified SQLite (`Microsoft.Data.Sqlite` 11.0.0) and SQL Server (`Microsoft.Data.SqlClient` 7.1.2) client baselines; the provider matrix remains subject to CI validation.
 
 ## [3.6.1] - Prepared for release, not published
 
