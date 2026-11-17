@@ -1,93 +1,64 @@
+# Consolidate routine version updates per repository, instead of per ecosystem.
+# Multi-ecosystem groups apply to version updates; security updates remain
+# independently grouped. Major changes still require human review.
+#
+# Root .NET SDK patch synchronization is owned by the central workflow in
+# rodri-oliveira-dev/.github (.github/workflows/dotnet-sdk-sync.yml).
+# .NET major migrations remain an explicit, manually reviewed decision.
 version: 2
-updates:
-  - package-ecosystem: "github-actions"
-    directory: "/"
+
+multi-ecosystem-groups:
+  weekly-dependencies:
     schedule:
       interval: "weekly"
       day: "monday"
       time: "09:00"
       timezone: "America/Sao_Paulo"
-    open-pull-requests-limit: 5
-    groups:
-      # Update init and analyze together, including when pinned to commit SHAs.
-      codeql-action:
-        applies-to: "version-updates"
-        patterns:
-          - "github/codeql-action/*"
-      github-actions-minor-patch:
-        applies-to: "version-updates"
-        patterns:
-          - "*"
-        exclude-patterns:
-          - "github/codeql-action/*"
-        update-types:
-          - "minor"
-          - "patch"
+    open-pull-requests-limit: 3
     commit-message:
       prefix: "build"
       include: "scope"
 
-  - package-ecosystem: "dotnet-sdk"
+updates:
+  - package-ecosystem: "github-actions"
     directory: "/"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:15"
-      timezone: "America/Sao_Paulo"
-    open-pull-requests-limit: 2
-    commit-message:
-      prefix: "build"
-      include: "scope"
+    patterns:
+      - "*"
+    multi-ecosystem-group: "weekly-dependencies"
+    cooldown:
+      default-days: 7
 
   - package-ecosystem: "nuget"
     directory: "/"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:30"
-      timezone: "America/Sao_Paulo"
-    open-pull-requests-limit: 5
+    patterns:
+      - "*"
+    multi-ecosystem-group: "weekly-dependencies"
+    cooldown:
+      semver-major-days: 14
+      semver-minor-days: 7
+      semver-patch-days: 3
     groups:
-      dotnet-minor-patch:
-        applies-to: "version-updates"
-        patterns:
-          - "*"
-        update-types:
-          - "minor"
-          - "patch"
       dotnet-security:
         applies-to: "security-updates"
         patterns:
           - "*"
-    commit-message:
-      prefix: "build"
-      include: "scope"
 
   - package-ecosystem: "npm"
     directory: "/website"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-      time: "09:45"
-      timezone: "America/Sao_Paulo"
-    open-pull-requests-limit: 5
+    patterns:
+      - "*"
+    multi-ecosystem-group: "weekly-dependencies"
+    cooldown:
+      semver-major-days: 14
+      semver-minor-days: 7
+      semver-patch-days: 3
     # Await Astro checker support before adopting TypeScript 7.
     ignore:
       - dependency-name: "typescript"
         versions:
           - ">=7.0.0"
     groups:
-      npm-minor-patch:
-        applies-to: "version-updates"
-        patterns:
-          - "*"
-        update-types:
-          - "minor"
-          - "patch"
       npm-security:
         applies-to: "security-updates"
         patterns:
           - "*"
-    commit-message:
-      prefix: "build"
-      include: "scope"
