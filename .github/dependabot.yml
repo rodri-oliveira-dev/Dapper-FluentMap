@@ -15,6 +15,9 @@ multi-ecosystem-groups:
       time: "09:00"
       timezone: "America/Sao_Paulo"
     open-pull-requests-limit: 3
+    commit-message:
+      prefix: "build"
+      include: "scope"
 
 updates:
   - package-ecosystem: "github-actions"
@@ -24,9 +27,6 @@ updates:
     multi-ecosystem-group: "weekly-dependencies"
     cooldown:
       default-days: 7
-    commit-message:
-      prefix: "build"
-      include: "scope"
 
   - package-ecosystem: "nuget"
     directory: "/"
@@ -42,9 +42,6 @@ updates:
         applies-to: "security-updates"
         patterns:
           - "*"
-    commit-message:
-      prefix: "build"
-      include: "scope"
 
   - package-ecosystem: "npm"
     directory: "/website"
@@ -65,6 +62,3 @@ updates:
         applies-to: "security-updates"
         patterns:
           - "*"
-    commit-message:
-      prefix: "build"
-      include: "scope"
