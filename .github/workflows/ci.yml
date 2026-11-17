@@ -205,6 +205,9 @@ jobs:
       - name: Test generators
         run: dotnet test ./test/Dapper.FluentMap.Generators.Tests/Dapper.FluentMap.Generators.Tests.csproj --configuration Release
 
+      - name: Build FluentMap Core for .NET 10 consumer smoke
+        run: dotnet build ./src/Dapper.FluentMap/Dapper.FluentMap.csproj --configuration Release --no-restore
+
       # Build and test in the repository SDK above, then verify that the
       # published analyzer binaries also load in the supported SDK 10 host.
       - name: Install .NET 10 consumer compiler
@@ -221,6 +224,7 @@ jobs:
 
           cp ./src/Dapper.FluentMap.Analyzers/bin/Release/netstandard2.0/Dapper.FluentMap.Analyzers.dll "$smoke_dir/"
           cp ./src/Dapper.FluentMap.Generators/bin/Release/netstandard2.0/Dapper.FluentMap.Generators.dll "$smoke_dir/"
+          cp ./src/Dapper.FluentMap/bin/Release/netstandard2.0/Dapper.FluentMap.dll "$smoke_dir/"
 
           sdk10="$(dotnet --list-sdks | awk '$1 ~ /^10[.]0[.]/ { print $1 }' | sort -V | tail -n 1)"
           test -n "$sdk10"
@@ -232,9 +236,13 @@ jobs:
               <TargetFramework>net10.0</TargetFramework>
               <Nullable>enable</Nullable>
               <RunAnalyzersDuringBuild>true</RunAnalyzersDuringBuild>
+              <EmitCompilerGeneratedFiles>true</EmitCompilerGeneratedFiles>
               <WarningsAsErrors>CS9057;CS8032;CS8784;CS8785</WarningsAsErrors>
             </PropertyGroup>
             <ItemGroup>
+              <Reference Include="Dapper.FluentMap">
+                <HintPath>Dapper.FluentMap.dll</HintPath>
+              </Reference>
               <Analyzer Include="Dapper.FluentMap.Analyzers.dll" />
               <Analyzer Include="Dapper.FluentMap.Generators.dll" />
             </ItemGroup>
@@ -247,6 +255,10 @@ jobs:
             echo "Consumer compiler SDK: $(dotnet --version)"
             test "$(dotnet --version)" = "$sdk10"
             dotnet build Consumer.csproj --configuration Release
+            if ! find obj/Release/net10.0 -name DapperFluentMapGeneratedRegistration.g.cs -print -quit | grep -q .; then
+              echo "::error::FluentMap source generator did not produce the expected output with .NET 10."
+              exit 1
+            fi
           )
 
   provider-compatibility:
