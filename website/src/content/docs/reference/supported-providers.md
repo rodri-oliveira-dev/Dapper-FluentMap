@@ -43,8 +43,8 @@ FluentMap registers typed metadata and applies it through the matching materiali
 
 | Provider | Core | Dommel | Tested server/runtime | Tested client |
 | --- | --- | --- | --- | --- |
-| SQLite | Certified | Certified | In-memory | `Microsoft.Data.Sqlite` 10.0.14 |
-| SQL Server | Certified | Certified | 2022 CU23 | `Microsoft.Data.SqlClient` 7.1.1 |
+| SQLite | Certified | Certified | In-memory | `Microsoft.Data.Sqlite` 10.0.15 |
+| SQL Server | Certified | Certified | 2022 CU23 | `Microsoft.Data.SqlClient` 7.1.2 |
 | PostgreSQL | Certified | Certified | 18.6 | `Npgsql` 10.0.3 |
 | MySQL | Certified | Certified | 8.4.11 | `MySqlConnector` 2.6.2 |
 | MariaDB | Certified | Certified | 11.8.9 | `MySqlConnector` 2.6.2 |

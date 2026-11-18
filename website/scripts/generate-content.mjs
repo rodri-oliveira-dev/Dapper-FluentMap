@@ -312,8 +312,8 @@ Consumidores avançados podem usar as APIs públicas \`DommelMapper.AddSqlBuilde
 
 | Provider | Core | Dommel | Tested server/runtime | Tested client |
 | --- | --- | --- | --- | --- |
-| SQLite | Certified | Certified | In-memory | \`Microsoft.Data.Sqlite\` 10.0.14 |
-| SQL Server | Certified | Certified | 2022 CU23 | \`Microsoft.Data.SqlClient\` 7.1.1 |
+| SQLite | Certified | Certified | In-memory | \`Microsoft.Data.Sqlite\` 10.0.15 |
+| SQL Server | Certified | Certified | 2022 CU23 | \`Microsoft.Data.SqlClient\` 7.1.2 |
 | PostgreSQL | Certified | Certified | 18.6 | \`Npgsql\` 10.0.3 |
 | MySQL | Certified | Certified | 8.4.11 | \`MySqlConnector\` 2.6.2 |
 | MariaDB | Certified | Certified | 11.8.9 | \`MySqlConnector\` 2.6.2 |
@@ -333,8 +333,8 @@ The date/time feature has a narrower evidence set: SQLite is verified with ISO t
 
 | Provider | Core | Dommel | Servidor/runtime testado | Cliente testado |
 | --- | --- | --- | --- | --- |
-| SQLite | Certificado | Certificado | Em memória | \`Microsoft.Data.Sqlite\` 10.0.14 |
-| SQL Server | Certificado | Certificado | 2022 CU23 | \`Microsoft.Data.SqlClient\` 7.1.1 |
+| SQLite | Certificado | Certificado | Em memória | \`Microsoft.Data.Sqlite\` 10.0.15 |
+| SQL Server | Certificado | Certificado | 2022 CU23 | \`Microsoft.Data.SqlClient\` 7.1.2 |
 | PostgreSQL | Certificado | Certificado | 18.6 | \`Npgsql\` 10.0.3 |
 | MySQL | Certificado | Certificado | 8.4.11 | \`MySqlConnector\` 2.6.2 |
 | MariaDB | Certificado | Certificado | 11.8.9 | \`MySqlConnector\` 2.6.2 |

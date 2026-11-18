@@ -23,7 +23,7 @@
         "ciFilter": "SQLite",
         "serverVersion": "in-memory",
         "clientPackage": "Microsoft.Data.Sqlite",
-        "clientVersion": "10.0.14"
+        "clientVersion": "10.0.15"
       },
       {
         "id": "sql-server",
@@ -35,7 +35,7 @@
         "ciFilter": "SQL Server",
         "serverVersion": "2022 CU23",
         "clientPackage": "Microsoft.Data.SqlClient",
-        "clientVersion": "7.1.1"
+        "clientVersion": "7.1.2"
       },
       {
         "id": "postgresql",
