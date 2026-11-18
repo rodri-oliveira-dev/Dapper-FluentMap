@@ -27,15 +27,15 @@
     "audit:lighthouse": "node scripts/audit-lighthouse.mjs"
   },
   "dependencies": {
-    "@astrojs/sitemap": "3.7.4",
-    "@astrojs/starlight": "0.42.9",
-    "astro": "7.4.7",
+    "@astrojs/sitemap": "3.7.5",
+    "@astrojs/starlight": "0.42.11",
+    "astro": "7.4.12",
     "sharp": "0.35.5"
   },
   "devDependencies": {
     "@astrojs/check": "0.9.12",
     "chrome-launcher": "1.2.3",
-    "html-validate": "11.18.0",
+    "html-validate": "11.21.0",
     "lighthouse": "13.6.0",
     "pa11y-ci": "5.0.0",
     "typescript": "6.0.3",
