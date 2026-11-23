@@ -51,7 +51,7 @@ jobs:
           global-json-file: global.json
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@3ea37a44b6e4e6847c46edae209410d258d548d1 # v4
+        uses: github/codeql-action/init@38112626f97ac1fd7acf3df7ebca51f4677c1b38 # v4
         with:
           languages: csharp
           build-mode: manual
@@ -63,6 +63,6 @@ jobs:
         run: dotnet build ./Dapper.FluentMap.slnx --configuration Release --no-restore
 
       - name: Analyze
-        uses: github/codeql-action/analyze@3ea37a44b6e4e6847c46edae209410d258d548d1 # v4
+        uses: github/codeql-action/analyze@38112626f97ac1fd7acf3df7ebca51f4677c1b38 # v4
         with:
           category: '/language:csharp'

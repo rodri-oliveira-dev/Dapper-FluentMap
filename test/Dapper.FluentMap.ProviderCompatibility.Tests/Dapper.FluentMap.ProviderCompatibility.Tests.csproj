@@ -6,7 +6,7 @@
     <SqliteClientPackageVersion Condition="'$(SqliteClientPackageVersion)' == ''">10.0.15</SqliteClientPackageVersion>
     <MySqlConnectorPackageVersion Condition="'$(MySqlConnectorPackageVersion)' == ''">2.6.2</MySqlConnectorPackageVersion>
     <NpgsqlPackageVersion Condition="'$(NpgsqlPackageVersion)' == ''">10.0.3</NpgsqlPackageVersion>
-    <OracleManagedDataAccessPackageVersion Condition="'$(OracleManagedDataAccessPackageVersion)' == ''">23.26.400</OracleManagedDataAccessPackageVersion>
+    <OracleManagedDataAccessPackageVersion Condition="'$(OracleManagedDataAccessPackageVersion)' == ''">23.26.401</OracleManagedDataAccessPackageVersion>
     <FirebirdClientPackageVersion Condition="'$(FirebirdClientPackageVersion)' == ''">10.3.4</FirebirdClientPackageVersion>
   </PropertyGroup>
   <ItemGroup>
@@ -21,7 +21,7 @@
     <PackageReference Include="FirebirdSql.Data.FirebirdClient" Version="$(FirebirdClientPackageVersion)" />
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.5" PrivateAssets="all" />
     <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.15" PrivateAssets="all" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.11.1" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.12.0" />
     <PackageReference Include="xunit.v3" Version="4.0.3" />
     <PackageReference Include="xunit.runner.visualstudio" Version="4.0.1">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
