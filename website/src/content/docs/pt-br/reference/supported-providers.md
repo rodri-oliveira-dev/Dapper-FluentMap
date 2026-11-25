@@ -45,7 +45,7 @@ O FluentMap registra metadados tipados e os aplica no caminho de materializaçã
 | --- | --- | --- | --- | --- |
 | SQLite | Certificado | Certificado | Em memória | `Microsoft.Data.Sqlite` 10.0.15 |
 | SQL Server | Certificado | Certificado | 2022 CU23 | `Microsoft.Data.SqlClient` 7.1.2 |
-| PostgreSQL | Certificado | Certificado | 18.6 | `Npgsql` 10.0.3 |
+| PostgreSQL | Certificado | Certificado | 18.6 | `Npgsql` 10.0.4 |
 | MySQL | Certificado | Certificado | 8.4.11 | `MySqlConnector` 2.6.2 |
 | MariaDB | Certificado | Certificado | 11.8.9 | `MySqlConnector` 2.6.2 |
 | Oracle | Certificado | Não certificado | 23.26.0 Free | `Oracle.ManagedDataAccess.Core` 23.26.401 |

@@ -5,7 +5,7 @@
     <SqlClientPackageVersion Condition="'$(SqlClientPackageVersion)' == ''">7.1.2</SqlClientPackageVersion>
     <SqliteClientPackageVersion Condition="'$(SqliteClientPackageVersion)' == ''">10.0.15</SqliteClientPackageVersion>
     <MySqlConnectorPackageVersion Condition="'$(MySqlConnectorPackageVersion)' == ''">2.6.2</MySqlConnectorPackageVersion>
-    <NpgsqlPackageVersion Condition="'$(NpgsqlPackageVersion)' == ''">10.0.3</NpgsqlPackageVersion>
+    <NpgsqlPackageVersion Condition="'$(NpgsqlPackageVersion)' == ''">10.0.4</NpgsqlPackageVersion>
     <OracleManagedDataAccessPackageVersion Condition="'$(OracleManagedDataAccessPackageVersion)' == ''">23.26.401</OracleManagedDataAccessPackageVersion>
     <FirebirdClientPackageVersion Condition="'$(FirebirdClientPackageVersion)' == ''">10.3.4</FirebirdClientPackageVersion>
   </PropertyGroup>
