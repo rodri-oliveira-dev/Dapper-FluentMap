@@ -37,6 +37,15 @@ updates:
       semver-major-days: 14
       semver-minor-days: 7
       semver-patch-days: 3
+    # Roslyn extensions must load on the compiler shipped by the supported SDK.
+    # Review this ceiling when the compiler baseline is deliberately advanced.
+    ignore:
+      - dependency-name: "Microsoft.CodeAnalysis.CSharp"
+        versions:
+          - ">=5.10.0"
+      - dependency-name: "Microsoft.CodeAnalysis.Analyzers"
+        versions:
+          - ">=5.10.0"
     groups:
       dotnet-security:
         applies-to: "security-updates"

@@ -26,7 +26,7 @@ No package changes are recorded beyond the prepared 3.6.1 release.
 - Release preflight now rejects a selected version that diverges from the repository's prepared version while retaining explicit `-p:Version` build and pack inputs.
 - Documented the distinction between the latest published release (`3.6.0`) and the prepared, unpublished release (`3.6.1`).
 - Raised the minimum supported Dapper version to 2.1.89 with package range `[2.1.89,3.0.0)`, and consolidated identical minimum/latest-stable compatibility lanes.
-- Updated certified provider clients to `Microsoft.Data.Sqlite` 10.0.14 and `Oracle.ManagedDataAccess.Core` 23.26.400.
+- Updated certified provider clients to `Microsoft.Data.Sqlite` 10.0.14 and `Oracle.ManagedDataAccess.Core` 23.26.401.
 - Aligned FluentMap-controlled runtime and generated materialization with Dapper 2.1.89 while preserving `netstandard2.0` and the strict-generated Native AOT boundary.
 - Documented the consumer migration from Dapper 2.1.79, the minimum-version range rather than an exact pin, and the upstream ownership of `DynamicParameters`, trimming diagnostics and separate StrongName-package fixes.
 - Limited provider-specific `DateOnly`/`TimeOnly` claims to verified SQLite text conversion, SQL Server `DateTime`/`TimeSpan` values and PostgreSQL native CLR values; no broader provider or universal Native AOT claim is made.
