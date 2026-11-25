@@ -47,7 +47,7 @@
         "ciFilter": "PostgreSQL",
         "serverVersion": "18.6",
         "clientPackage": "Npgsql",
-        "clientVersion": "10.0.3"
+        "clientVersion": "10.0.4"
       },
       {
         "id": "mysql",

@@ -314,7 +314,7 @@ Consumidores avançados podem usar as APIs públicas \`DommelMapper.AddSqlBuilde
 | --- | --- | --- | --- | --- |
 | SQLite | Certified | Certified | In-memory | \`Microsoft.Data.Sqlite\` 10.0.15 |
 | SQL Server | Certified | Certified | 2022 CU23 | \`Microsoft.Data.SqlClient\` 7.1.2 |
-| PostgreSQL | Certified | Certified | 18.6 | \`Npgsql\` 10.0.3 |
+| PostgreSQL | Certified | Certified | 18.6 | \`Npgsql\` 10.0.4 |
 | MySQL | Certified | Certified | 8.4.11 | \`MySqlConnector\` 2.6.2 |
 | MariaDB | Certified | Certified | 11.8.9 | \`MySqlConnector\` 2.6.2 |
 | Oracle | Certified | Not certified | 23.26.0 Free | \`Oracle.ManagedDataAccess.Core\` 23.26.401 |
@@ -335,7 +335,7 @@ The date/time feature has a narrower evidence set: SQLite is verified with ISO t
 | --- | --- | --- | --- | --- |
 | SQLite | Certificado | Certificado | Em memória | \`Microsoft.Data.Sqlite\` 10.0.15 |
 | SQL Server | Certificado | Certificado | 2022 CU23 | \`Microsoft.Data.SqlClient\` 7.1.2 |
-| PostgreSQL | Certificado | Certificado | 18.6 | \`Npgsql\` 10.0.3 |
+| PostgreSQL | Certificado | Certificado | 18.6 | \`Npgsql\` 10.0.4 |
 | MySQL | Certificado | Certificado | 8.4.11 | \`MySqlConnector\` 2.6.2 |
 | MariaDB | Certificado | Certificado | 11.8.9 | \`MySqlConnector\` 2.6.2 |
 | Oracle | Certificado | Não certificado | 23.26.0 Free | \`Oracle.ManagedDataAccess.Core\` 23.26.401 |
