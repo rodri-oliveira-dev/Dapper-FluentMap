@@ -317,7 +317,7 @@ Consumidores avançados podem usar as APIs públicas \`DommelMapper.AddSqlBuilde
 | PostgreSQL | Certified | Certified | 18.6 | \`Npgsql\` 10.0.3 |
 | MySQL | Certified | Certified | 8.4.11 | \`MySqlConnector\` 2.6.2 |
 | MariaDB | Certified | Certified | 11.8.9 | \`MySqlConnector\` 2.6.2 |
-| Oracle | Certified | Not certified | 23.26.0 Free | \`Oracle.ManagedDataAccess.Core\` 23.26.400 |
+| Oracle | Certified | Not certified | 23.26.0 Free | \`Oracle.ManagedDataAccess.Core\` 23.26.401 |
 | Firebird | Certified | Not certified | 5.0.4 | \`FirebirdSql.Data.FirebirdClient\` 10.3.4 |
 | SQL Server CE | Legacy/upstream-limited | Legacy/upstream-limited | Not certified | Not certified |
 
@@ -338,7 +338,7 @@ The date/time feature has a narrower evidence set: SQLite is verified with ISO t
 | PostgreSQL | Certificado | Certificado | 18.6 | \`Npgsql\` 10.0.3 |
 | MySQL | Certificado | Certificado | 8.4.11 | \`MySqlConnector\` 2.6.2 |
 | MariaDB | Certificado | Certificado | 11.8.9 | \`MySqlConnector\` 2.6.2 |
-| Oracle | Certificado | Não certificado | 23.26.0 Free | \`Oracle.ManagedDataAccess.Core\` 23.26.400 |
+| Oracle | Certificado | Não certificado | 23.26.0 Free | \`Oracle.ManagedDataAccess.Core\` 23.26.401 |
 | Firebird | Certificado | Não certificado | 5.0.4 | \`FirebirdSql.Data.FirebirdClient\` 10.3.4 |
 | SQL Server CE | Legado/limitado pelo upstream | Legado/limitado pelo upstream | Não certificado | Não certificado |
 

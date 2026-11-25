@@ -83,7 +83,7 @@
         "ciFilter": "Oracle",
         "serverVersion": "23.26.0 Free",
         "clientPackage": "Oracle.ManagedDataAccess.Core",
-        "clientVersion": "23.26.400"
+        "clientVersion": "23.26.401"
       },
       {
         "id": "firebird",
